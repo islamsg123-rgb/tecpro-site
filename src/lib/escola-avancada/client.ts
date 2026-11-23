@@ -93,7 +93,11 @@ async function chamar<T>(recurso: string, campos: Record<string, string> = {}): 
   if (r.status >= 400) throw new ErroEscolaAvancada(`HTTP ${r.status} em ${recurso}: ${r.texto.slice(0, 300)}`);
   try {
     const json = JSON.parse(r.texto) as EAResposta<T> & Record<string, unknown>;
-    return (json.dados ?? json.data ?? json) as T;
+    // A API responde {"erro": "", "resultado": ...}; "erro" preenchido indica falha.
+    if (typeof json.erro === "string" && json.erro.trim()) {
+      throw new ErroEscolaAvancada(`Escola Avançada recusou ${recurso}: ${json.erro}`);
+    }
+    return (json.resultado ?? json.dados ?? json.data ?? json) as T;
   } catch {
     throw new ErroEscolaAvancada(`Resposta não é JSON em ${recurso}: ${r.texto.slice(0, 300)}`);
   }
@@ -111,6 +115,30 @@ export async function listarAulasRaw(cursoId: string): Promise<EAAulaRaw[]> {
 
 /* ---------- Alunos e matrículas (a Escola Avançada é a fonte oficial) ---------- */
 
+/** Regras da matrícula na Escola Avançada. */
+export const configMatricula = {
+  /** Liberar o certificado da própria Escola Avançada? O site já emite o certificado Tecpro. */
+  certificadoNaEscola: false,
+};
+
+/** Acha o código do aluno na resposta de usuarios/novo, aceitando formatos comuns. */
+function idDoAluno(r: unknown): string {
+  if (typeof r === "string" || typeof r === "number") return String(r).trim();
+  if (Array.isArray(r)) return r.length ? idDoAluno(r[0]) : "";
+  if (r && typeof r === "object") {
+    const o = r as Record<string, unknown>;
+    for (const k of ["id", "aluno", "idaluno", "id_aluno", "usuario", "idusuario", "codigo"]) {
+      const v = o[k];
+      if ((typeof v === "string" || typeof v === "number") && String(v).trim()) return String(v).trim();
+    }
+    for (const v of Object.values(o)) {
+      const dentro = idDoAluno(v);
+      if (dentro && /^\d+$/.test(dentro)) return dentro;
+    }
+  }
+  return "";
+}
+
 export interface NovoAluno {
   nome: string;
   email: string;
@@ -123,16 +151,26 @@ const g = globalThis as unknown as { __vinculosDemo?: Map<string, Set<string>> }
 const vinculosDemo = (g.__vinculosDemo ??= new Map([["sim-demo", new Set(["101", "104"])]]));
 
 /**
- * IDs dos cursos liberados para o aluno, via `usuarios/cursosvinculados`.
- * SUPOSIÇÃO: nome do campo do usuário e formato da resposta. Conferir com a API real.
+ * Cursos liberados para o aluno, via `usuarios/cursosvinculados` (campo confirmado: id_aluno).
+ * A resposta pode não trazer o código do curso; nesse caso devolvemos "nome:<nome do curso>"
+ * e a área do aluno faz a correspondência pelo nome.
  */
 export async function cursosVinculados(usuarioId: string): Promise<string[]> {
   if (usandoDadosDeExemplo) return Array.from(vinculosDemo.get(usuarioId) ?? []);
-  const lista = await chamar<{ curso?: string | number; id?: string | number; situacao?: string }[]>(
-    "usuarios/cursosvinculados",
-    { usuario: usuarioId },
-  );
-  return (lista ?? []).map((c) => String(c.curso ?? c.id));
+  const r = await chamar<unknown>("usuarios/cursosvinculados", { id_aluno: usuarioId });
+  const lista = (Array.isArray(r) ? r : r && typeof r === "object" ? Object.values(r) : []) as Record<string, unknown>[];
+  return lista.flatMap((c) => {
+    if (!c || typeof c !== "object") return [];
+    for (const k of ["idcurso", "id_curso", "curso_id", "curso", "id"]) {
+      const v = c[k];
+      if ((typeof v === "string" || typeof v === "number") && /^\d+$/.test(String(v).trim())) return [String(v).trim()];
+    }
+    const capa = String(c.capa_image ?? c.capa ?? "");
+    const doCapa = capa.match(/imagemcursos\/(\d+)\./)?.[1];
+    if (doCapa) return [doCapa];
+    const nome = String(c.nome ?? c.curso ?? "").trim();
+    return nome ? [`nome:${nome}`] : [];
+  });
 }
 
 /**
@@ -145,6 +183,8 @@ export async function matricularAluno(
   aluno: NovoAluno,
   cursoId: string,
   usuarioIdExistente?: string,
+  /** Prazo de acesso em meses (painel > Configurações); null = vitalício. */
+  mesesDeAcesso: number | null = null,
 ): Promise<{ usuarioId: string; novoVinculo: boolean }> {
   let usuarioId = usuarioIdExistente;
 
@@ -159,17 +199,32 @@ export async function matricularAluno(
   }
 
   if (!usuarioId) {
-    const r = await chamar<{ id?: string | number; usuario?: string | number }>("usuarios/novo", {
+    // Campos confirmados no manual (usuarios/novo).
+    const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+    // Vitalício: a Escola Avançada pede uma data, então usamos uma bem distante.
+    const fim = new Date();
+    if (mesesDeAcesso) fim.setMonth(fim.getMonth() + mesesDeAcesso);
+    const final = mesesDeAcesso ? fim.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : "2099-12-31";
+    const r = await chamar<unknown>("usuarios/novo", {
       nome: aluno.nome,
       email: aluno.email,
       cpf: aluno.cpf,
-      telefone: aluno.telefone,
+      fone: aluno.telefone,
+      status: "ativo",
+      apostila: "liberar",
+      datacadastro: hoje,
+      datafinal: final,
+      certificado: configMatricula.certificadoNaEscola ? "S" : "N",
+      bolsista: "N",
+      funcionario_cadastro: "Site Tecpro",
+      obs: "Cadastro automático pela compra no site Tecpro",
     });
-    usuarioId = String(r.id ?? r.usuario ?? "");
+    usuarioId = idDoAluno(r);
     if (!usuarioId) throw new Error("Escola Avançada não devolveu o código do aluno");
   }
   if ((await cursosVinculados(usuarioId)).includes(cursoId)) return { usuarioId, novoVinculo: false };
-  await chamar("usuarios/vinculocurso", { usuario: usuarioId, curso: cursoId });
-  await chamar("usuarios/envioemail", { usuario: usuarioId });
+  // Campos confirmados no manual: vinculocurso {aluno, idcurso}; envioemail {aluno}.
+  await chamar("usuarios/vinculocurso", { aluno: usuarioId, idcurso: cursoId });
+  await chamar("usuarios/envioemail", { aluno: usuarioId });
   return { usuarioId, novoVinculo: true };
 }

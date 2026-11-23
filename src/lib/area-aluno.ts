@@ -42,7 +42,17 @@ async function montar(email: string, curso: Curso): Promise<CursoDoAluno> {
 /** IDs dos cursos do aluno, consultados na Escola Avançada (fonte oficial das matrículas). */
 async function idsDosCursos(email: string): Promise<string[]> {
   const aluno = await obterAluno(email);
-  return aluno ? cursosVinculados(aluno.eaUsuarioId) : [];
+  if (!aluno) return [];
+  const brutos = await cursosVinculados(aluno.eaUsuarioId);
+  if (!brutos.some((b) => b.startsWith("nome:"))) return brutos;
+  // A Escola Avançada às vezes só informa o nome do curso: casamos pelo nome.
+  const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const cursos = await getCursos();
+  return brutos.flatMap((b) => {
+    if (!b.startsWith("nome:")) return [b];
+    const achado = cursos.find((c) => norm(c.nome) === norm(b.slice(5)));
+    return achado ? [achado.id] : [];
+  });
 }
 
 export async function cursosDoAluno(email: string): Promise<CursoDoAluno[]> {

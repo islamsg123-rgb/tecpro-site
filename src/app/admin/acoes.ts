@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { exigirAdmin } from "@/lib/admin";
 import { getCursos } from "@/lib/cursos";
-import { salvarConfiguracaoCurso } from "@/lib/dados";
+import { salvarConfigLoja, salvarConfiguracaoCurso } from "@/lib/dados";
 
 /** "197,90" / "197.90" / "R$ 197" -> centavos. Vazio -> null. */
 function lerPreco(v: FormDataEntryValue | null): number | null | "invalido" {
@@ -40,4 +40,17 @@ export async function salvarCurso(f: FormData) {
   // Atualiza a vitrine, as páginas de curso e a área do aluno.
   revalidatePath("/", "layout");
   voltar("salvo=1");
+}
+
+/** Configurações gerais (prazo de acesso do aluno). */
+export async function salvarConfiguracoes(f: FormData) {
+  await exigirAdmin();
+  const tipo = String(f.get("prazo"));
+  let meses: number | null = null;
+  if (tipo === "meses") {
+    meses = Number(String(f.get("meses") ?? "").trim());
+    if (!Number.isInteger(meses) || meses < 1 || meses > 120) redirect("/admin/configuracoes?erro=meses");
+  }
+  await salvarConfigLoja({ mesesDeAcesso: meses });
+  redirect("/admin/configuracoes?salvo=1");
 }
