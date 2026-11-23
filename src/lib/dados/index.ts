@@ -303,7 +303,9 @@ export async function registrarEventoMatricula(etapa: string, ok: boolean, detal
 export async function eventosMatricula(): Promise<EventoMatricula[]> {
   if (bancoEmDemonstracao) return gEventos.__eventosDemo ?? [];
   const { data } = await db().from("configuracoes_loja").select("valor").eq("chave", "eventos_matricula").maybeSingle();
-  return Array.isArray(data?.valor) ? (data.valor as EventoMatricula[]) : [];
+  const lista = Array.isArray(data?.valor) ? (data.valor as EventoMatricula[]) : [];
+  // Eventos antigos podem ter a senha devolvida por usuarios/novo: escondemos na leitura.
+  return lista.map((e) => ({ ...e, detalhe: String(e.detalhe).replace(/("senha"\s*:\s*)("[^"]*"|[^,}\s]+)/gi, '$1"***"') }));
 }
 
 export interface AlunoListado extends RegistroAluno {
