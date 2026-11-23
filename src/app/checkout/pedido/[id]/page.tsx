@@ -46,7 +46,7 @@ export default async function Pedido({ params }: Props) {
             </p>
           </div>
         </div>
-        <Link href="/entrar" className="mt-8 inline-flex items-center gap-2 rounded-full bg-laranja-500 px-8 py-4 font-bold text-marca-900 hover:bg-laranja-400">
+        <Link href="/minha-conta" className="mt-8 inline-flex items-center gap-2 rounded-full bg-laranja-500 px-8 py-4 font-bold text-marca-900 hover:bg-laranja-400">
           Ir para a área do aluno <IconeSeta className="h-5 w-5" />
         </Link>
       </section>

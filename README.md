@@ -26,3 +26,9 @@ Para ligar o Asaas:
 
 Quando o pagamento é confirmado, o site cria o aluno na Escola Avançada, libera o curso e dispara o e-mail de acesso (`src/lib/pagamentos/liberacao.ts`).
 Regras de parcelamento: `src/lib/config-loja.ts`.
+
+## Área do aluno (Supabase)
+Cadastro e matrículas ficam na **Escola Avançada** (fonte oficial, via API). O Supabase guarda só:
+o vínculo e-mail ↔ código do aluno na Escola Avançada e as aulas concluídas (`supabase/migrations/0001_banco_minimo.sql`).
+Login por link mágico no e-mail (Supabase Auth). Sem as variáveis do Supabase, roda em **modo demonstração**
+(entra com qualquer e-mail; `aluno@demo.tecpro` já tem dois cursos). Nunca publicar em modo demonstração.

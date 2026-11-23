@@ -21,7 +21,7 @@ export function Rodape() {
         <div className="text-sm">
           <p className="font-semibold text-white">Aluno</p>
           <ul className="mt-4 space-y-3">
-            <li><Link href="/entrar" className="hover:text-white">Área do aluno</Link></li>
+            <li><Link href="/minha-conta" className="hover:text-white">Área do aluno</Link></li>
             <li><Link href="/#duvidas" className="hover:text-white">Dúvidas frequentes</Link></li>
           </ul>
         </div>
