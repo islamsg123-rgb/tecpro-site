@@ -17,66 +17,21 @@ const TOKEN = process.env.ESCOLA_AVANCADA_TOKEN;
 
 export const usandoDadosDeExemplo = !URL_BASE || !TOKEN;
 
+/** Endereço de um recurso. Confirmado no diagnóstico: POST em /api/v2/index.php?recurso, token no formulário. */
+const endereco = (recurso: string) => `${URL_BASE}/api/v2/index.php?${recurso}`;
+
 /** Erro da API da Escola Avançada, com um trecho da resposta para diagnóstico (sem o token). */
 export class ErroEscolaAvancada extends Error {}
 
 /** Resposta crua de um recurso: usada pela página de diagnóstico do painel. */
 export async function respostaCrua(recurso: string, campos: Record<string, string> = {}) {
   const form = new FormData();
-  form.set("token", TOKEN!); // SUPOSIÇÃO: confirmar se o token vai no corpo ou no cabeçalho.
+  form.set("token", TOKEN!); // Confirmado: o token vai no formulário.
   for (const [k, v] of Object.entries(campos)) form.set(k, v);
-  const url = `${URL_BASE}/api/v2/?${recurso}`;
+  const url = endereco(recurso);
   const resp = await fetch(url, { method: "POST", body: form, cache: "no-store" });
   const texto = await resp.text();
   return { url, status: resp.status, texto };
-}
-
-/** Testa várias formas de chamar a API (método e onde vai o token), para o diagnóstico. O token nunca é mostrado. */
-export async function testarVariacoes(recurso: string) {
-  const base = `${URL_BASE}/api/v2/?${recurso}`;
-  const t = TOKEN!;
-  const form = () => {
-    const f = new FormData();
-    f.set("token", t);
-    return f;
-  };
-  const variacoes: { nome: string; url: string; init: RequestInit }[] = [
-    { nome: "POST, token no formulário", url: base, init: { method: "POST", body: form() } },
-    { nome: "GET, token no endereço", url: `${base}&token=${encodeURIComponent(t)}`, init: { method: "GET" } },
-    { nome: "POST, token no endereço", url: `${base}&token=${encodeURIComponent(t)}`, init: { method: "POST" } },
-    { nome: "GET, token no cabeçalho 'token'", url: base, init: { method: "GET", headers: { token: t } } },
-    { nome: "POST, token no cabeçalho 'token'", url: base, init: { method: "POST", headers: { token: t } } },
-    { nome: "GET, Authorization: Bearer", url: base, init: { method: "GET", headers: { Authorization: `Bearer ${t}` } } },
-    {
-      nome: "POST, JSON {token}",
-      url: base,
-      init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: t }) },
-    },
-    { nome: "GET, sem barra antes do ?", url: `${URL_BASE}/api/v2?${recurso}&token=${encodeURIComponent(t)}`, init: { method: "GET" } },
-    { nome: "POST, index.php", url: `${URL_BASE}/api/v2/index.php?${recurso}`, init: { method: "POST", body: form() } },
-    { nome: "POST, caminho /api/v2/recurso", url: `${URL_BASE}/api/v2/${recurso}`, init: { method: "POST", body: form() } },
-    { nome: "POST, ?url=recurso", url: `${URL_BASE}/api/v2/?url=${recurso}`, init: { method: "POST", body: form() } },
-    { nome: "POST, na raiz do domínio", url: `${new URL(URL_BASE!).origin}/api/v2/?${recurso}`, init: { method: "POST", body: form() } },
-    { nome: "GET, só /api/v2/ (sem recurso)", url: `${URL_BASE}/api/v2/`, init: { method: "GET" } },
-    { nome: "GET, só /api/ (sem versão)", url: `${URL_BASE}/api/`, init: { method: "GET" } },
-  ];
-  const resultados = [];
-  for (const v of variacoes) {
-    try {
-      const r = await fetch(v.url, { ...v.init, cache: "no-store", redirect: "manual" });
-      const texto = await r.text();
-      const destino = r.headers.get("location");
-      resultados.push({
-        nome: v.nome,
-        status: r.status,
-        trecho: (destino ? `→ redireciona para: ${destino}  ` : "") + texto.slice(0, 600),
-      });
-    } catch (e) {
-      resultados.push({ nome: v.nome, status: 0, trecho: e instanceof Error ? e.message : String(e) });
-    }
-  }
-  // Garante que o token não aparece no que vai para a tela.
-  return resultados.map((r) => ({ ...r, trecho: r.trecho.split(t).join("•••") }));
 }
 
 /** Acha a lista dentro da resposta, aceitando formatos comuns: [..], {dados:[..]}, {data:[..]}, etc. */
@@ -84,7 +39,7 @@ function extrairLista(json: unknown): unknown[] | null {
   if (Array.isArray(json)) return json;
   if (json && typeof json === "object") {
     const o = json as Record<string, unknown>;
-    for (const chave of ["dados", "data", "cursos", "aulas", "result", "resultado", "items"]) {
+    for (const chave of ["resultado", "dados", "data", "cursos", "aulas", "result", "resultado", "items"]) {
       const v = o[chave];
       if (Array.isArray(v)) return v;
       if (v && typeof v === "object") {
@@ -101,10 +56,10 @@ function extrairLista(json: unknown): unknown[] | null {
 
 async function chamarLista<T>(recurso: string, campos: Record<string, string> = {}, guardarCache = false): Promise<T[]> {
   const form = new FormData();
-  form.set("token", TOKEN!); // SUPOSIÇÃO: confirmar se o token vai no corpo ou no cabeçalho.
+  form.set("token", TOKEN!); // Confirmado: o token vai no formulário.
   for (const [k, v] of Object.entries(campos)) form.set(k, v);
 
-  const resp = await fetch(`${URL_BASE}/api/v2/?${recurso}`, {
+  const resp = await fetch(endereco(recurso), {
     method: "POST",
     body: form,
     // Guarda a resposta por 10 minutos para o site ficar rápido e não sobrecarregar a API.
