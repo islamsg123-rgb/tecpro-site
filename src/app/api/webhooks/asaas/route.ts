@@ -35,6 +35,7 @@ export async function POST(req: Request) {
   if (!EVENTOS_PAGO.has(corpo.event)) return NextResponse.json({ ok: true, ignorado: corpo.event });
 
   const produto = produtoDaReferencia(corpo.payment.externalReference);
+  console.info(`[webhook] ${corpo.event} ${corpo.payment.id} referência=${corpo.payment.externalReference ?? "-"}`);
   if (!produto) return NextResponse.json({ ok: true, ignorado: "sem produto" });
 
   try {
