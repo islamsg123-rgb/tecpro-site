@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { exigirAdmin } from "@/lib/admin";
 import Link from "next/link";
 import { getCursos } from "@/lib/cursos";
 import { listarCarrinhos, listarCupons, mensagensProntas, type Carrinho, type EtapaCarrinho } from "@/lib/dados/carrinhos";
@@ -33,6 +34,7 @@ function quando(iso: string) {
 type Props = { searchParams: Promise<{ ver?: string; mensagens?: string }> };
 
 export default async function Carrinhos({ searchParams }: Props) {
+  await exigirAdmin("vendas");
   const [{ lista, tabelaFaltando }, cursos, mensagens, { lista: cupons }, sp] = await Promise.all([
     listarCarrinhos(), getCursos(), mensagensProntas(), listarCupons(), searchParams,
   ]);

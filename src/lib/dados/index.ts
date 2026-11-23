@@ -298,8 +298,18 @@ export async function salvarConfiguracoesCursos(lista: ConfigCurso[]): Promise<v
 export interface ConfigLoja {
   /** Prazo de acesso do aluno em meses; null = vitalício. */
   mesesDeAcesso: number | null;
+  /** Mostra o botão "Avaliar" (pesquisa de satisfação) nas aulas. */
+  pesquisaNasAulas: boolean;
+  /** Mostra os depoimentos na página inicial. */
+  mostrarDepoimentos: boolean;
+  /** Contatos mostrados no rodapé do site (vazio = não mostra). */
+  whatsapp: string;
+  emailContato: string;
+  instagram: string;
 }
-const CONFIG_LOJA_PADRAO: ConfigLoja = { mesesDeAcesso: null };
+const CONFIG_LOJA_PADRAO: ConfigLoja = {
+  mesesDeAcesso: null, pesquisaNasAulas: true, mostrarDepoimentos: true, whatsapp: "", emailContato: "", instagram: "",
+};
 
 const gLoja = globalThis as unknown as { __configLojaDemo?: ConfigLoja };
 
@@ -473,9 +483,15 @@ export async function ultimaAtividadePorAluno(): Promise<Map<string, string>> {
     return out;
   }
   // Lê do mais recente para o mais antigo: a primeira linha de cada aluno é a última atividade.
-  const { data, error } = await db().from("progresso").select("email, concluida_em").order("concluida_em", { ascending: false }).limit(20000);
-  if (error) throw error;
-  for (const r of data ?? []) if (!out.has(r.email)) out.set(r.email, r.concluida_em);
+  // O Supabase devolve no máximo 1000 linhas por vez: lemos em páginas.
+  for (let de = 0; de < 200_000; de += 1000) {
+    const { data, error } = await db()
+      .from("progresso").select("email, concluida_em")
+      .order("concluida_em", { ascending: false }).order("email").order("aula_id").range(de, de + 999);
+    if (error) throw error;
+    for (const r of data ?? []) if (!out.has(r.email)) out.set(r.email, r.concluida_em);
+    if (!data || data.length < 1000) break;
+  }
   return out;
 }
 
@@ -500,4 +516,28 @@ export async function listarCertificadosPagos(): Promise<{ email: string; cursoI
   const { data, error } = await db().from("certificados_pagos").select("*").order("pago_em", { ascending: false }).limit(1000);
   if (error) throw error;
   return (data ?? []).map((r) => ({ email: r.email, cursoId: r.curso_id, cobrancaId: r.cobranca_id, pagoEm: r.pago_em }));
+}
+
+/** Quantas aulas cada aluno concluiu em cada curso ("email|curso" -> quantidade). Só aulas reais, sem as etapas. */
+export async function aulasConcluidasPorAlunoCurso(): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (bancoEmDemonstracao) {
+    for (const [k, s] of mem.progresso) out.set(k, s.size);
+    return out;
+  }
+  // O Supabase devolve no máximo 1000 linhas por vez: lemos em páginas.
+  const data: { email: string; curso_id: string }[] = [];
+  for (let de = 0; de < 200_000; de += 1000) {
+    const { data: pag, error } = await db()
+      .from("progresso").select("email, curso_id, aula_id").not("aula_id", "like", "%#%")
+      .order("email").order("curso_id").order("aula_id").range(de, de + 999);
+    if (error) throw error;
+    data.push(...(pag ?? []));
+    if (!pag || pag.length < 1000) break;
+  }
+  for (const r of data) {
+    const k = `${r.email}|${r.curso_id}`;
+    out.set(k, (out.get(k) ?? 0) + 1);
+  }
+  return out;
 }

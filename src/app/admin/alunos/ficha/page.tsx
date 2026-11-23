@@ -6,12 +6,36 @@ import { atividadesDoAluno, obterAluno } from "@/lib/dados";
 import { provaDaAula } from "@/lib/provas";
 import { dataBR, diasDesde } from "@/lib/admin-relatorios";
 import { BarraProgresso } from "@/components/aluno/Progresso";
+import { exigirAdmin } from "@/lib/admin";
+import { getCursos } from "@/lib/cursos";
+import { formatarPreco } from "@/lib/formatar";
+import { cobrancasDoEmail, clientePorEmail } from "@/lib/pagamentos";
+import { listarCarrinhos } from "@/lib/dados/carrinhos";
+import { cursosRemovidos, dadosExtrasAluno, listarPesquisas } from "@/lib/dados/painel";
+import { DIAS_PARA_INATIVO } from "@/lib/painel-resumo";
+import { TabelaVendas } from "@/components/admin/TabelaVendas";
+import { EtiquetaAluno } from "@/components/admin/Blocos";
+import { adicionarCursoAluno, removerCursoAluno, salvarDadosAlunoAcao } from "../../acoes";
 import { IconeChevron } from "@/components/Icones";
 
 export const metadata: Metadata = { title: "Ficha do aluno" };
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Promise<{ email?: string }> };
+type Props = { searchParams: Promise<{ email?: string; salvo?: string; erro?: string }> };
+
+const avisos: Record<string, [string, boolean]> = {
+  "salvo:dados": ["Dados salvos.", true],
+  "salvo:curso": ["Curso liberado para o aluno.", true],
+  "salvo:removido": ["Curso removido. O aluno não vê mais esse curso (dá para devolver abaixo).", true],
+  "salvo:devolvido": ["Curso devolvido ao aluno.", true],
+  "salvo:novo": ["Aluno cadastrado e curso liberado.", true],
+  "erro:cpf": ["CPF inválido.", false],
+  "erro:telefone": ["Telefone inválido.", false],
+  "erro:colunas": ["Falta rodar o SQL novo no Supabase (painel-completo.sql) para salvar isso.", false],
+  "erro:banco": ["Não foi possível salvar agora.", false],
+  "erro:curso": ["Escolha um curso.", false],
+  "erro:matricula": ["A Escola Avançada não aceitou a matrícula. Veja o motivo em Alunos > Últimas tentativas de matrícula (no fim da página Alunos). Se faltar CPF ou telefone, preencha os dados acima.", false],
+};
 
 const nomeEtapa: Record<string, string> = { inicio: "abriu a aula", video: "assistiu ao vídeo", prova: "passou na prova" };
 const nomeCert: Record<EstadoCertificado, [string, string]> = {
@@ -22,9 +46,12 @@ const nomeCert: Record<EstadoCertificado, [string, string]> = {
 };
 
 export default async function Ficha({ searchParams }: Props) {
-  const email = String((await searchParams).email ?? "").trim().toLowerCase();
-  const registro = email ? await obterAluno(email) : null;
-  if (!registro) {
+  await exigirAdmin("alunos");
+  const params = await searchParams;
+  const email = String(params.email ?? "").trim().toLowerCase();
+  const [registro, { lista: carrinhosTodos }] = await Promise.all([email ? obterAluno(email) : null, listarCarrinhos(2000)]);
+  const carrinhos = carrinhosTodos.filter((c) => c.email === email);
+  if (!email || (!registro && !carrinhos.length)) {
     return (
       <>
         <Voltar />
@@ -33,19 +60,36 @@ export default async function Ficha({ searchParams }: Props) {
     );
   }
 
-  const [cursos, atividades] = await Promise.all([
-    cursosDoAluno(email).catch(() => null),
+  const [cursos, atividades, extras, asaas, pagamentos, removidos, todosCursos, { lista: pesquisasTodas }] = await Promise.all([
+    registro ? cursosDoAluno(email).catch(() => null) : Promise.resolve([]),
     atividadesDoAluno(email),
+    dadosExtrasAluno(email),
+    clientePorEmail(email),
+    cobrancasDoEmail(email).catch(() => null),
+    cursosRemovidos(email),
+    getCursos(),
+    listarPesquisas(500),
   ]);
+  const pesquisas = pesquisasTodas.filter((p) => p.email === email);
   const certs = cursos ? await Promise.all(cursos.map((c) => situacaoCertificado(email, c))) : [];
   const ultima = atividades[0]?.quando ?? null;
   const dias = diasDesde(ultima);
+  const situacao = dias === null ? "interessado" : dias >= DIAS_PARA_INATIVO ? "inativo" : "ativo";
+  const nome = registro?.nome ?? carrinhos[0]?.nome ?? asaas?.nome ?? email;
+  const telefone = extras.telefone ?? asaas?.telefone ?? carrinhos.find((c) => c.telefone)?.telefone ?? "";
+  const cpf = extras.cpf ?? asaas?.cpf ?? "";
+  const nomeCurso = (id: string) => todosCursos.find((c) => c.id === id)?.nome ?? `curso ${id}`;
+  const idsAtuais = new Set((cursos ?? []).map((c) => c.curso.id));
+  const paraAdicionar = [...todosCursos].filter((c) => !idsAtuais.has(c.id)).sort((a, b) => a.nome.localeCompare(b.nome));
+  const pagos = (pagamentos ?? []).filter((p) => p.situacao === "pago");
+  const aviso = params.salvo ? avisos[`salvo:${params.salvo}`] : params.erro ? avisos[`erro:${params.erro}`] : null;
+  const campo = "mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal";
 
   const tituloAula = (cursoId: string, aulaId: string) => {
     const c = cursos?.find((x) => x.curso.id === cursoId);
     const [id, etapa] = aulaId.split("#");
     const aula = c?.aulas.find((a) => a.id === id);
-    return { curso: c?.curso.nome ?? `curso ${cursoId}`, aula: aula?.titulo ?? `aula ${id}`, etapa: etapa ? nomeEtapa[etapa] ?? etapa : "concluiu a aula" };
+    return { curso: c?.curso.nome ?? nomeCurso(cursoId), aula: aula?.titulo ?? `aula ${id}`, etapa: etapa ? nomeEtapa[etapa] ?? etapa : "concluiu a aula" };
   };
 
   return (
@@ -53,21 +97,59 @@ export default async function Ficha({ searchParams }: Props) {
       <Voltar />
       <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-marca-900">{registro.nome ?? email}</h1>
-          <p className="mt-1 text-sm text-slate-500">{email} · código na Escola Avançada {registro.eaUsuarioId}</p>
+          <h1 className="text-3xl font-extrabold text-marca-900">{nome}</h1>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <EtiquetaAluno s={situacao} />
+            {email}{registro ? ` · código na Escola Avançada ${registro.eaUsuarioId}` : " · ainda sem matrícula"}
+          </p>
         </div>
-        <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-          Última atividade: <strong className="text-marca-900">{ultima ? `${dataBR(ultima)} (${dias === 0 ? "hoje" : `há ${dias} dias`})` : "nunca estudou"}</strong>
-        </p>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">
+            Total pago: <strong className="text-marca-900">{formatarPreco(pagos.reduce((s, p) => s + p.valorCentavos, 0))}</strong>
+          </p>
+          <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">
+            Última atividade: <strong className="text-marca-900">{ultima ? `${dataBR(ultima)} (${dias === 0 ? "hoje" : `há ${dias} dias`})` : "nunca estudou"}</strong>
+          </p>
+          {telefone && (
+            <a href={`https://wa.me/${telefone.replace(/\D/g, "").length <= 11 ? "55" : ""}${telefone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700">
+              WhatsApp
+            </a>
+          )}
+        </div>
       </div>
 
-      <h2 className="mt-10 text-xl font-bold text-marca-900">Cursos</h2>
+      {aviso && (
+        <p className={`mt-6 rounded-2xl border p-4 text-sm ${aviso[1] ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-700"}`}>{aviso[0]}</p>
+      )}
+
+      <h2 id="dados" className="mt-10 scroll-mt-24 text-xl font-bold text-marca-900">Dados do aluno</h2>
+      <form action={salvarDadosAlunoAcao} className="mt-4 grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 text-sm sm:grid-cols-2">
+        <input type="hidden" name="email" value={email} />
+        <label className="font-semibold text-marca-900">Nome<input name="nome" defaultValue={registro?.nome ?? nome} disabled={!registro} className={campo} /></label>
+        <label className="font-semibold text-marca-900">E-mail (login)<input value={email} readOnly className={`${campo} bg-slate-50`} /></label>
+        <label className="font-semibold text-marca-900">CPF<input name="cpf" defaultValue={cpf} disabled={!registro} className={campo} /></label>
+        <label className="font-semibold text-marca-900">Telefone / WhatsApp<input name="telefone" defaultValue={telefone} disabled={!registro} className={campo} /></label>
+        <label className="font-semibold text-marca-900 sm:col-span-2">Observações internas <span className="font-normal text-slate-400">(só a equipe vê)</span>
+          <textarea name="observacoes" rows={2} defaultValue={extras.observacoes ?? ""} disabled={!registro} className={campo} />
+        </label>
+        <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+          {registro ? (
+            <button className="rounded-full bg-marca-900 px-6 py-2.5 font-semibold text-white hover:bg-marca-800">Salvar dados</button>
+          ) : (
+            <p className="text-slate-500">Esta pessoa só preencheu o contato no checkout. Libere um curso abaixo para virar aluno.</p>
+          )}
+          {extras.colunasFaltando && <p className="text-amber-700">Para salvar CPF, telefone e observações, rode o SQL novo no Supabase.</p>}
+          {asaas && <p className="text-xs text-slate-400">CPF e telefone vêm do cadastro de pagamento quando não foram editados aqui.</p>}
+        </div>
+      </form>
+
+      <h2 id="cursos" className="mt-10 scroll-mt-24 text-xl font-bold text-marca-900">Cursos</h2>
       {cursos === null ? (
         <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Não conseguimos consultar os cursos na Escola Avançada agora. Tente de novo em instantes (veja a aba API).
         </p>
       ) : !cursos.length ? (
-        <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">Nenhum curso vinculado.</p>
+        <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">Nenhum curso liberado.</p>
       ) : (
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           {cursos.map((c, i) => {
@@ -102,10 +184,87 @@ export default async function Ficha({ searchParams }: Props) {
                     </dd>
                   </div>
                 </dl>
+                <details className="mt-4 text-sm">
+                  <summary className="cursor-pointer text-xs font-semibold text-slate-400 hover:text-red-600">Remover este curso do aluno</summary>
+                  <form action={removerCursoAluno} className="mt-2 rounded-xl bg-red-50 p-3">
+                    <input type="hidden" name="email" value={email} />
+                    <input type="hidden" name="cursoId" value={c.curso.id} />
+                    <p className="text-xs text-red-800">O aluno deixa de ver este curso no site. O progresso fica guardado e dá para devolver depois.</p>
+                    <button className="mt-2 rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-700">Sim, remover</button>
+                  </form>
+                </details>
               </div>
             );
           })}
         </div>
+      )}
+
+      {removidos.size > 0 && (
+        <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm">
+          <p className="font-semibold text-marca-900">Cursos removidos deste aluno</p>
+          <ul className="mt-2 space-y-2">
+            {Array.from(removidos).map((id) => (
+              <li key={id} className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-slate-600">{nomeCurso(id)}</span>
+                <form action={removerCursoAluno}>
+                  <input type="hidden" name="email" value={email} />
+                  <input type="hidden" name="cursoId" value={id} />
+                  <input type="hidden" name="desfazer" value="1" />
+                  <button className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-marca-900 hover:border-marca-900">Devolver</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <form action={adicionarCursoAluno} className="mt-4 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-5 text-sm">
+        <input type="hidden" name="email" value={email} />
+        <label className="min-w-[240px] flex-1 font-semibold text-marca-900">Liberar outro curso para {registro ? "este aluno" : "esta pessoa"}
+          <select name="cursoId" required defaultValue="" className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-normal">
+            <option value="" disabled>Escolha o curso…</option>
+            {paraAdicionar.map((c) => <option key={c.id} value={c.id}>{c.nome}{removidos.has(c.id) ? " (removido antes)" : ""}</option>)}
+          </select>
+        </label>
+        <button className="rounded-full bg-laranja-500 px-5 py-2.5 font-bold text-marca-900 hover:bg-laranja-400">Liberar curso</button>
+        <p className="w-full text-xs text-slate-500">Libera na Escola Avançada sem cobrança (para bolsas, pagamentos por fora ou correções). O aluno recebe o e-mail de boas-vindas.</p>
+      </form>
+
+      <h2 className="mt-10 text-xl font-bold text-marca-900">Pagamentos</h2>
+      <div className="mt-4">
+        {pagamentos === null ? (
+          <p className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Não conseguimos consultar o Asaas agora.</p>
+        ) : (
+          <TabelaVendas vendas={pagamentos} />
+        )}
+      </div>
+
+      {carrinhos.length > 0 && (
+        <>
+          <h2 className="mt-10 text-xl font-bold text-marca-900">Interesse e checkout</h2>
+          <ul className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
+            {carrinhos.map((c) => (
+              <li key={`${c.cursoId}|${c.tipo}`} className="flex flex-wrap justify-between gap-2 px-5 py-3">
+                <span><strong className="text-marca-900">{c.tipo === "certificado" ? "Certificado de " : ""}{nomeCurso(c.cursoId)}</strong> <span className="text-slate-500">· {c.etapa === "contato" ? "preencheu o contato" : c.etapa === "pagamento" ? "gerou o pagamento" : c.etapa}</span></span>
+                <span className="text-slate-400">{dataBR(c.atualizadoEm)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {pesquisas.length > 0 && (
+        <>
+          <h2 className="mt-10 text-xl font-bold text-marca-900">Pesquisas respondidas</h2>
+          <ul className="mt-4 space-y-2">
+            {pesquisas.map((p) => (
+              <li key={p.id} className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm">
+                <span className="text-laranja-500">{"★".repeat(p.nota)}{"☆".repeat(5 - p.nota)}</span> <span className="text-slate-500">· {p.cursoNome} · {dataBR(p.criadoEm)}</span>
+                {p.comentario && <p className="mt-1 text-slate-700">“{p.comentario}”</p>}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       <h2 className="mt-10 text-xl font-bold text-marca-900">Histórico nas aulas</h2>

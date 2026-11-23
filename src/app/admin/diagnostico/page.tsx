@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { exigirAdmin } from "@/lib/admin";
+import { notFound } from "next/navigation";
 import { respostaCrua, ultimosErros, usandoDadosDeExemplo } from "@/lib/escola-avancada/client";
 import { getCursos } from "@/lib/cursos";
 
@@ -18,6 +20,7 @@ async function testar(recurso: string, campos: Record<string, string> = {}) {
 
 /** Mostra a resposta crua da Escola Avançada para conferirmos os nomes dos campos. O token nunca aparece. */
 export default async function Diagnostico({ searchParams }: Props) {
+  if (!(await exigirAdmin()).dono) notFound();
   if (usandoDadosDeExemplo) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-10">

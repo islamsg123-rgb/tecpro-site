@@ -4,6 +4,8 @@ import { getCursosPublicos } from "@/lib/cursos";
 import { formatarPreco } from "@/lib/formatar";
 import { CartaoCurso } from "@/components/CartaoCurso";
 import { Duvidas } from "@/components/Duvidas";
+import { obterConfigLoja } from "@/lib/dados";
+import { listarDepoimentos } from "@/lib/dados/painel";
 import {
   IconeBusca, IconeCadeado, IconeCategoria, IconeCelular, IconeCertificado, IconeChapeu,
   IconeCheck, IconeCarrinho, IconePix, IconePlay, IconeSeta,
@@ -25,7 +27,11 @@ const perguntas = [
 ];
 
 export default async function Inicio() {
-  const cursos = await getCursosPublicos();
+  const [cursos, loja, { lista: depoimentos }] = await Promise.all([
+    getCursosPublicos(),
+    obterConfigLoja(),
+    listarDepoimentos(true).catch(() => ({ lista: [] })),
+  ]);
   const destaques = cursos.slice(0, 6);
   const categorias = Array.from(new Set(cursos.map((c) => c.categoria)));
   const vitrine = cursos[0];
@@ -252,6 +258,34 @@ export default async function Inicio() {
           </div>
         </div>
       </section>
+
+      {/* ===== DEPOIMENTOS (painel: Loja virtual > Depoimentos) ===== */}
+      {loja.mostrarDepoimentos && depoimentos.length > 0 && (
+        <section id="depoimentos" className="mx-auto max-w-7xl scroll-mt-20 px-4 pt-24 sm:px-6">
+          <div className="text-center">
+            <p className="text-sm font-bold uppercase tracking-widest text-laranja-600">Depoimentos</p>
+            <h2 className="mt-2 text-3xl font-extrabold text-marca-900 sm:text-4xl">O que dizem nossos alunos</h2>
+          </div>
+          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {depoimentos.slice(0, 9).map((d) => (
+              <figure key={d.id} className="flex flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+                <span className="font-display text-5xl leading-none text-laranja-500" aria-hidden>“</span>
+                <blockquote className="mt-2 flex-1 text-slate-700">{d.texto}</blockquote>
+                <figcaption className="mt-6 flex items-center gap-3">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-marca-100 font-bold text-marca-700">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    {d.foto ? <img src={d.foto} alt={`Foto de ${d.nome}`} className="h-full w-full object-cover" /> : d.nome[0]}
+                  </span>
+                  <span>
+                    <span className="block font-bold text-marca-900">{d.nome}</span>
+                    {d.detalhe && <span className="block text-sm text-slate-500">{d.detalhe}</span>}
+                  </span>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ===== DÚVIDAS ===== */}
       <section id="duvidas" className="mx-auto max-w-3xl scroll-mt-20 px-4 py-24 sm:px-6">

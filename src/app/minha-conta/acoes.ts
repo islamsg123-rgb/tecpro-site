@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cursoDoAluno, exigirAluno } from "@/lib/area-aluno";
-import { definirAulaConcluida, marcarEtapa } from "@/lib/dados";
+import { definirAulaConcluida, marcarEtapa, obterAluno } from "@/lib/dados";
+import { registrarPesquisa } from "@/lib/dados/painel";
 import { PCT_MINIMO_VIDEO, situacaoDaAula } from "@/lib/regras-aula";
 import { emitirCertificado, limparNome } from "@/lib/certificados";
 import { corrigir, type ResultadoProva } from "@/lib/provas";
@@ -94,4 +95,34 @@ export async function corrigirProva(
   const r = corrigir(c.curso.nome, i, c.aulas[i].titulo, respostas);
   if (r && r.acertos === r.total) await marcarEtapa(aluno.email, c.curso.id, aulaId, "prova");
   return r;
+}
+
+/* ---------- Pesquisa de satisfação (opcional, botão nas aulas) ---------- */
+
+export async function enviarPesquisa(_: { ok?: boolean; erro?: string }, f: FormData): Promise<{ ok?: boolean; erro?: string }> {
+  const aluno = await exigirAluno();
+  const nota = Number(f.get("nota"));
+  if (!Number.isInteger(nota) || nota < 1 || nota > 5) return { erro: "Escolha de 1 a 5 estrelas." };
+  const rec = String(f.get("recomenda") ?? "");
+  const recomenda = rec === "" ? null : Number(rec);
+  const slug = String(f.get("slug") ?? "");
+  const aulaId = String(f.get("aulaId") ?? "");
+  try {
+    const c = slug ? await cursoDoAluno(aluno.email, slug) : null;
+    const registro = await obterAluno(aluno.email);
+    await registrarPesquisa({
+      email: aluno.email,
+      nome: registro?.nome ?? null,
+      cursoId: c?.curso.id ?? null,
+      cursoNome: c?.curso.nome ?? null,
+      aulaTitulo: c?.aulas.find((a) => a.id === aulaId)?.titulo ?? null,
+      nota,
+      recomenda: recomenda !== null && Number.isInteger(recomenda) && recomenda >= 0 && recomenda <= 10 ? recomenda : null,
+      comentario: String(f.get("comentario") ?? "").trim().slice(0, 1500) || null,
+    });
+    return { ok: true };
+  } catch (e) {
+    console.error("[pesquisa]", e instanceof Error ? e.message : e);
+    return { erro: "Não conseguimos enviar agora. Tente de novo mais tarde." };
+  }
 }

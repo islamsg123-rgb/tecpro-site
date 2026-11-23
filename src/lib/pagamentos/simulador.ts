@@ -55,7 +55,15 @@ export function consultarCobrancaSimulada(id: string): { cobranca: Cobranca; com
 export function listarCobrancasSimuladas(): Cobranca[] {
   return Array.from(banco.values())
     .sort((a, b) => b.criadoEm - a.criadoEm)
-    .map((r) => ({ ...r.cobranca, cliente: r.comprador.nome, criadoEm: new Date(r.criadoEm).toISOString() }));
+    .map((r) => ({
+      ...r.cobranca,
+      cliente: r.comprador.nome,
+      clienteEmail: r.comprador.email.toLowerCase(),
+      clienteTelefone: r.comprador.telefone,
+      criadoEm: new Date(r.criadoEm).toISOString(),
+      pagoEm: r.cobranca.situacao === "pago" ? new Date(r.criadoEm).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : undefined,
+      valorLiquidoCentavos: r.cobranca.situacao === "pago" ? Math.round(r.cobranca.valorCentavos * 0.97) : undefined,
+    }));
 }
 
 export async function pixSimulado(id: string): Promise<DadosPix> {

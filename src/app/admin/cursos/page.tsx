@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { exigirAdmin } from "@/lib/admin";
 import { getCursos } from "@/lib/cursos";
 import { configuracoesDosCursos } from "@/lib/dados";
 import { formatarPreco } from "@/lib/formatar";
@@ -18,6 +19,7 @@ const erros: Record<string, string> = {
 };
 
 export default async function CursosAdmin({ searchParams }: Props) {
+  await exigirAdmin("cursos");
   const [cursos, cfg, sp] = await Promise.all([getCursos(), configuracoesDosCursos(), searchParams]);
 
   return (

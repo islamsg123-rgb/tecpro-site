@@ -62,6 +62,17 @@ export interface Cobranca {
   criadoEm?: string; // AAAA-MM-DD ou data/hora ISO
   /** Nome do cliente, quando disponível (o Asaas só manda o código do cliente na lista) */
   cliente?: string;
+  /** E-mail do cliente, quando disponível */
+  clienteEmail?: string;
+  clienteTelefone?: string;
+  /** Código do cliente no Asaas */
+  clienteId?: string;
+  /** Data em que o dinheiro foi pago (AAAA-MM-DD) */
+  pagoEm?: string;
+  /** Valor que fica para a Tecpro depois das taxas do Asaas, em centavos */
+  valorLiquidoCentavos?: number;
+  /** Parcela (ex.: 2 de 12) quando o cartão é parcelado */
+  parcela?: number;
 }
 
 export interface DadosPix {

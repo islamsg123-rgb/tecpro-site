@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { eventosMatricula } from "@/lib/dados";
-import { alunosComAtividade, diasDesde } from "@/lib/admin-relatorios";
+import { diasDesde } from "@/lib/admin-relatorios";
+import { exigirAdmin } from "@/lib/admin";
+import { getCursos } from "@/lib/cursos";
+import { DIAS_PARA_INATIVO, pessoasDoPainel } from "@/lib/painel-resumo";
+import { EtiquetaAluno, Numero, Titulo } from "@/components/admin/Blocos";
 import { BotaoExportar } from "@/components/admin/BotaoExportar";
 
 export const metadata: Metadata = { title: "Alunos" };
@@ -17,33 +21,43 @@ function data(iso: string | null) {
 
 const filtros = [
   { id: "", rotulo: "Todos" },
-  { id: "nunca", rotulo: "Nunca estudaram" },
+  { id: "ativo", rotulo: "Ativos" },
+  { id: "inativo", rotulo: "Inativos" },
+  { id: "interessado", rotulo: "Interessados" },
   { id: "7", rotulo: "Parados há 7+ dias" },
-  { id: "30", rotulo: "Parados há 30+ dias" },
 ];
 
 type Props = { searchParams: Promise<{ filtro?: string; busca?: string }> };
 
 export default async function Alunos({ searchParams }: Props) {
-  const [todos, eventos, { filtro = "", busca = "" }] = await Promise.all([alunosComAtividade(), eventosMatricula(), searchParams]);
+  await exigirAdmin("alunos");
+  const [todos, eventos, cursos, { filtro = "", busca = "" }] = await Promise.all([pessoasDoPainel(), eventosMatricula(), getCursos(), searchParams]);
   const termo = busca.trim().toLowerCase();
+  const nomeCurso = (id: string | null) => (id ? cursos.find((c) => c.id === id)?.nome ?? "" : "");
+  const conta = (s: string) => todos.filter((p) => p.situacao === s).length;
   const alunos = todos.filter((a) => {
     const dias = diasDesde(a.ultimaAtividade);
-    if (filtro === "nunca" && dias !== null) return false;
-    if ((filtro === "7" || filtro === "30") && (dias === null || dias < Number(filtro))) return false;
-    if (termo && !`${a.nome ?? ""} ${a.email}`.toLowerCase().includes(termo)) return false;
+    if (["ativo", "inativo", "interessado"].includes(filtro) && a.situacao !== filtro) return false;
+    if (filtro === "7" && (dias === null || dias < 7)) return false;
+    if (filtro === "nunca" && (dias !== null || !a.matriculado)) return false;
+    if (termo && !`${a.nome ?? ""} ${a.email} ${a.telefone ?? ""}`.toLowerCase().includes(termo)) return false;
     return true;
   });
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-extrabold text-marca-900">Alunos</h1>
-        <BotaoExportar tipo="alunos" />
+      <Titulo
+        acao={<div className="flex flex-wrap gap-2"><Link href="/admin/alunos/novo" className="rounded-full bg-laranja-500 px-4 py-2 text-sm font-bold text-marca-900 hover:bg-laranja-400">+ Cadastrar aluno</Link><BotaoExportar tipo="alunos" /></div>}
+        descricao={<>Clique no nome para abrir a ficha completa: dados, pagamentos, cursos (adicionar ou remover), progresso e certificados. <strong>Ativo</strong> = estudou nos últimos {DIAS_PARA_INATIVO} dias; <strong>inativo</strong> = parou há mais tempo; <strong>interessado</strong> = se cadastrou, mas ainda não viu nenhuma aula.</>}
+      >
+        Alunos
+      </Titulo>
+      <div className="mb-5 grid gap-3 sm:grid-cols-4">
+        <Numero rotulo="Total" valor={String(todos.length)} detalhe={`${todos.filter((p) => p.matriculado).length} matriculados`} />
+        <Numero rotulo="Ativos" valor={String(conta("ativo"))} cor="verde" href="/admin/alunos?filtro=ativo" />
+        <Numero rotulo="Inativos" valor={String(conta("inativo"))} cor="vermelho" href="/admin/alunos?filtro=inativo" />
+        <Numero rotulo="Interessados" valor={String(conta("interessado"))} cor="laranja" href="/admin/alunos?filtro=interessado" />
       </div>
-      <p className="mt-2 text-sm text-slate-500">
-        Alunos matriculados pelo site ({todos.length}). Clique no nome para ver a ficha: cursos, progresso, provas e certificados.
-      </p>
-      <form className="mt-5 flex flex-wrap items-center gap-2">
+      <form className="flex flex-wrap items-center gap-2">
         {filtros.map((f) => (
           <Link
             key={f.id}
@@ -54,20 +68,20 @@ export default async function Alunos({ searchParams }: Props) {
           </Link>
         ))}
         <input type="hidden" name="filtro" value={filtro} />
-        <input name="busca" defaultValue={busca} placeholder="Buscar nome ou e-mail" className="ml-auto w-full rounded-full border border-slate-300 bg-white px-4 py-2 text-sm sm:w-64" />
+        <input name="busca" defaultValue={busca} placeholder="Buscar nome, e-mail ou telefone" className="ml-auto w-full rounded-full border border-slate-300 bg-white px-4 py-2 text-sm sm:w-72" />
       </form>
       {!alunos.length ? (
         <p className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
-          {todos.length ? "Nenhum aluno neste filtro." : "Nenhum aluno matriculado pelo site ainda."}
+          {todos.length ? "Ninguém neste filtro." : "Nenhum aluno ainda."}
         </p>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-5 py-3 font-semibold">Nome</th>
-                <th className="px-5 py-3 font-semibold">E-mail</th>
-                <th className="px-5 py-3 font-semibold">Código na Escola Avançada</th>
+                <th className="px-5 py-3 font-semibold">Contato</th>
+                <th className="px-5 py-3 font-semibold">Situação</th>
                 <th className="px-5 py-3 font-semibold">Desde</th>
                 <th className="px-5 py-3 font-semibold">Última atividade</th>
               </tr>
@@ -79,15 +93,12 @@ export default async function Alunos({ searchParams }: Props) {
                     <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(a.email)}`} className="text-marca-900 underline decoration-laranja-500 underline-offset-4 hover:text-marca-700">
                       {a.nome ?? a.email}
                     </Link>
+                    {!a.matriculado && a.cursoInteresse && <span className="block text-xs font-normal text-slate-500">olhou: {nomeCurso(a.cursoInteresse)}</span>}
                   </td>
-                  <td className="px-5 py-3 text-slate-600">{a.email}</td>
-                  <td className="px-5 py-3">
-                    <Link href={`/admin/diagnostico?aluno=${encodeURIComponent(a.eaUsuarioId)}`} className="text-marca-700 underline">
-                      {a.eaUsuarioId}
-                    </Link>
-                  </td>
-                  <td className="whitespace-nowrap px-5 py-3 text-slate-500">{data(a.criadoEm)}</td>
-                  <td className="whitespace-nowrap px-5 py-3"><Atividade iso={a.ultimaAtividade} /></td>
+                  <td className="px-5 py-3 text-slate-600">{a.email}{a.telefone && <span className="block text-xs text-slate-500">{a.telefone}</span>}</td>
+                  <td className="px-5 py-3"><EtiquetaAluno s={a.situacao} />{!a.matriculado && <span className="ml-1 text-xs text-slate-400">sem matrícula</span>}</td>
+                  <td className="whitespace-nowrap px-5 py-3 text-slate-500">{data(a.desde)}</td>
+                  <td className="whitespace-nowrap px-5 py-3">{a.matriculado ? <Atividade iso={a.ultimaAtividade} /> : <span className="text-xs text-slate-400">—</span>}</td>
                 </tr>
               ))}
             </tbody>
