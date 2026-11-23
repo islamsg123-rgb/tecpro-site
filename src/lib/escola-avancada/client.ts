@@ -8,7 +8,11 @@ import { aulasMock, cursosMock } from "./mock";
  * O token fica só no servidor; o navegador do visitante nunca o vê.
  */
 
-const URL_BASE = process.env.ESCOLA_AVANCADA_URL?.replace(/\/$/, "");
+// Aceita a variável com ou sem "/api/v2/?..." no fim: guarda só o começo do endereço.
+const URL_BASE = process.env.ESCOLA_AVANCADA_URL?.trim()
+  .replace(/\?.*$/, "")
+  .replace(/\/api\/v2\/?$/i, "")
+  .replace(/\/+$/, "");
 const TOKEN = process.env.ESCOLA_AVANCADA_TOKEN;
 
 export const usandoDadosDeExemplo = !URL_BASE || !TOKEN;
