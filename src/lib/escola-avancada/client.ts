@@ -109,7 +109,8 @@ async function chamar<T>(recurso: string, campos: Record<string, string> = {}): 
 async function chamarComLog<T>(recurso: string, campos: Record<string, string> = {}): Promise<T> {
   try {
     const r = await chamar<T>(recurso, campos);
-    const texto = JSON.stringify(r).slice(0, 500);
+    // Nunca guardar a senha que a Escola Avançada devolve em usuarios/novo.
+    const texto = JSON.stringify(r, (k, v) => (/^(senha|password|pass)$/i.test(k) ? "***" : v)).slice(0, 500);
     console.info(`[escola-avancada] ${recurso} respondeu:`, texto);
     await registrarEventoMatricula(recurso, true, `respondeu: ${texto}`);
     return r;
@@ -160,7 +161,7 @@ function idDoAluno(r: unknown): string {
   if (Array.isArray(r)) return r.length ? idDoAluno(r[0]) : "";
   if (r && typeof r === "object") {
     const o = r as Record<string, unknown>;
-    for (const k of ["id", "aluno", "idaluno", "id_aluno", "usuario", "idusuario", "codigo"]) {
+    for (const k of ["login", "id", "aluno", "idaluno", "id_aluno", "usuario", "idusuario", "codigo"]) {
       const v = o[k];
       if ((typeof v === "string" || typeof v === "number") && String(v).trim()) return String(v).trim();
     }
