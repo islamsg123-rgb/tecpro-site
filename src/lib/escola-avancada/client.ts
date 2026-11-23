@@ -139,6 +139,21 @@ export const configMatricula = {
   certificadoNaEscola: false,
 };
 
+const semAcento = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+/**
+ * A Escola Avançada responde {"erro": ""} mesmo quando recusa, com a explicação em "resultado"
+ * (ex.: "Curso não existe no banco de dados, verifique o ID informado.").
+ * Devolve a mensagem quando ela indica falha.
+ */
+function mensagemDeFalha(r: unknown): string | null {
+  const texto = typeof r === "string" ? r : r && typeof r === "object" && !Array.isArray(r) ? Object.values(r).find((v) => typeof v === "string") : null;
+  if (typeof texto !== "string") return null;
+  const t = semAcento(texto);
+  if (/ja esta matriculado/.test(t)) return null;
+  return /nao existe|nao enviado|nao encontrad|verifique|invalid|erro|falh/.test(t) ? texto : null;
+}
+
 /** Acha o código do aluno na resposta de usuarios/novo, aceitando formatos comuns. */
 function idDoAluno(r: unknown): string {
   if (typeof r === "string" || typeof r === "number") return String(r).trim();
@@ -177,8 +192,11 @@ export async function cursosVinculados(usuarioId: string): Promise<string[]> {
   if (usandoDadosDeExemplo) return Array.from(vinculosDemo.get(usuarioId) ?? []);
   const r = await chamarComLog<unknown>("usuarios/cursosvinculados", { id_aluno: usuarioId });
   const lista = (Array.isArray(r) ? r : r && typeof r === "object" ? Object.values(r) : []) as Record<string, unknown>[];
-  return lista.flatMap((c) => {
-    if (!c || typeof c !== "object") return [];
+  return lista.flatMap((original) => {
+    if (!original || typeof original !== "object") return [];
+    // A API devolve chaves como "Curso" e "Situação": comparamos sem maiúsculas e sem acentos.
+    const c: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(original)) c[semAcento(k)] = v;
     for (const k of ["idcurso", "id_curso", "curso_id", "curso", "id"]) {
       const v = c[k];
       if ((typeof v === "string" || typeof v === "number") && /^\d+$/.test(String(v).trim())) return [String(v).trim()];
@@ -205,6 +223,8 @@ export async function matricularAluno(
   mesesDeAcesso: number | null = null,
   /** Chamado logo depois de criar o aluno, para guardar o código antes das próximas etapas. */
   aoCriarAluno?: (usuarioId: string) => Promise<void>,
+  /** Nome do curso: a lista de cursos do aluno na Escola Avançada só traz o nome. */
+  cursoNome?: string,
 ): Promise<{ usuarioId: string; novoVinculo: boolean }> {
   let usuarioId = usuarioIdExistente;
 
@@ -244,9 +264,20 @@ export async function matricularAluno(
     // Guarda já: se uma etapa seguinte falhar, a nova tentativa do Asaas não cria o aluno de novo.
     await aoCriarAluno?.(usuarioId);
   }
-  if ((await cursosVinculados(usuarioId)).includes(cursoId)) return { usuarioId, novoVinculo: false };
+  const vinculados = await cursosVinculados(usuarioId);
+  const jaTem =
+    vinculados.includes(cursoId) ||
+    (cursoNome ? vinculados.some((v) => v.startsWith("nome:") && semAcento(v.slice(5)) === semAcento(cursoNome)) : false);
+  if (jaTem) return { usuarioId, novoVinculo: false };
   // Campos confirmados no manual: vinculocurso {aluno, idcurso}; envioemail {aluno}.
-  await chamarComLog("usuarios/vinculocurso", { aluno: usuarioId, idcurso: cursoId });
-  await chamarComLog("usuarios/envioemail", { aluno: usuarioId });
+  const vinculo = await chamarComLog("usuarios/vinculocurso", { aluno: usuarioId, idcurso: cursoId });
+  const falhaVinculo = mensagemDeFalha(vinculo);
+  if (falhaVinculo) throw new ErroEscolaAvancada(`Curso ${cursoId} não foi vinculado: ${falhaVinculo}`);
+  const email = await chamarComLog("usuarios/envioemail", { aluno: usuarioId });
+  const falhaEmail = mensagemDeFalha(email);
+  if (falhaEmail) {
+    // O curso já está liberado; só o e-mail da Escola Avançada falhou. Registramos sem bloquear.
+    await registrarEventoMatricula("usuarios/envioemail", false, `Curso liberado, mas o e-mail de acesso falhou: ${falhaEmail}`);
+  }
   return { usuarioId, novoVinculo: true };
 }

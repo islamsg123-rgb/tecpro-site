@@ -2,6 +2,7 @@ import "server-only";
 import { matricularAluno } from "../escola-avancada/client";
 import { obterAluno, obterConfigLoja, registrarEventoMatricula, salvarAluno } from "../dados";
 import { liberarCertificadoPago } from "../certificados";
+import { getCursos } from "../cursos";
 import type { Comprador, Produto } from "./tipos";
 
 /**
@@ -27,13 +28,15 @@ export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cu
   emAndamento.add(cobrancaId);
   console.info(`[liberacao] cobrança ${cobrancaId}: matriculando ${comprador.email} no curso ${cursoId}`);
   try {
-    const [existente, loja] = await Promise.all([obterAluno(comprador.email), obterConfigLoja()]);
+    const [existente, loja, cursos] = await Promise.all([obterAluno(comprador.email), obterConfigLoja(), getCursos()]);
+    const cursoNome = cursos.find((c) => c.id === cursoId)?.nome;
     const { novoVinculo } = await matricularAluno(
       comprador,
       cursoId,
       existente?.eaUsuarioId,
       loja.mesesDeAcesso,
       (usuarioId) => salvarAluno({ email: comprador.email, eaUsuarioId: usuarioId, nome: comprador.nome }),
+      cursoNome,
     );
     if (novoVinculo) console.info(`[liberacao] cobrança ${cobrancaId}: curso ${cursoId} liberado para ${comprador.email}`);
     await registrarEventoMatricula(
