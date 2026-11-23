@@ -267,20 +267,27 @@ export async function configuracoesDosCursos(): Promise<Map<string, ConfigCurso>
 }
 
 export async function salvarConfiguracaoCurso(c: ConfigCurso): Promise<void> {
+  await salvarConfiguracoesCursos([c]);
+}
+
+/** Salva vários cursos de uma vez (uma só chamada ao banco). */
+export async function salvarConfiguracoesCursos(lista: ConfigCurso[]): Promise<void> {
+  if (!lista.length) return;
   if (bancoEmDemonstracao) {
-    configs().set(c.cursoId, c);
+    for (const c of lista) configs().set(c.cursoId, c);
     return;
   }
+  const agora = new Date().toISOString();
   const { error } = await db().from("configuracoes_curso").upsert(
-    {
+    lista.map((c) => ({
       curso_id: c.cursoId,
       preco_centavos: c.precoCentavos,
       visivel: c.visivel,
       destaque: c.destaque,
       certificado_modo: c.certificadoModo,
       certificado_preco_centavos: c.certificadoPrecoCentavos,
-      atualizado_em: new Date().toISOString(),
-    },
+      atualizado_em: agora,
+    })),
     { onConflict: "curso_id" },
   );
   if (error) throw error;
@@ -382,4 +389,115 @@ export async function contagens(): Promise<{ alunos: number; certificados: numbe
     db().from("certificados").select("*", { count: "exact", head: true }),
   ]);
   return { alunos: a.count ?? 0, certificados: c.count ?? 0 };
+}
+
+/* ---------- Cursos gratuitos ----------
+ * Guardados em configuracoes_loja (chave "cursos_gratuitos"), assim não é preciso mudar o banco. */
+
+const gGratis = globalThis as unknown as { __gratisDemo?: string[] };
+
+export async function cursosGratuitos(): Promise<Set<string>> {
+  if (bancoEmDemonstracao) return new Set(gGratis.__gratisDemo ?? []);
+  const { data, error } = await db().from("configuracoes_loja").select("valor").eq("chave", "cursos_gratuitos").maybeSingle();
+  if (error) {
+    console.error("[dados] cursos_gratuitos", error.message);
+    return new Set();
+  }
+  return new Set(Array.isArray(data?.valor) ? (data.valor as string[]).map(String) : []);
+}
+
+export async function definirCursoGratuito(cursoId: string, gratuito: boolean): Promise<void> {
+  const atual = await cursosGratuitos();
+  if (gratuito === atual.has(cursoId)) return;
+  if (gratuito) atual.add(cursoId);
+  else atual.delete(cursoId);
+  await definirCursosGratuitos(Array.from(atual));
+}
+
+/** Substitui a lista inteira de cursos gratuitos. */
+export async function definirCursosGratuitos(ids: string[]): Promise<void> {
+  const lista = Array.from(new Set(ids.map(String))).sort();
+  if (bancoEmDemonstracao) {
+    gGratis.__gratisDemo = lista;
+    return;
+  }
+  const { error } = await db()
+    .from("configuracoes_loja")
+    .upsert({ chave: "cursos_gratuitos", valor: lista, atualizado_em: new Date().toISOString() }, { onConflict: "chave" });
+  if (error) throw error;
+}
+
+/* ---------- Relatórios do painel ---------- */
+
+export interface Atividade {
+  email: string;
+  cursoId: string;
+  /** id da aula, ou "id#etapa" (inicio, video, prova) */
+  aulaId: string;
+  quando: string;
+}
+
+/** Tudo o que o aluno fez nas aulas (aulas concluídas e etapas), mais recente primeiro. */
+export async function atividadesDoAluno(emailAluno: string): Promise<Atividade[]> {
+  const email = norm(emailAluno);
+  if (bancoEmDemonstracao) {
+    const out: Atividade[] = [];
+    for (const [k, aulas] of mem.progresso) {
+      const [e, cursoId] = k.split("|");
+      if (e === email) for (const aulaId of aulas) out.push({ email, cursoId, aulaId, quando: new Date().toISOString() });
+    }
+    for (const [k, d] of mem.etapas ?? []) {
+      const [e, cursoId, aulaId] = k.split("|");
+      if (e === email) out.push({ email, cursoId, aulaId, quando: d.toISOString() });
+    }
+    return out.sort((a, b) => b.quando.localeCompare(a.quando));
+  }
+  const { data, error } = await db()
+    .from("progresso")
+    .select("curso_id, aula_id, concluida_em")
+    .eq("email", email)
+    .order("concluida_em", { ascending: false })
+    .limit(5000);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ email, cursoId: r.curso_id, aulaId: r.aula_id, quando: r.concluida_em }));
+}
+
+/** Data da última atividade de cada aluno nas aulas (para achar quem parou de estudar). */
+export async function ultimaAtividadePorAluno(): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (bancoEmDemonstracao) {
+    for (const email of mem.alunos.keys()) {
+      const a = await atividadesDoAluno(email);
+      if (a[0]) out.set(email, a[0].quando);
+    }
+    return out;
+  }
+  // Lê do mais recente para o mais antigo: a primeira linha de cada aluno é a última atividade.
+  const { data, error } = await db().from("progresso").select("email, concluida_em").order("concluida_em", { ascending: false }).limit(20000);
+  if (error) throw error;
+  for (const r of data ?? []) if (!out.has(r.email)) out.set(r.email, r.concluida_em);
+  return out;
+}
+
+export interface CertificadoListado extends Certificado {}
+
+/** Certificados emitidos (mais recentes primeiro). */
+export async function listarCertificados(limite = 500): Promise<Certificado[]> {
+  if (bancoEmDemonstracao) return Array.from(certs().values()).sort((a, b) => b.emitidoEm.localeCompare(a.emitidoEm));
+  const { data, error } = await db().from("certificados").select("*").order("emitido_em", { ascending: false }).limit(limite);
+  if (error) throw error;
+  return (data ?? []).map((r) => daLinha(r as LinhaCert));
+}
+
+/** Certificados pagos (cobrança confirmada), emitidos ou não. */
+export async function listarCertificadosPagos(): Promise<{ email: string; cursoId: string; cobrancaId: string; pagoEm: string }[]> {
+  if (bancoEmDemonstracao) {
+    return Array.from(certPagos(), ([k, cobrancaId]) => {
+      const [email, cursoId] = k.split("|");
+      return { email, cursoId, cobrancaId, pagoEm: new Date().toISOString() };
+    });
+  }
+  const { data, error } = await db().from("certificados_pagos").select("*").order("pago_em", { ascending: false }).limit(1000);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ email: r.email, cursoId: r.curso_id, cobrancaId: r.cobranca_id, pagoEm: r.pago_em }));
 }

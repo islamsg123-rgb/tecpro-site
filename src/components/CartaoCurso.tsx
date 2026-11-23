@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Curso } from "@/lib/types";
 import { CapaCurso } from "./CapaCurso";
-import { formatarPreco } from "@/lib/formatar";
+import { precoDoCurso } from "@/lib/formatar";
 import { IconeCertificado, IconeRelogio, IconeSeta } from "./Icones";
 
 export function CartaoCurso({ curso }: { curso: Curso }) {
@@ -24,7 +24,7 @@ export function CartaoCurso({ curso }: { curso: Curso }) {
           <span className="flex items-center gap-1.5"><IconeCertificado className="h-4 w-4" /> Certificado</span>
         </div>
         <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-5">
-          <span className="font-display text-2xl font-bold text-marca-900">{formatarPreco(curso.precoCentavos)}</span>
+          <span className="font-display text-2xl font-bold text-marca-900">{precoDoCurso(curso)}</span>
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-marca-900 text-white transition group-hover:bg-laranja-500 group-hover:text-marca-900">
             <IconeSeta className="h-5 w-5" />
           </span>

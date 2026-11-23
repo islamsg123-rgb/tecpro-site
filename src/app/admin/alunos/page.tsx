@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { eventosMatricula, listarAlunos } from "@/lib/dados";
+import { eventosMatricula } from "@/lib/dados";
+import { alunosComAtividade, diasDesde } from "@/lib/admin-relatorios";
+import { BotaoExportar } from "@/components/admin/BotaoExportar";
 
 export const metadata: Metadata = { title: "Alunos" };
 export const dynamic = "force-dynamic";
@@ -13,17 +15,50 @@ function data(iso: string | null) {
   return iso ? new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—";
 }
 
-export default async function Alunos() {
-  const [alunos, eventos] = await Promise.all([listarAlunos(), eventosMatricula()]);
+const filtros = [
+  { id: "", rotulo: "Todos" },
+  { id: "nunca", rotulo: "Nunca estudaram" },
+  { id: "7", rotulo: "Parados há 7+ dias" },
+  { id: "30", rotulo: "Parados há 30+ dias" },
+];
+
+type Props = { searchParams: Promise<{ filtro?: string; busca?: string }> };
+
+export default async function Alunos({ searchParams }: Props) {
+  const [todos, eventos, { filtro = "", busca = "" }] = await Promise.all([alunosComAtividade(), eventosMatricula(), searchParams]);
+  const termo = busca.trim().toLowerCase();
+  const alunos = todos.filter((a) => {
+    const dias = diasDesde(a.ultimaAtividade);
+    if (filtro === "nunca" && dias !== null) return false;
+    if ((filtro === "7" || filtro === "30") && (dias === null || dias < Number(filtro))) return false;
+    if (termo && !`${a.nome ?? ""} ${a.email}`.toLowerCase().includes(termo)) return false;
+    return true;
+  });
   return (
     <>
-      <h1 className="text-3xl font-extrabold text-marca-900">Alunos</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-extrabold text-marca-900">Alunos</h1>
+        <BotaoExportar tipo="alunos" />
+      </div>
       <p className="mt-2 text-sm text-slate-500">
-        Alunos matriculados pelo site. O cadastro completo e os cursos de cada um ficam no painel da Escola Avançada.
+        Alunos matriculados pelo site ({todos.length}). Clique no nome para ver a ficha: cursos, progresso, provas e certificados.
       </p>
+      <form className="mt-5 flex flex-wrap items-center gap-2">
+        {filtros.map((f) => (
+          <Link
+            key={f.id}
+            href={f.id ? `/admin/alunos?filtro=${f.id}` : "/admin/alunos"}
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${filtro === f.id ? "bg-marca-900 text-white" : "border border-slate-200 bg-white text-slate-600 hover:border-marca-900"}`}
+          >
+            {f.rotulo}
+          </Link>
+        ))}
+        <input type="hidden" name="filtro" value={filtro} />
+        <input name="busca" defaultValue={busca} placeholder="Buscar nome ou e-mail" className="ml-auto w-full rounded-full border border-slate-300 bg-white px-4 py-2 text-sm sm:w-64" />
+      </form>
       {!alunos.length ? (
         <p className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">
-          Nenhum aluno matriculado pelo site ainda.
+          {todos.length ? "Nenhum aluno neste filtro." : "Nenhum aluno matriculado pelo site ainda."}
         </p>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
@@ -34,12 +69,17 @@ export default async function Alunos() {
                 <th className="px-5 py-3 font-semibold">E-mail</th>
                 <th className="px-5 py-3 font-semibold">Código na Escola Avançada</th>
                 <th className="px-5 py-3 font-semibold">Desde</th>
+                <th className="px-5 py-3 font-semibold">Última atividade</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {alunos.map((a) => (
                 <tr key={a.email} className="hover:bg-marca-50/50">
-                  <td className="px-5 py-3 font-medium text-marca-900">{a.nome ?? "—"}</td>
+                  <td className="px-5 py-3 font-medium">
+                    <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(a.email)}`} className="text-marca-900 underline decoration-laranja-500 underline-offset-4 hover:text-marca-700">
+                      {a.nome ?? a.email}
+                    </Link>
+                  </td>
                   <td className="px-5 py-3 text-slate-600">{a.email}</td>
                   <td className="px-5 py-3">
                     <Link href={`/admin/diagnostico?aluno=${encodeURIComponent(a.eaUsuarioId)}`} className="text-marca-700 underline">
@@ -47,6 +87,7 @@ export default async function Alunos() {
                     </Link>
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">{data(a.criadoEm)}</td>
+                  <td className="whitespace-nowrap px-5 py-3"><Atividade iso={a.ultimaAtividade} /></td>
                 </tr>
               ))}
             </tbody>
@@ -82,4 +123,11 @@ export default async function Alunos() {
       )}
     </>
   );
+}
+
+function Atividade({ iso }: { iso: string | null }) {
+  const dias = diasDesde(iso);
+  if (dias === null) return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">nunca estudou</span>;
+  const cor = dias >= 30 ? "bg-red-100 text-red-700" : dias >= 7 ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800";
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cor}`}>{dias === 0 ? "hoje" : dias === 1 ? "ontem" : `há ${dias} dias`}</span>;
 }

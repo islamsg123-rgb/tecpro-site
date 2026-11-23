@@ -15,6 +15,8 @@ export interface Curso {
   visivel: boolean;
   /** Vai para o topo e para "Mais procurados" (painel de administração) */
   destaque: boolean;
+  /** Curso gratuito: matrícula sem pagamento; só o certificado é cobrado no final (painel de administração) */
+  gratuito: boolean;
   capaUrl: string | null;
   cargaHoraria: number;
   categoria: string;

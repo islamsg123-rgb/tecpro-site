@@ -20,7 +20,12 @@ export function CartaoCertificado({
         <IconeCertificado className="h-8 w-8 text-laranja-500" />
         <h2 className="mt-3 text-lg font-bold">Certificado</h2>
         <p className="mt-1 text-sm text-slate-300">
-          {pago && s.regra.modo === "pago" ? `Emissão: ${formatarPreco(s.regra.precoCentavos)}` : "Grátis ao concluir o curso"}
+          {/* O valor do certificado pago só aparece depois que o aluno conclui o curso. */}
+          {!pago
+            ? "Grátis ao concluir o curso"
+            : s.estado === "aguardando_pagamento" && s.regra.modo === "pago"
+              ? `Emissão: ${formatarPreco(s.regra.precoCentavos)}`
+              : "Disponível ao concluir o curso"}
         </p>
       </div>
       <div className="p-6">

@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatarPreco, getCursoPublicoPorSlug } from "@/lib/cursos";
+import { precoDoCurso, getCursoPublicoPorSlug } from "@/lib/cursos";
 import { opcoesParcelas } from "@/lib/config-loja";
 import { pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { CapaCurso } from "@/components/CapaCurso";
 import { FormularioCheckout } from "@/components/checkout/FormularioCheckout";
+import { FormularioGratis } from "@/components/checkout/FormularioGratis";
+import { alunoLogado } from "@/lib/auth";
+import { obterAluno } from "@/lib/dados";
 import { IconeCadeado, IconeCertificado, IconeCheck, IconeChevron, IconeRelogio } from "@/components/Icones";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -15,6 +18,9 @@ export const metadata: Metadata = { title: "Finalizar matrícula", robots: { ind
 export default async function Checkout({ params }: Props) {
   const curso = await getCursoPublicoPorSlug((await params).slug);
   if (!curso) notFound();
+  const gratis = curso.gratuito;
+  const logado = gratis ? await alunoLogado() : null;
+  const registro = logado ? await obterAluno(logado.email).catch(() => null) : null;
 
   return (
     <div className="bg-[#f3f6fb]">
@@ -27,7 +33,7 @@ export default async function Checkout({ params }: Props) {
           <IconeCadeado className="h-4 w-4 text-green-600" /> Ambiente seguro. Seus dados são protegidos.
         </p>
 
-        {pagamentoEmSimulacao && (
+        {!gratis && pagamentoEmSimulacao && (
           <div className="mt-6 rounded-2xl border border-laranja-500/40 bg-laranja-300/20 p-4 text-sm text-marca-900">
             <strong>Modo de teste:</strong> nenhum valor será cobrado. Use qualquer CPF válido.
             No cartão, qualquer número válido é aprovado; o 4000 0000 0000 0002 simula recusa. O Pix é “pago” sozinho em 20 segundos.
@@ -35,7 +41,11 @@ export default async function Checkout({ params }: Props) {
         )}
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px] lg:items-start">
-          <FormularioCheckout cursoId={curso.id} precoCentavos={curso.precoCentavos} parcelas={opcoesParcelas(curso.precoCentavos)} />
+          {gratis ? (
+            <FormularioGratis cursoId={curso.id} emailInicial={logado?.email} nomeInicial={registro?.nome ?? undefined} />
+          ) : (
+            <FormularioCheckout cursoId={curso.id} precoCentavos={curso.precoCentavos} parcelas={opcoesParcelas(curso.precoCentavos)} />
+          )}
 
           <aside className="order-first overflow-hidden rounded-3xl border border-slate-200 bg-white lg:sticky lg:top-24 lg:order-none">
             <div className="flex gap-4 p-5 lg:block lg:p-0">
@@ -52,7 +62,7 @@ export default async function Checkout({ params }: Props) {
             </div>
             <div className="hidden px-6 pt-5 lg:block">
               <ul className="space-y-2.5 text-sm text-slate-600">
-                {["Acesso liberado após o pagamento", "Aulas no celular e computador", "Estude no seu ritmo"].map((t) => (
+                {[gratis ? "Acesso liberado na hora" : "Acesso liberado após o pagamento", "Aulas no celular e computador", "Estude no seu ritmo"].map((t) => (
                   <li key={t} className="flex items-center gap-2"><IconeCheck className="h-4 w-4 text-laranja-600" /> {t}</li>
                 ))}
                 <li className="flex items-center gap-2"><IconeCertificado className="h-4 w-4 text-laranja-600" /> Certificado de conclusão</li>
@@ -60,7 +70,7 @@ export default async function Checkout({ params }: Props) {
             </div>
             <div className="mx-5 mb-5 mt-1 flex items-center justify-between border-t border-slate-100 pt-4 lg:mx-6 lg:mb-6 lg:mt-6 lg:pt-5">
               <span className="font-semibold text-slate-600">Total</span>
-              <span className="font-display text-2xl font-extrabold text-marca-900">{formatarPreco(curso.precoCentavos)}</span>
+              <span className="font-display text-2xl font-extrabold text-marca-900">{precoDoCurso(curso)}</span>
             </div>
           </aside>
         </div>

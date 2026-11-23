@@ -16,7 +16,7 @@ const formasBase: { id: Forma; rotulo: string; detalhe: string; Icone: typeof Ic
   { id: "BOLETO", rotulo: "Boleto", detalhe: "Até 3 dias úteis", Icone: IconeCodigoBarras },
 ];
 
-function Campo({
+export function Campo({
   nome, rotulo, erro, className = "", mascara, ...resto
 }: {
   nome: string;

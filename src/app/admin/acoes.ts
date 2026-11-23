@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { exigirAdmin } from "@/lib/admin";
 import { getCursos } from "@/lib/cursos";
-import { registrarEventoMatricula, salvarConfigLoja, salvarConfiguracaoCurso } from "@/lib/dados";
+import { configuracoesDosCursos, definirCursoGratuito, definirCursosGratuitos, registrarEventoMatricula, salvarConfigLoja, salvarConfiguracaoCurso, salvarConfiguracoesCursos } from "@/lib/dados";
 import { asaasConfigurado, cobrancaParaLiberacao } from "@/lib/pagamentos/asaas";
 import { processarPagamento } from "@/lib/pagamentos/liberacao";
 
@@ -28,8 +28,11 @@ export async function salvarCurso(f: FormData) {
   const precoCert = lerPreco(f.get("certificadoPreco"));
   const voltar = (q: string) => redirect(`/admin/cursos?${q}&curso=${cursoId}#curso-${cursoId}`);
 
+  const gratuito = f.get("gratuito") === "on";
   if (preco === "invalido") voltar("erro=preco");
   if (modo === "pago" && (precoCert === null || precoCert === "invalido")) voltar("erro=certificado");
+  // Curso gratuito: o que se cobra é o certificado no final, então ele precisa ter valor.
+  if (gratuito && modo !== "pago") voltar("erro=gratuito");
 
   await salvarConfiguracaoCurso({
     cursoId,
@@ -39,9 +42,39 @@ export async function salvarCurso(f: FormData) {
     certificadoModo: modo === "pago" ? "pago" : "gratis",
     certificadoPrecoCentavos: modo === "pago" ? (precoCert as number) : null,
   });
+  await definirCursoGratuito(cursoId, gratuito);
   // Atualiza a vitrine, as páginas de curso e a área do aluno.
   revalidatePath("/", "layout");
   voltar("salvo=1");
+}
+
+/** Deixa todos os cursos gratuitos (com certificado pago) ou volta todos a pagos. */
+export async function gratuitoEmMassa(f: FormData) {
+  await exigirAdmin();
+  const cursos = await getCursos();
+  if (String(f.get("acao")) === "pagos") {
+    await definirCursosGratuitos([]);
+  } else {
+    const precoCert = lerPreco(f.get("certificadoPreco"));
+    if (precoCert === null || precoCert === "invalido") redirect("/admin/cursos?erro=massa");
+    const cfg = await configuracoesDosCursos();
+    await salvarConfiguracoesCursos(
+      cursos.map((c) => {
+        const atual = cfg.get(c.id);
+        return {
+          cursoId: c.id,
+          precoCentavos: atual?.precoCentavos ?? null,
+          visivel: atual?.visivel ?? c.visivel,
+          destaque: atual?.destaque ?? c.destaque,
+          certificadoModo: "pago" as const,
+          certificadoPrecoCentavos: precoCert as number,
+        };
+      }),
+    );
+    await definirCursosGratuitos(cursos.map((c) => c.id));
+  }
+  revalidatePath("/", "layout");
+  redirect("/admin/cursos?massa=1");
 }
 
 /** Configurações gerais (prazo de acesso do aluno). */
