@@ -1,39 +1,55 @@
 import "server-only";
-import afterEffects from "@/data/conteudo-escola/69.json";
+import todos from "@/data/conteudo-escola/cursos.json";
 
 /**
- * Vídeos e apostilas dos cursos da Escola Avançada.
- * A API deles não entrega isso, então o conteúdo foi lido da Área do Aluno e guardado aqui
- * (um arquivo por curso, em src/data/conteudo-escola). As aulas seguem a mesma ordem do curso.
- * Piloto: só After Effects (curso 69).
+ * Vídeos, apostilas e provas dos cursos da Escola Avançada.
+ * A API deles não entrega isso: o conteúdo foi lido da Área do Aluno (aluno de teste com todos
+ * os cursos) e guardado em src/data/conteudo-escola/cursos.json. Para atualizar, repetir a leitura.
  */
 
 export interface ConteudoAula {
+  /** Código da aula na Escola Avançada */
   aulaEscola: string;
-  tipo: "video" | "slides";
-  embed: string;
+  titulo: string;
+  tipo: "video" | "slides" | "outro";
+  embed: string | null;
 }
 
 interface ConteudoCurso {
-  curso: string;
+  nome: string;
   apostila: string | null;
   aulas: ConteudoAula[];
 }
 
-const CURSOS: Record<string, ConteudoCurso> = {
-  "69": afterEffects as ConteudoCurso,
-};
+const CURSOS = todos as unknown as Record<string, ConteudoCurso>;
 
 // Só aceitamos players destes endereços.
-const PERMITIDOS = /^https:\/\/([a-z0-9-]+\.tv\.pandavideo\.com\.br|drive\.google\.com|docs\.google\.com)\//;
+const PERMITIDOS =
+  /^https:\/\/([a-z0-9-]+\.tv\.pandavideo\.com\.br|drive\.google\.com|docs\.google\.com|www\.youtube\.com|www\.youtube-nocookie\.com|player\.vimeo\.com)\//;
 
-/** Conteúdo da aula pela posição dela no curso (0 = primeira aula). */
-export function conteudoDaAula(cursoId: string, posicao: number): ConteudoAula | null {
-  const a = CURSOS[cursoId]?.aulas[posicao];
-  return a && PERMITIDOS.test(a.embed) ? a : null;
+const norm = (t: string) =>
+  t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/**
+ * Conteúdo da aula. Procura pelo título (o mais seguro); se não achar, usa a posição no curso.
+ */
+export function conteudoDaAula(cursoId: string, posicao: number, titulo?: string): ConteudoAula | null {
+  const curso = CURSOS[cursoId];
+  if (!curso) return null;
+  let a: ConteudoAula | undefined;
+  if (titulo) {
+    const alvo = norm(titulo);
+    a = curso.aulas.find((x) => norm(x.titulo) === alvo);
+  }
+  a ??= curso.aulas[posicao];
+  return a && a.embed && PERMITIDOS.test(a.embed) ? a : null;
 }
 
 export function apostilaDoCurso(cursoId: string): string | null {
   const url = CURSOS[cursoId]?.apostila ?? null;
   return url && url.startsWith("https://") ? url : null;
+}
+
+export function temConteudo(cursoId: string): boolean {
+  return Boolean(CURSOS[cursoId]?.aulas.length);
 }

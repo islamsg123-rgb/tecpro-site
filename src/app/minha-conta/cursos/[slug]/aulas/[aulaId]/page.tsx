@@ -22,7 +22,7 @@ export default async function Aula({ params }: Props) {
   const anterior = c.aulas[i - 1];
   const proxima = c.aulas[i + 1];
   const feita = c.concluidas.has(aula.id);
-  const conteudo = conteudoDaAula(c.curso.id, i);
+  const conteudo = conteudoDaAula(c.curso.id, i, aula.titulo);
   const apostila = apostilaDoCurso(c.curso.id);
   const link = (id: string) => `/minha-conta/cursos/${slug}/aulas/${encodeURIComponent(id)}`;
 
@@ -36,7 +36,7 @@ export default async function Aula({ params }: Props) {
         {conteudo ? (
           <div className="mt-4 aspect-video overflow-hidden rounded-3xl bg-marca-950">
             <iframe
-              src={conteudo.embed}
+              src={conteudo.embed ?? undefined}
               title={aula.titulo}
               className="h-full w-full border-0"
               allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
