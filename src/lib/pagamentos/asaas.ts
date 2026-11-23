@@ -73,8 +73,21 @@ export function paraCobranca(p: Json): Cobranca {
 
 /** Procura o cliente pelo CPF; se não existir, cria. */
 async function obterCliente(c: Comprador): Promise<string> {
-  const busca = await chamar<{ data?: { id: string }[] }>(`/customers?cpfCnpj=${c.cpf}`);
-  if (busca.data?.[0]) return busca.data[0].id;
+  const busca = await chamar<{ data?: { id: string; name?: string; email?: string; mobilePhone?: string }[] }>(
+    `/customers?cpfCnpj=${c.cpf}`,
+  );
+  const existente = busca.data?.[0];
+  if (existente) {
+    // Mesmo CPF com outro nome/e-mail: atualiza o cliente, porque a matrícula usa o e-mail
+    // cadastrado no Asaas. Sem isso, o curso seria liberado no e-mail antigo.
+    if (existente.email !== c.email || existente.name !== c.nome || existente.mobilePhone !== c.telefone) {
+      await chamar(`/customers/${encodeURIComponent(existente.id)}`, {
+        method: "POST",
+        body: { name: c.nome, email: c.email, mobilePhone: c.telefone },
+      });
+    }
+    return existente.id;
+  }
   const novo = await chamar<{ id: string }>("/customers", {
     method: "POST",
     body: { name: c.nome, email: c.email, cpfCnpj: c.cpf, mobilePhone: c.telefone },
@@ -136,7 +149,21 @@ export async function consultarCobrancaAsaas(id: string): Promise<Cobranca | nul
 /** Últimas cobranças da conta (mais recentes primeiro), para o painel. */
 export async function listarCobrancasAsaas(limite = 50): Promise<Cobranca[]> {
   const r = await chamar<{ data?: Json[] }>(`/payments?limit=${limite}&offset=0`);
-  return (r.data ?? []).map(paraCobranca);
+  const pagamentos = r.data ?? [];
+  // A lista do Asaas só traz o código do cliente; buscamos o nome de cada cliente uma vez.
+  const ids = Array.from(new Set(pagamentos.map((p) => String(p.customer ?? "")).filter(Boolean)));
+  const nomes = new Map<string, string>();
+  await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const c = await chamar<Json>(`/customers/${encodeURIComponent(id)}`);
+        nomes.set(id, [c.name, c.email].filter(Boolean).join(" · "));
+      } catch {
+        /* sem nome: a tabela mostra "—" */
+      }
+    }),
+  );
+  return pagamentos.map((p) => ({ ...paraCobranca(p), cliente: nomes.get(String(p.customer)) || undefined }));
 }
 
 export async function pixAsaas(id: string): Promise<DadosPix> {
