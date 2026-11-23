@@ -66,6 +66,8 @@ export function paraCobranca(p: Json): Cobranca {
     produto: produtoDaReferencia(p.externalReference),
     vencimento: String(p.dueDate),
     linkFatura: (p.bankSlipUrl as string) || (p.invoiceUrl as string) || undefined,
+    descricao: (p.description as string) || undefined,
+    criadoEm: (p.dateCreated as string) || undefined,
   };
 }
 
@@ -129,6 +131,12 @@ export async function consultarCobrancaAsaas(id: string): Promise<Cobranca | nul
   } catch {
     return null;
   }
+}
+
+/** Últimas cobranças da conta (mais recentes primeiro), para o painel. */
+export async function listarCobrancasAsaas(limite = 50): Promise<Cobranca[]> {
+  const r = await chamar<{ data?: Json[] }>(`/payments?limit=${limite}&offset=0`);
+  return (r.data ?? []).map(paraCobranca);
 }
 
 export async function pixAsaas(id: string): Promise<DadosPix> {

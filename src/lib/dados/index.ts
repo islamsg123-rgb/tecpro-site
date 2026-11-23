@@ -25,6 +25,7 @@ function db(): SupabaseClient {
 
 /* ---------- Demonstração (memória) ---------- */
 interface Memoria {
+  configuracoes?: Map<string, ConfigCurso>;
   certificadosPagos?: Map<string, string>; // "email|curso" -> cobrança
   certificados?: Map<string, Certificado>; // código -> certificado
   alunos: Map<string, { eaUsuarioId: string; nome: string | null }>;
@@ -172,4 +173,76 @@ export async function gravarCertificado(c: Certificado): Promise<Certificado> {
     throw error;
   }
   return novo;
+}
+
+/* ---------- Configurações do painel (por curso) ---------- */
+
+export interface ConfigCurso {
+  cursoId: string;
+  /** null = usa o preço da Escola Avançada */
+  precoCentavos: number | null;
+  visivel: boolean;
+  destaque: boolean;
+  /** null = padrão do site (grátis) */
+  certificadoModo: "gratis" | "pago" | null;
+  certificadoPrecoCentavos: number | null;
+}
+
+// Demonstração: o curso 104 com certificado pago, para mostrar os dois casos.
+const configs = () =>
+  (mem.configuracoes ??= new Map([
+    ["104", { cursoId: "104", precoCentavos: null, visivel: true, destaque: false, certificadoModo: "pago", certificadoPrecoCentavos: 2990 }],
+  ]));
+
+export async function configuracoesDosCursos(): Promise<Map<string, ConfigCurso>> {
+  if (bancoEmDemonstracao) return new Map(configs());
+  const { data, error } = await db().from("configuracoes_curso").select("*");
+  if (error) {
+    // Se o banco cair, a vitrine continua no ar com os dados da Escola Avançada.
+    console.error("[dados] configuracoes_curso", error.message);
+    return new Map();
+  }
+  return new Map(
+    (data ?? []).map((r) => [
+      r.curso_id as string,
+      {
+        cursoId: r.curso_id,
+        precoCentavos: r.preco_centavos,
+        visivel: r.visivel,
+        destaque: r.destaque,
+        certificadoModo: r.certificado_modo,
+        certificadoPrecoCentavos: r.certificado_preco_centavos,
+      } satisfies ConfigCurso,
+    ]),
+  );
+}
+
+export async function salvarConfiguracaoCurso(c: ConfigCurso): Promise<void> {
+  if (bancoEmDemonstracao) {
+    configs().set(c.cursoId, c);
+    return;
+  }
+  const { error } = await db().from("configuracoes_curso").upsert(
+    {
+      curso_id: c.cursoId,
+      preco_centavos: c.precoCentavos,
+      visivel: c.visivel,
+      destaque: c.destaque,
+      certificado_modo: c.certificadoModo,
+      certificado_preco_centavos: c.certificadoPrecoCentavos,
+      atualizado_em: new Date().toISOString(),
+    },
+    { onConflict: "curso_id" },
+  );
+  if (error) throw error;
+}
+
+/** Totais simples para a visão geral do painel. */
+export async function contagens(): Promise<{ alunos: number; certificados: number }> {
+  if (bancoEmDemonstracao) return { alunos: mem.alunos.size, certificados: certs().size };
+  const [a, c] = await Promise.all([
+    db().from("alunos").select("*", { count: "exact", head: true }),
+    db().from("certificados").select("*", { count: "exact", head: true }),
+  ]);
+  return { alunos: a.count ?? 0, certificados: c.count ?? 0 };
 }

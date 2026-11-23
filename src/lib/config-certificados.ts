@@ -1,19 +1,22 @@
+import "server-only";
+import { configuracoesDosCursos } from "./dados";
+
 /**
- * Regras do certificado de cada curso. Ajuste aqui (depois, pelo painel de administração).
+ * Regra do certificado de cada curso. É definida no painel de administração (/admin/cursos).
  *  - "gratis": liberado quando o aluno conclui todas as aulas.
  *  - "pago":   o aluno conclui as aulas e paga o valor para emitir.
- * EXEMPLO: o curso 104 (Design, dos dados de teste) está como pago para mostrar os dois casos.
+ * Curso sem configuração usa o PADRÃO abaixo.
  */
 
 export type RegraCertificado = { modo: "gratis" } | { modo: "pago"; precoCentavos: number };
 
-export const configCertificados: { padrao: RegraCertificado; porCurso: Record<string, RegraCertificado> } = {
-  padrao: { modo: "gratis" },
-  porCurso: {
-    "104": { modo: "pago", precoCentavos: 2990 },
-  },
-};
+export const regraPadrao: RegraCertificado = { modo: "gratis" };
 
-export function regraDoCertificado(cursoId: string): RegraCertificado {
-  return configCertificados.porCurso[cursoId] ?? configCertificados.padrao;
+export async function regraDoCertificado(cursoId: string): Promise<RegraCertificado> {
+  const cfg = (await configuracoesDosCursos()).get(cursoId);
+  if (cfg?.certificadoModo === "pago" && cfg.certificadoPrecoCentavos) {
+    return { modo: "pago", precoCentavos: cfg.certificadoPrecoCentavos };
+  }
+  if (cfg?.certificadoModo === "gratis") return { modo: "gratis" };
+  return regraPadrao;
 }

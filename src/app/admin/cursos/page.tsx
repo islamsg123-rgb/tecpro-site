@@ -1,0 +1,108 @@
+import type { Metadata } from "next";
+import { getCursos } from "@/lib/cursos";
+import { configuracoesDosCursos } from "@/lib/dados";
+import { formatarPreco } from "@/lib/formatar";
+import { salvarCurso } from "../acoes";
+import { CapaCurso } from "@/components/CapaCurso";
+
+export const metadata: Metadata = { title: "Cursos" };
+
+type Props = { searchParams: Promise<{ salvo?: string; erro?: string; curso?: string }> };
+
+const reais = (c: number | null | undefined) => (c ? (c / 100).toFixed(2).replace(".", ",") : "");
+
+const erros: Record<string, string> = {
+  preco: "Preço inválido. Use um valor como 197,00 (mínimo R$ 5,00), ou deixe vazio para usar o preço da Escola Avançada.",
+  certificado: "Para certificado pago, informe o valor (mínimo R$ 5,00).",
+};
+
+export default async function CursosAdmin({ searchParams }: Props) {
+  const [cursos, cfg, sp] = await Promise.all([getCursos(), configuracoesDosCursos(), searchParams]);
+
+  return (
+    <>
+      <h1 className="text-3xl font-extrabold text-marca-900">Cursos</h1>
+      <p className="mt-2 max-w-3xl text-sm text-slate-500">
+        Nome, descrição e aulas vêm da Escola Avançada. Aqui você ajusta o que é da Tecpro: preço de venda, se o curso aparece no site,
+        se fica em destaque e a regra do certificado.
+      </p>
+
+      <div className="mt-8 space-y-4">
+        {cursos.map((c) => {
+          const ajuste = cfg.get(c.id);
+          const certPago = ajuste?.certificadoModo === "pago";
+          const desteCurso = sp.curso === c.id;
+          return (
+            <form
+              key={c.id}
+              id={`curso-${c.id}`}
+              action={salvarCurso}
+              className={`scroll-mt-24 overflow-hidden rounded-2xl border bg-white ${desteCurso && sp.salvo ? "border-green-400 ring-4 ring-green-100" : "border-slate-200"}`}
+            >
+              <input type="hidden" name="cursoId" value={c.id} />
+              <div className="grid gap-6 p-5 lg:grid-cols-[180px_1fr_1fr_1fr_auto] lg:items-start">
+                <div className="flex gap-4 lg:block">
+                  <div className="w-28 shrink-0 overflow-hidden rounded-xl lg:w-full"><CapaCurso curso={c} comTitulo={false} /></div>
+                  <div className="lg:mt-3">
+                    <p className="font-bold leading-snug text-marca-900">{c.nome}</p>
+                    <p className="text-xs text-slate-500">{c.categoria} · {c.cargaHoraria}h · código {c.id}</p>
+                  </div>
+                </div>
+
+                <label className="block">
+                  <span className="block text-sm font-semibold text-marca-900">Preço de venda (R$)</span>
+                  <input
+                    name="preco"
+                    inputMode="decimal"
+                    defaultValue={reais(ajuste?.precoCentavos)}
+                    placeholder={reais(c.precoEscolaCentavos)}
+                    className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2.5 outline-none focus:border-marca-500 focus:ring-4 focus:ring-marca-100"
+                  />
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Vazio = preço da Escola Avançada ({formatarPreco(c.precoEscolaCentavos)})
+                  </span>
+                </label>
+
+                <fieldset className="space-y-3">
+                  <legend className="text-sm font-semibold text-marca-900">Vitrine</legend>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" name="visivel" defaultChecked={c.visivel} className="h-4 w-4 accent-[#011749]" /> Mostrar no site
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" name="destaque" defaultChecked={c.destaque} className="h-4 w-4 accent-[#ffa500]" /> Destaque (aparece primeiro)
+                  </label>
+                </fieldset>
+
+                <fieldset>
+                  <legend className="text-sm font-semibold text-marca-900">Certificado</legend>
+                  <select
+                    name="certificadoModo"
+                    defaultValue={certPago ? "pago" : "gratis"}
+                    className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
+                  >
+                    <option value="gratis">Grátis ao concluir</option>
+                    <option value="pago">Pago</option>
+                  </select>
+                  <input
+                    name="certificadoPreco"
+                    inputMode="decimal"
+                    defaultValue={reais(ajuste?.certificadoPrecoCentavos)}
+                    placeholder="Valor se for pago, ex.: 29,90"
+                    aria-label="Valor do certificado"
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-marca-500 focus:ring-4 focus:ring-marca-100"
+                  />
+                </fieldset>
+
+                <div className="lg:pt-6">
+                  <button className="w-full rounded-full bg-marca-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-marca-800">Salvar</button>
+                </div>
+              </div>
+              {desteCurso && sp.salvo && <p className="border-t border-green-100 bg-green-50 px-5 py-2.5 text-sm font-medium text-green-800">Salvo. O site já foi atualizado.</p>}
+              {desteCurso && sp.erro && <p className="border-t border-red-100 bg-red-50 px-5 py-2.5 text-sm font-medium text-red-700">{erros[sp.erro] ?? "Não foi possível salvar."}</p>}
+            </form>
+          );
+        })}
+      </div>
+    </>
+  );
+}

@@ -1,10 +1,10 @@
 import "server-only";
 import type { Cobranca, DadosBoleto, DadosPix, NovaCobranca } from "./tipos";
 import {
-  asaasConfigurado, boletoAsaas, consultarCobrancaAsaas, criarCobrancaAsaas, pixAsaas,
+  asaasConfigurado, boletoAsaas, consultarCobrancaAsaas, criarCobrancaAsaas, listarCobrancasAsaas, pixAsaas,
 } from "./asaas";
 import {
-  boletoSimulado, consultarCobrancaSimulada, criarCobrancaSimulada, pixSimulado,
+  boletoSimulado, consultarCobrancaSimulada, criarCobrancaSimulada, listarCobrancasSimuladas, pixSimulado,
 } from "./simulador";
 import { processarPagamento } from "./liberacao";
 
@@ -33,6 +33,13 @@ export async function consultarCobranca(id: string): Promise<Cobranca | null> {
     return r.cobranca;
   }
   return consultarCobrancaAsaas(id);
+}
+
+export async function listarCobrancas(): Promise<Cobranca[]> {
+  if (!pagamentoEmSimulacao) return listarCobrancasAsaas();
+  // Na simulação, consulta as pendentes antes (é isso que "paga" o Pix e libera o curso).
+  for (const c of listarCobrancasSimuladas()) if (c.situacao === "aguardando") await consultarCobranca(c.id);
+  return listarCobrancasSimuladas();
 }
 
 export async function dadosPix(id: string): Promise<DadosPix> {

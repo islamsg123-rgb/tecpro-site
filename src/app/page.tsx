@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getCursos } from "@/lib/cursos";
+import { getCursosPublicos } from "@/lib/cursos";
 import { formatarPreco } from "@/lib/formatar";
 import { CartaoCurso } from "@/components/CartaoCurso";
 import { Duvidas } from "@/components/Duvidas";
@@ -25,7 +25,7 @@ const perguntas = [
 ];
 
 export default async function Inicio() {
-  const cursos = await getCursos();
+  const cursos = await getCursosPublicos();
   const destaques = cursos.slice(0, 6);
   const categorias = Array.from(new Set(cursos.map((c) => c.categoria)));
   const vitrine = cursos[0];

@@ -37,3 +37,9 @@ Login por link mágico no e-mail (Supabase Auth). Sem as variáveis do Supabase,
 Emitidos pelo próprio site em PDF (`src/lib/certificado-pdf.ts`), com código e página pública de validação (`/validar`).
 Regra por curso em `src/lib/config-certificados.ts`: grátis ao concluir ou pago (o pagamento usa o mesmo checkout do Asaas).
 Tabelas: `supabase/migrations/0002_certificados.sql`.
+
+## Painel de administração (`/admin`)
+Entra quem estiver em `ADMIN_EMAILS` (mesmo login por link). Em modo demonstração: `admin@demo.tecpro`.
+- **Cursos**: preço de venda da Tecpro (vazio = preço da Escola Avançada), mostrar/esconder, destaque e regra do certificado.
+- **Vendas**: últimas 50 cobranças do Asaas.
+Tabela: `supabase/migrations/0003_painel_admin.sql`.

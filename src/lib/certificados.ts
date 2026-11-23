@@ -22,7 +22,7 @@ export interface SituacaoCertificado {
 }
 
 export async function situacaoCertificado(email: string, c: CursoDoAluno): Promise<SituacaoCertificado> {
-  const regra = regraDoCertificado(c.curso.id);
+  const regra = await regraDoCertificado(c.curso.id);
   const certificado = await certificadoDoAluno(email, c.curso.id);
   if (certificado) return { estado: "emitido", regra, certificado };
   if (c.total === 0 || c.feitas < c.total) return { estado: "em_andamento", regra, certificado: null };

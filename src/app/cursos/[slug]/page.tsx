@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatarPreco, getCursoPorSlug, getCursos, getModulos } from "@/lib/cursos";
+import { formatarPreco, getCursoPublicoPorSlug, getCursosPublicos, getModulos } from "@/lib/cursos";
 import { CapaCurso } from "@/components/CapaCurso";
 import { CartaoCurso } from "@/components/CartaoCurso";
 import { Duvidas } from "@/components/Duvidas";
@@ -12,18 +12,18 @@ import {
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateStaticParams() {
-  return (await getCursos()).map((c) => ({ slug: c.slug }));
+  return (await getCursosPublicos()).map((c) => ({ slug: c.slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const curso = await getCursoPorSlug((await params).slug);
+  const curso = await getCursoPublicoPorSlug((await params).slug);
   return curso ? { title: curso.nome, description: curso.resumo } : {};
 }
 
 export default async function PaginaCurso({ params }: Props) {
-  const curso = await getCursoPorSlug((await params).slug);
+  const curso = await getCursoPublicoPorSlug((await params).slug);
   if (!curso) notFound();
-  const [modulos, todos] = await Promise.all([getModulos(curso.id), getCursos()]);
+  const [modulos, todos] = await Promise.all([getModulos(curso.id), getCursosPublicos()]);
   const totalAulas = modulos.reduce((n, m) => n + m.aulas.length, 0);
   const relacionados = todos.filter((c) => c.id !== curso.id && c.categoria === curso.categoria).concat(
     todos.filter((c) => c.id !== curso.id && c.categoria !== curso.categoria),

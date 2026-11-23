@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getCursos } from "@/lib/cursos";
+import { getCursosPublicos } from "@/lib/cursos";
 import { Catalogo } from "@/components/Catalogo";
 
 export const metadata: Metadata = { title: "Cursos" };
@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Cursos" };
 type Props = { searchParams: Promise<{ busca?: string; categoria?: string }> };
 
 export default async function PaginaCursos({ searchParams }: Props) {
-  const [cursos, sp] = await Promise.all([getCursos(), searchParams]);
+  const [cursos, sp] = await Promise.all([getCursosPublicos(), searchParams]);
   return (
     <>
       <section className="relative overflow-hidden bg-marca-900 text-white">

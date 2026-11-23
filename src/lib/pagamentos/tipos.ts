@@ -58,6 +58,10 @@ export interface Cobranca {
   vencimento: string; // AAAA-MM-DD
   /** Link do boleto/fatura no Asaas */
   linkFatura?: string;
+  descricao?: string;
+  criadoEm?: string; // AAAA-MM-DD ou data/hora ISO
+  /** Nome do cliente, quando disponível (o Asaas só manda o código do cliente na lista) */
+  cliente?: string;
 }
 
 export interface DadosPix {

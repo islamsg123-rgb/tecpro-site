@@ -25,6 +25,7 @@ type Item = { produto: Produto; descricao: string; valorCentavos: number };
 
 async function itemDaCompra(tipo: string, curso: Curso): Promise<Item | { erro: string }> {
   if (tipo !== "certificado") {
+    if (!curso.visivel) return { erro: "Este curso não está disponível para venda no momento." };
     return { produto: { tipo: "curso", cursoId: curso.id }, descricao: `Curso online: ${curso.nome}`, valorCentavos: curso.precoCentavos };
   }
   // Certificado: só para o aluno logado, que concluiu o curso e ainda não pagou.
