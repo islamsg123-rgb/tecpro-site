@@ -3,6 +3,7 @@ import { matricularAluno } from "../escola-avancada/client";
 import { obterAluno, obterConfigLoja, registrarEventoMatricula, salvarAluno } from "../dados";
 import { liberarCertificadoPago } from "../certificados";
 import { getCursos } from "../cursos";
+import { emailBoasVindas, enviarEmail } from "../email";
 import type { Comprador, Produto } from "./tipos";
 
 /**
@@ -39,6 +40,7 @@ export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cu
       cursoNome,
     );
     if (novoVinculo) console.info(`[liberacao] cobrança ${cobrancaId}: curso ${cursoId} liberado para ${comprador.email}`);
+    if (novoVinculo) await enviarBoasVindas(comprador, cursoNome ?? `curso ${cursoId}`);
     await registrarEventoMatricula(
       "matrícula",
       true,
@@ -56,5 +58,16 @@ export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cu
     throw e; // o webhook responde erro e o Asaas tenta de novo
   } finally {
     emAndamento.delete(cobrancaId);
+  }
+}
+
+/** E-mail de boas-vindas do próprio site. Se falhar, o curso continua liberado; só registramos. */
+async function enviarBoasVindas(comprador: Comprador, cursoNome: string): Promise<void> {
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://tecpro-site.vercel.app";
+  try {
+    await enviarEmail({ para: comprador.email, ...emailBoasVindas(comprador.nome, cursoNome, site) });
+    await registrarEventoMatricula("e-mail de boas-vindas", true, `Enviado para ${comprador.email}`);
+  } catch (e) {
+    await registrarEventoMatricula("e-mail de boas-vindas", false, e instanceof Error ? e.message : String(e));
   }
 }
