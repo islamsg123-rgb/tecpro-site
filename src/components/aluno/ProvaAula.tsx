@@ -1,28 +1,34 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { corrigirProva } from "@/app/minha-conta/acoes";
 import type { PerguntaPublica, ResultadoProva } from "@/lib/provas";
 
 const LETRAS = ["A", "B", "C", "D", "E", "F"];
 
-export function ProvaAula({ slug, aulaId, perguntas }: { slug: string; aulaId: string; perguntas: PerguntaPublica[] }) {
+export function ProvaAula({
+  slug, aulaId, perguntas, jaAprovado = false, onAprovado,
+}: { slug: string; aulaId: string; perguntas: PerguntaPublica[]; jaAprovado?: boolean; onAprovado?: () => void }) {
   const [resultado, enviar, enviando] = useActionState(corrigirProva, null);
   const [tentativa, setTentativa] = useState(0);
   const [descartado, setDescartado] = useState<ResultadoProva | null>(null);
   const r = resultado && resultado !== descartado ? resultado : null;
-  const aprovado = r ? r.acertos / r.total >= 0.7 : false;
+  const aprovado = r ? r.acertos === r.total : false;
+  useEffect(() => {
+    if (resultado && resultado.acertos === resultado.total) onAprovado?.();
+  }, [resultado, onAprovado]);
 
   return (
     <section className="mt-10 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
       <h2 className="text-xl font-extrabold text-marca-900">Prova da aula</h2>
       <p className="mt-1 text-sm text-slate-500">
         {perguntas.length === 1 ? "1 pergunta" : `${perguntas.length} perguntas`}. Escolha uma alternativa em cada uma e clique em Corrigir.
+        {jaAprovado ? " Você já acertou todas as questões desta prova." : " Para liberar a próxima aula, é preciso acertar todas."}
       </p>
 
       {r && (
         <div className={`mt-5 rounded-2xl p-4 font-semibold ${aprovado ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900"}`}>
-          Você acertou {r.acertos} de {r.total}. {aprovado ? "Muito bem!" : "Reveja a aula e tente de novo."}
+          Você acertou {r.acertos} de {r.total}. {aprovado ? "Muito bem! Prova aprovada." : "Para liberar a próxima aula você precisa acertar todas. Reveja a aula e refaça a prova."}
         </div>
       )}
 

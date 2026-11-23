@@ -5,7 +5,7 @@ import { AnelProgresso } from "@/components/aluno/Progresso";
 import { CartaoCertificado } from "@/components/aluno/CartaoCertificado";
 import { situacaoCertificado } from "@/lib/certificados";
 import { obterAluno } from "@/lib/dados";
-import { IconeCheck, IconeChevron, IconePlay } from "@/components/Icones";
+import { IconeCadeado, IconeCheck, IconeChevron, IconePlay } from "@/components/Icones";
 
 export const metadata: Metadata = { title: "Meu curso", robots: { index: false } };
 
@@ -54,6 +54,13 @@ export default async function MeuCurso({ params, searchParams }: Props) {
                 <ol>
                   {m.aulas.map((a) => {
                     const ok = c.concluidas.has(a.id);
+                    if (c.aulas.indexOf(a) > c.liberadaAte)
+                      return (
+                        <li key={a.id} className="flex items-center gap-3 px-6 py-3.5 text-sm text-slate-400" title="Conclua as aulas anteriores para liberar">
+                          <IconeCadeado className="h-6 w-6 shrink-0" />
+                          <span>{a.titulo}</span>
+                        </li>
+                      );
                     return (
                       <li key={a.id}>
                         <Link href={link(a.id)} className="flex items-center gap-3 px-6 py-3.5 text-sm hover:bg-marca-50">

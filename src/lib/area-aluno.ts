@@ -21,13 +21,17 @@ export interface CursoDoAluno {
   feitas: number;
   pct: number;
   proxima: Aula | null;
+  /** Índice da última aula liberada: a primeira ainda não concluída (as seguintes ficam bloqueadas). */
+  liberadaAte: number;
 }
 
 async function montar(email: string, curso: Curso): Promise<CursoDoAluno> {
   const [modulos, concluidas] = await Promise.all([getModulos(curso.id), aulasConcluidas(email, curso.id)]);
   const aulas = modulos.flatMap((m) => m.aulas);
   const feitas = aulas.filter((a) => concluidas.has(a.id)).length;
+  const primeiraPendente = aulas.findIndex((a) => !concluidas.has(a.id));
   return {
+    liberadaAte: primeiraPendente < 0 ? aulas.length - 1 : primeiraPendente,
     curso,
     modulos,
     aulas,
