@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { compradorDoClienteAsaas } from "@/lib/pagamentos/asaas";
 import { processarPagamento } from "@/lib/pagamentos/liberacao";
 import { produtoDaReferencia } from "@/lib/pagamentos/tipos";
+import { registrarEventoMatricula } from "@/lib/dados";
 
 /**
  * Avisos automáticos do Asaas (webhook).
@@ -24,6 +25,11 @@ function tokenConfere(recebido: string | null): boolean {
 
 export async function POST(req: Request) {
   if (!tokenConfere(req.headers.get("asaas-access-token"))) {
+    await registrarEventoMatricula(
+      "aviso do Asaas",
+      false,
+      "Recusado: o token do webhook no Asaas é diferente de ASAAS_WEBHOOK_TOKEN na Vercel.",
+    );
     return NextResponse.json({ erro: "não autorizado" }, { status: 401 });
   }
 
@@ -36,12 +42,18 @@ export async function POST(req: Request) {
 
   const produto = produtoDaReferencia(corpo.payment.externalReference);
   console.info(`[webhook] ${corpo.event} ${corpo.payment.id} referência=${corpo.payment.externalReference ?? "-"}`);
+  await registrarEventoMatricula(
+    "aviso do Asaas",
+    Boolean(produto),
+    `${corpo.event} da cobrança ${corpo.payment.id}` + (produto ? "" : ` ignorado: referência "${corpo.payment.externalReference ?? ""}" não indica um produto`),
+  );
   if (!produto) return NextResponse.json({ ok: true, ignorado: "sem produto" });
 
   try {
     const comprador = await compradorDoClienteAsaas(corpo.payment.customer);
     await processarPagamento(corpo.payment.id, comprador, produto);
-  } catch {
+  } catch (e) {
+    await registrarEventoMatricula("aviso do Asaas", false, `Falha ao processar ${corpo.payment.id}: ${e instanceof Error ? e.message : String(e)}`);
     // Responder erro faz o Asaas tentar de novo mais tarde.
     return NextResponse.json({ erro: "falha ao liberar acesso" }, { status: 500 });
   }

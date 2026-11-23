@@ -1,6 +1,6 @@
 import "server-only";
 import { matricularAluno } from "../escola-avancada/client";
-import { obterAluno, obterConfigLoja, salvarAluno } from "../dados";
+import { obterAluno, obterConfigLoja, registrarEventoMatricula, salvarAluno } from "../dados";
 import { liberarCertificadoPago } from "../certificados";
 import type { Comprador, Produto } from "./tipos";
 
@@ -36,8 +36,20 @@ export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cu
       (usuarioId) => salvarAluno({ email: comprador.email, eaUsuarioId: usuarioId, nome: comprador.nome }),
     );
     if (novoVinculo) console.info(`[liberacao] cobrança ${cobrancaId}: curso ${cursoId} liberado para ${comprador.email}`);
+    await registrarEventoMatricula(
+      "matrícula",
+      true,
+      novoVinculo
+        ? `Curso ${cursoId} liberado para ${comprador.email} (cobrança ${cobrancaId})`
+        : `Curso ${cursoId} já estava liberado para ${comprador.email} (cobrança ${cobrancaId})`,
+    );
   } catch (e) {
     console.error(`[liberacao] falhou para a cobrança ${cobrancaId}`, e);
+    await registrarEventoMatricula(
+      "matrícula",
+      false,
+      `Cobrança ${cobrancaId}, ${comprador.email}, curso ${cursoId}: ${e instanceof Error ? e.message : String(e)}`,
+    );
     throw e; // o webhook responde erro e o Asaas tenta de novo
   } finally {
     emAndamento.delete(cobrancaId);
