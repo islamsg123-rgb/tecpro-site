@@ -53,13 +53,24 @@ export async function testarVariacoes(recurso: string) {
       init: { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: t }) },
     },
     { nome: "GET, sem barra antes do ?", url: `${URL_BASE}/api/v2?${recurso}&token=${encodeURIComponent(t)}`, init: { method: "GET" } },
+    { nome: "POST, index.php", url: `${URL_BASE}/api/v2/index.php?${recurso}`, init: { method: "POST", body: form() } },
+    { nome: "POST, caminho /api/v2/recurso", url: `${URL_BASE}/api/v2/${recurso}`, init: { method: "POST", body: form() } },
+    { nome: "POST, ?url=recurso", url: `${URL_BASE}/api/v2/?url=${recurso}`, init: { method: "POST", body: form() } },
+    { nome: "POST, na raiz do domínio", url: `${new URL(URL_BASE!).origin}/api/v2/?${recurso}`, init: { method: "POST", body: form() } },
+    { nome: "GET, só /api/v2/ (sem recurso)", url: `${URL_BASE}/api/v2/`, init: { method: "GET" } },
+    { nome: "GET, só /api/ (sem versão)", url: `${URL_BASE}/api/`, init: { method: "GET" } },
   ];
   const resultados = [];
   for (const v of variacoes) {
     try {
       const r = await fetch(v.url, { ...v.init, cache: "no-store", redirect: "manual" });
       const texto = await r.text();
-      resultados.push({ nome: v.nome, status: r.status, trecho: texto.slice(0, 600) });
+      const destino = r.headers.get("location");
+      resultados.push({
+        nome: v.nome,
+        status: r.status,
+        trecho: (destino ? `→ redireciona para: ${destino}  ` : "") + texto.slice(0, 600),
+      });
     } catch (e) {
       resultados.push({ nome: v.nome, status: 0, trecho: e instanceof Error ? e.message : String(e) });
     }
