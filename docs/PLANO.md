@@ -9,7 +9,7 @@
 
 ## Etapas
 1. **Vitrine de cursos** (esta etapa): página inicial, catálogo com busca e filtros, página de vendas de cada curso. Dados de exemplo no formato da API da Escola Avançada.
-2. **Checkout**: pagamento transparente; ao confirmar, o site cria o aluno e libera o curso na Escola Avançada pela API.
+2. **Checkout** (feito, aguardando chave do Asaas): pagamento transparente; ao confirmar, o site cria o aluno e libera o curso na Escola Avançada pela API.
 3. **Área do aluno**: login, "Meus cursos", progresso.
 4. **Página de aula**: vídeo do Vimeo embutido e progresso marcado pelo site. *Depende dos IDs do Vimeo e da liberação do domínio, pedidos à Escola Avançada.*
 5. **Certificado**: gerado pelo site em PDF, com código de validação; configurável por curso como grátis ao concluir ou pago.
