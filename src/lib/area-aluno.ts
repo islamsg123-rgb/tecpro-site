@@ -64,7 +64,10 @@ export async function cursosDoAluno(email: string): Promise<CursoDoAluno[]> {
   const lista = ids
     .map((id) => cursos.find((c) => c.id === id))
     .filter((c): c is Curso => Boolean(c));
-  return Promise.all(lista.map((c) => montar(email, c)));
+  // Monta poucos cursos por vez para não disparar centenas de chamadas à Escola Avançada ao mesmo tempo.
+  const out: CursoDoAluno[] = [];
+  for (let k = 0; k < lista.length; k += 8) out.push(...(await Promise.all(lista.slice(k, k + 8).map((c) => montar(email, c)))));
+  return out;
 }
 
 /** Curso do aluno pelo slug; manda para "Meus cursos" se ele não estiver matriculado. */

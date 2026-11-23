@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { respostaCrua, usandoDadosDeExemplo } from "@/lib/escola-avancada/client";
+import { respostaCrua, ultimosErros, usandoDadosDeExemplo } from "@/lib/escola-avancada/client";
 import { getCursos } from "@/lib/cursos";
 
 export const metadata: Metadata = { title: "Diagnóstico da API" };
@@ -43,6 +43,14 @@ export default async function Diagnostico({ searchParams }: Props) {
         Cursos que o site conseguiu entender: <strong className="text-marca-900">{cursos.length}</strong>. Para ver as aulas de um curso,
         acrescente <code>?curso=ID</code> no endereço; para ver os cursos de um aluno, <code>?aluno=ID</code>.
       </p>
+      {ultimosErros.size > 0 && (
+        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-semibold">Últimas falhas ao ler a Escola Avançada (neste servidor):</p>
+          <ul className="mt-2 space-y-1 break-all">
+            {[...ultimosErros].map(([r, m]) => <li key={r}><b>{r}</b>: {m}</li>)}
+          </ul>
+        </div>
+      )}
       {blocos.map(({ titulo, r }) => (
         <section key={titulo} className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="font-bold text-marca-900">{titulo}</h2>

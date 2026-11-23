@@ -79,14 +79,32 @@ async function chamarLista<T>(recurso: string, campos: Record<string, string> = 
   return lista as T[];
 }
 
-/** Chama a API sem derrubar o site: se falhar, registra no log e devolve lista vazia. */
+/**
+ * Chama a API sem derrubar o site. Guarda a última resposta boa na memória do servidor por 10 minutos;
+ * se a Escola Avançada falhar, tenta de novo e, se ainda falhar, usa a última resposta boa.
+ * (Não usamos o cache de fetch do Next aqui: ele chegou a guardar uma resposta ruim e o site ficou sem cursos.)
+ */
+const memoria = (globalThis as unknown as { __eaCache?: Map<string, { em: number; lista: unknown[] }> }).__eaCache ??= new Map();
+
+/** Último erro de cada recurso (mostrado na página de diagnóstico do painel). */
+export const ultimosErros: Map<string, string> = ((globalThis as unknown as { __eaErros?: Map<string, string> }).__eaErros ??= new Map());
+
 async function listaSegura<T>(recurso: string, campos: Record<string, string> = {}): Promise<T[]> {
-  try {
-    return await chamarLista<T>(recurso, campos, true);
-  } catch (e) {
-    console.error("[escola-avancada]", e instanceof Error ? e.message : e);
-    return [];
+  const chave = recurso + "|" + JSON.stringify(campos);
+  const guardada = memoria.get(chave);
+  if (guardada && Date.now() - guardada.em < 10 * 60 * 1000) return guardada.lista as T[];
+  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+    try {
+      const lista = await chamarLista<T>(recurso, campos, false);
+      if (lista.length || !guardada) memoria.set(chave, { em: Date.now(), lista });
+      return lista.length || !guardada ? lista : (guardada.lista as T[]);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      ultimosErros.set(recurso, `${new Date().toISOString()} ${msg}`.slice(0, 600));
+      console.error("[escola-avancada]", recurso, `tentativa ${tentativa}:`, msg);
+    }
   }
+  return (guardada?.lista as T[]) ?? [];
 }
 
 async function chamar<T>(recurso: string, campos: Record<string, string> = {}): Promise<T> {

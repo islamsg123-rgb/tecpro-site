@@ -2,7 +2,9 @@ import "server-only";
 import { adaptarAula, adaptarCurso } from "./escola-avancada/adapter";
 import { listarAulasRaw, listarCursosRaw } from "./escola-avancada/client";
 import { configuracoesDosCursos } from "./dados";
+import { titulosLocais } from "./conteudo-escola";
 import type { Curso, Modulo } from "./types";
+import type { EAAulaRaw } from "./escola-avancada/types";
 
 /**
  * Ponto único de onde as páginas pegam os cursos.
@@ -41,7 +43,10 @@ export async function getCursoPublicoPorSlug(slug: string): Promise<Curso | null
 }
 
 export async function getModulos(cursoId: string): Promise<Modulo[]> {
-  const aulas = (await listarAulasRaw(cursoId)).map(adaptarAula).sort((a, b) => a.ordem - b.ordem);
+  let brutas = await listarAulasRaw(cursoId);
+  // Se a Escola Avançada não responder, usamos a lista de aulas guardada no site (mesma ordem e mesmos números).
+  if (!brutas.length) brutas = titulosLocais(cursoId).map((t) => ({ aula: t }) as unknown as EAAulaRaw);
+  const aulas = brutas.map(adaptarAula).sort((a, b) => a.ordem - b.ordem);
   const modulos: Modulo[] = [];
   for (const aula of aulas) {
     const ultimo = modulos[modulos.length - 1];
