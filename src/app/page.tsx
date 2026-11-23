@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getCursos } from "@/lib/cursos";
+import { getCursosPublicos } from "@/lib/cursos";
 import { formatarPreco } from "@/lib/formatar";
 import { CartaoCurso } from "@/components/CartaoCurso";
 import { Duvidas } from "@/components/Duvidas";
@@ -25,7 +25,7 @@ const perguntas = [
 ];
 
 export default async function Inicio() {
-  const cursos = await getCursos();
+  const cursos = await getCursosPublicos();
   const destaques = cursos.slice(0, 6);
   const categorias = Array.from(new Set(cursos.map((c) => c.categoria)));
   const vitrine = cursos[0];
@@ -245,7 +245,7 @@ export default async function Inicio() {
                   <div className="rounded-md bg-marca-900 px-2 py-1.5">
                     <Image src="/logo-tecpro-transparente.png" alt="" width={88} height={32} />
                   </div>
-                  <p className="text-[10px] text-slate-400">Código de validação<br /><span className="font-mono text-marca-900">TP-2026-XXXX</span></p>
+                  <p className="text-[10px] text-slate-400">Código de validação<br /><span className="font-mono text-marca-900">TP-XXXX-XXXX</span></p>
                 </div>
               </div>
             </div>

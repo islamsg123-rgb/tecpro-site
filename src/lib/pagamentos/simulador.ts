@@ -28,11 +28,12 @@ export async function criarCobrancaSimulada(n: NovaCobranca): Promise<{ cobranca
     throw new ErroPagamento("Transação não autorizada pelo banco emissor. (simulação)");
   }
   const cobranca: Cobranca = {
+    descricao: n.descricao,
     id: `sim_${randomUUID().slice(0, 12)}`,
     forma: n.forma,
     situacao: n.forma === "CREDIT_CARD" ? "pago" : "aguardando",
     valorCentavos: n.valorCentavos,
-    cursoId: n.cursoId,
+    produto: n.produto,
     vencimento: hojeMais(n.forma === "BOLETO" ? configLoja.diasVencimentoBoleto : 1),
   };
   banco.set(cobranca.id, { cobranca, comprador: n.comprador, criadoEm: Date.now() });
@@ -49,6 +50,12 @@ export function consultarCobrancaSimulada(id: string): { cobranca: Cobranca; com
     acabouDePagar = true;
   }
   return { cobranca: r.cobranca, comprador: r.comprador, acabouDePagar };
+}
+
+export function listarCobrancasSimuladas(): Cobranca[] {
+  return Array.from(banco.values())
+    .sort((a, b) => b.criadoEm - a.criadoEm)
+    .map((r) => ({ ...r.cobranca, cliente: r.comprador.nome, criadoEm: new Date(r.criadoEm).toISOString() }));
 }
 
 export async function pixSimulado(id: string): Promise<DadosPix> {

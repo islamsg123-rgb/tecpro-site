@@ -1,12 +1,12 @@
 import "server-only";
 import type { Cobranca, DadosBoleto, DadosPix, NovaCobranca } from "./tipos";
 import {
-  asaasConfigurado, boletoAsaas, consultarCobrancaAsaas, criarCobrancaAsaas, pixAsaas,
+  asaasConfigurado, boletoAsaas, consultarCobrancaAsaas, criarCobrancaAsaas, listarCobrancasAsaas, pixAsaas,
 } from "./asaas";
 import {
-  boletoSimulado, consultarCobrancaSimulada, criarCobrancaSimulada, pixSimulado,
+  boletoSimulado, consultarCobrancaSimulada, criarCobrancaSimulada, listarCobrancasSimuladas, pixSimulado,
 } from "./simulador";
-import { liberarAcesso } from "./liberacao";
+import { processarPagamento } from "./liberacao";
 
 /**
  * Porta de entrada dos pagamentos. As páginas só usam estas funções;
@@ -18,7 +18,7 @@ export const pagamentoEmSimulacao = !asaasConfigurado;
 export async function criarCobranca(n: NovaCobranca): Promise<Cobranca> {
   if (pagamentoEmSimulacao) {
     const { cobranca, comprador } = await criarCobrancaSimulada(n);
-    if (cobranca.situacao === "pago") await liberarAcesso(cobranca.id, comprador, n.cursoId);
+    if (cobranca.situacao === "pago") await processarPagamento(cobranca.id, comprador, n.produto);
     return cobranca;
   }
   // No Asaas real, a liberação acontece quando o aviso (webhook) de pagamento chega.
@@ -29,10 +29,17 @@ export async function consultarCobranca(id: string): Promise<Cobranca | null> {
   if (pagamentoEmSimulacao) {
     const r = consultarCobrancaSimulada(id);
     if (!r) return null;
-    if (r.acabouDePagar && r.cobranca.cursoId) await liberarAcesso(id, r.comprador, r.cobranca.cursoId);
+    if (r.acabouDePagar && r.cobranca.produto) await processarPagamento(id, r.comprador, r.cobranca.produto);
     return r.cobranca;
   }
   return consultarCobrancaAsaas(id);
+}
+
+export async function listarCobrancas(): Promise<Cobranca[]> {
+  if (!pagamentoEmSimulacao) return listarCobrancasAsaas();
+  // Na simulação, consulta as pendentes antes (é isso que "paga" o Pix e libera o curso).
+  for (const c of listarCobrancasSimuladas()) if (c.situacao === "aguardando") await consultarCobranca(c.id);
+  return listarCobrancasSimuladas();
 }
 
 export async function dadosPix(id: string): Promise<DadosPix> {

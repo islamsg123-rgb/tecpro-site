@@ -1,3 +1,21 @@
+/** O que está sendo pago: a matrícula num curso ou o certificado de um curso já feito. */
+export type Produto =
+  | { tipo: "curso"; cursoId: string }
+  | { tipo: "certificado"; cursoId: string; email: string };
+
+/** Texto guardado no Asaas (externalReference) para saber o que foi pago. */
+export function referenciaProduto(p: Produto): string {
+  return p.tipo === "curso" ? `curso:${p.cursoId}` : `certificado:${p.cursoId}:${p.email}`;
+}
+
+export function produtoDaReferencia(ref: unknown): Produto | null {
+  if (typeof ref !== "string") return null;
+  const [tipo, cursoId, ...resto] = ref.split(":");
+  if (tipo === "curso" && cursoId) return { tipo, cursoId };
+  if (tipo === "certificado" && cursoId && resto.length) return { tipo, cursoId, email: resto.join(":") };
+  return null;
+}
+
 export type FormaPagamento = "PIX" | "BOLETO" | "CREDIT_CARD";
 
 /** Situação simplificada que o site mostra ao aluno. */
@@ -21,7 +39,7 @@ export interface DadosCartao {
 }
 
 export interface NovaCobranca {
-  cursoId: string;
+  produto: Produto;
   descricao: string;
   valorCentavos: number;
   forma: FormaPagamento;
@@ -36,10 +54,14 @@ export interface Cobranca {
   forma: FormaPagamento;
   situacao: Situacao;
   valorCentavos: number;
-  cursoId: string | null;
+  produto: Produto | null;
   vencimento: string; // AAAA-MM-DD
   /** Link do boleto/fatura no Asaas */
   linkFatura?: string;
+  descricao?: string;
+  criadoEm?: string; // AAAA-MM-DD ou data/hora ISO
+  /** Nome do cliente, quando disponível (o Asaas só manda o código do cliente na lista) */
+  cliente?: string;
 }
 
 export interface DadosPix {

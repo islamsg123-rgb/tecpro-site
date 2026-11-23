@@ -16,6 +16,7 @@ export function Rodape() {
           <ul className="mt-4 space-y-3">
             <li><Link href="/cursos" className="hover:text-white">Todos os cursos</Link></li>
             <li><Link href="/#certificado" className="hover:text-white">Certificado</Link></li>
+            <li><Link href="/validar" className="hover:text-white">Validar certificado</Link></li>
           </ul>
         </div>
         <div className="text-sm">

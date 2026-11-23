@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatarPreco, getCursoPorSlug } from "@/lib/cursos";
+import { formatarPreco, getCursoPublicoPorSlug } from "@/lib/cursos";
 import { opcoesParcelas } from "@/lib/config-loja";
 import { pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { CapaCurso } from "@/components/CapaCurso";
@@ -13,7 +13,7 @@ type Props = { params: Promise<{ slug: string }> };
 export const metadata: Metadata = { title: "Finalizar matrícula", robots: { index: false } };
 
 export default async function Checkout({ params }: Props) {
-  const curso = await getCursoPorSlug((await params).slug);
+  const curso = await getCursoPublicoPorSlug((await params).slug);
   if (!curso) notFound();
 
   return (

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import { compradorDoClienteAsaas, cursoDaReferencia } from "@/lib/pagamentos/asaas";
-import { liberarAcesso } from "@/lib/pagamentos/liberacao";
+import { compradorDoClienteAsaas } from "@/lib/pagamentos/asaas";
+import { processarPagamento } from "@/lib/pagamentos/liberacao";
+import { produtoDaReferencia } from "@/lib/pagamentos/tipos";
 
 /**
  * Avisos automáticos do Asaas (webhook).
@@ -33,12 +34,12 @@ export async function POST(req: Request) {
   if (!corpo?.event || !corpo.payment) return NextResponse.json({ ok: true });
   if (!EVENTOS_PAGO.has(corpo.event)) return NextResponse.json({ ok: true, ignorado: corpo.event });
 
-  const cursoId = cursoDaReferencia(corpo.payment.externalReference);
-  if (!cursoId) return NextResponse.json({ ok: true, ignorado: "sem curso" });
+  const produto = produtoDaReferencia(corpo.payment.externalReference);
+  if (!produto) return NextResponse.json({ ok: true, ignorado: "sem produto" });
 
   try {
     const comprador = await compradorDoClienteAsaas(corpo.payment.customer);
-    await liberarAcesso(corpo.payment.id, comprador, cursoId);
+    await processarPagamento(corpo.payment.id, comprador, produto);
   } catch {
     // Responder erro faz o Asaas tentar de novo mais tarde.
     return NextResponse.json({ erro: "falha ao liberar acesso" }, { status: 500 });

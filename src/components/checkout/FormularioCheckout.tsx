@@ -42,11 +42,14 @@ function Campo({
 }
 
 export function FormularioCheckout({
-  cursoId, precoCentavos, parcelas,
+  cursoId, precoCentavos, parcelas, tipo = "curso", nomeInicial, emailInicial,
 }: {
   cursoId: string;
   precoCentavos: number;
   parcelas: number[];
+  tipo?: "curso" | "certificado";
+  nomeInicial?: string;
+  emailInicial?: string;
 }) {
   const [estado, acao, enviando] = useActionState<EstadoCheckout, FormData>(pagar, {});
   const [forma, setForma] = useState<Forma>("PIX");
@@ -70,6 +73,7 @@ export function FormularioCheckout({
       }}
     >
       <input type="hidden" name="cursoId" value={cursoId} />
+      <input type="hidden" name="tipo" value={tipo} />
       <input type="hidden" name="forma" value={forma} />
 
       <fieldset className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
@@ -78,10 +82,12 @@ export function FormularioCheckout({
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-marca-900 text-xs text-laranja-500">1</span>
           Seus dados
         </h2>
-        <p className="mt-1 text-sm text-slate-500">O acesso ao curso será enviado para este e-mail.</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {tipo === "curso" ? "O acesso ao curso será enviado para este e-mail." : "Dados para a cobrança do certificado."}
+        </p>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Campo nome="nome" rotulo="Nome completo" autoComplete="name" erro={e.nome} className="sm:col-span-2" required />
-          <Campo nome="email" rotulo="E-mail" type="email" autoComplete="email" erro={e.email} className="sm:col-span-2" required />
+          <Campo nome="nome" rotulo="Nome completo" autoComplete="name" defaultValue={nomeInicial} erro={e.nome} className="sm:col-span-2" required />
+          <Campo nome="email" rotulo="E-mail" type="email" autoComplete="email" defaultValue={emailInicial} erro={e.email} className="sm:col-span-2" required />
           <Campo nome="cpf" rotulo="CPF" inputMode="numeric" placeholder="000.000.000-00" mascara={mascaraCpf} erro={e.cpf} required />
           <Campo nome="telefone" rotulo="Celular (WhatsApp)" inputMode="tel" autoComplete="tel" placeholder="(00) 00000-0000" mascara={mascaraTelefone} erro={e.telefone} required />
         </div>

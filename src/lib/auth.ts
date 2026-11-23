@@ -1,3 +1,4 @@
+import { urlSupabase } from "@/lib/supabase-url";
 import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
@@ -8,7 +9,7 @@ import { createServerClient } from "@supabase/ssr";
  * Sem Supabase: MODO DEMONSTRAÇÃO, entra direto com qualquer e-mail (só para testes; nunca publicar assim).
  */
 
-const URL_SUPABASE = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const URL_SUPABASE = urlSupabase();
 const CHAVE_PUBLICA = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export const loginEmDemonstracao = !URL_SUPABASE || !CHAVE_PUBLICA;
 
