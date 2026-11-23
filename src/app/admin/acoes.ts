@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { exigirAdmin } from "@/lib/admin";
 import { getCursos } from "@/lib/cursos";
-import { salvarConfigLoja, salvarConfiguracaoCurso } from "@/lib/dados";
+import { registrarEventoMatricula, salvarConfigLoja, salvarConfiguracaoCurso } from "@/lib/dados";
+import { asaasConfigurado, cobrancaParaLiberacao } from "@/lib/pagamentos/asaas";
+import { processarPagamento } from "@/lib/pagamentos/liberacao";
 
 /** "197,90" / "197.90" / "R$ 197" -> centavos. Vazio -> null. */
 function lerPreco(v: FormDataEntryValue | null): number | null | "invalido" {
@@ -53,4 +55,23 @@ export async function salvarConfiguracoes(f: FormData) {
   }
   await salvarConfigLoja({ mesesDeAcesso: meses });
   redirect("/admin/configuracoes?salvo=1");
+}
+
+/** Refaz a matrícula de uma venda paga (útil depois de corrigir um problema). */
+export async function matricularDeNovo(f: FormData) {
+  await exigirAdmin();
+  const id = String(f.get("cobrancaId") ?? "");
+  if (!asaasConfigurado || !id) redirect("/admin/vendas");
+  try {
+    const { pago, comprador, produto } = await cobrancaParaLiberacao(id);
+    if (!pago || !produto) {
+      await registrarEventoMatricula("matrícula", false, `Cobrança ${id} não está paga ou não é de um curso.`);
+    } else {
+      await processarPagamento(id, comprador, produto);
+    }
+  } catch {
+    /* o erro já ficou registrado nos eventos */
+  }
+  revalidatePath("/admin/alunos");
+  redirect("/admin/alunos#eventos");
 }

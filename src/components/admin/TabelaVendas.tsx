@@ -1,6 +1,7 @@
 import type { Cobranca } from "@/lib/pagamentos/tipos";
 import { formatarPreco } from "@/lib/formatar";
 import { EtiquetaSituacao, nomeForma } from "./EtiquetaSituacao";
+import { matricularDeNovo } from "@/app/admin/acoes";
 
 function data(iso?: string) {
   if (!iso) return "—";
@@ -14,7 +15,7 @@ export function TabelaVendas({ vendas }: { vendas: Cobranca[] }) {
   }
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-      <table className="w-full min-w-[640px] text-left text-sm">
+      <table className="w-full min-w-[760px] text-left text-sm">
         <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
           <tr>
             <th className="px-5 py-3 font-semibold">Data</th>
@@ -23,6 +24,7 @@ export function TabelaVendas({ vendas }: { vendas: Cobranca[] }) {
             <th className="px-5 py-3 font-semibold">Forma</th>
             <th className="px-5 py-3 text-right font-semibold">Valor</th>
             <th className="px-5 py-3 font-semibold">Situação</th>
+            <th className="px-5 py-3 font-semibold"><span className="sr-only">Ações</span></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -34,6 +36,16 @@ export function TabelaVendas({ vendas }: { vendas: Cobranca[] }) {
               <td className="px-5 py-3 text-slate-600">{nomeForma[v.forma] ?? v.forma}</td>
               <td className="whitespace-nowrap px-5 py-3 text-right font-semibold text-marca-900">{formatarPreco(v.valorCentavos)}</td>
               <td className="px-5 py-3"><EtiquetaSituacao s={v.situacao} /></td>
+              <td className="px-5 py-3">
+                {v.situacao === "pago" && v.produto?.tipo === "curso" && (
+                  <form action={matricularDeNovo}>
+                    <input type="hidden" name="cobrancaId" value={v.id} />
+                    <button className="whitespace-nowrap rounded-full border border-marca-100 px-3 py-1 text-xs font-semibold text-marca-700 hover:bg-marca-50">
+                      Matricular de novo
+                    </button>
+                  </form>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

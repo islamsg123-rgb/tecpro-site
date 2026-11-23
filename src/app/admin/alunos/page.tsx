@@ -1,16 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { listarAlunos } from "@/lib/dados";
+import { eventosMatricula, listarAlunos } from "@/lib/dados";
 
 export const metadata: Metadata = { title: "Alunos" };
 export const dynamic = "force-dynamic";
+
+function dataHora(iso: string) {
+  return new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "medium" });
+}
 
 function data(iso: string | null) {
   return iso ? new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—";
 }
 
 export default async function Alunos() {
-  const alunos = await listarAlunos();
+  const [alunos, eventos] = await Promise.all([listarAlunos(), eventosMatricula()]);
   return (
     <>
       <h1 className="text-3xl font-extrabold text-marca-900">Alunos</h1>
@@ -48,6 +52,33 @@ export default async function Alunos() {
             </tbody>
           </table>
         </div>
+      )}
+
+      <h2 id="eventos" className="mt-12 text-xl font-bold text-marca-900">Últimas tentativas de matrícula</h2>
+      <p className="mt-1 text-sm text-slate-500">
+        O que aconteceu depois de cada pagamento: o aviso do Asaas e cada resposta da Escola Avançada. Mais recentes primeiro.
+      </p>
+      {!eventos.length ? (
+        <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+          Nada registrado ainda. Se você fez uma compra e nada aparece aqui, o aviso do Asaas não chegou ao site
+          (confira o webhook em Asaas &gt; Integrações &gt; Webhooks).
+        </p>
+      ) : (
+        <ul className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
+          {eventos.map((e, i) => (
+            <li key={i} className="flex gap-3 px-5 py-3">
+              <span className={e.ok ? "text-emerald-600" : "text-red-600"} aria-label={e.ok ? "ok" : "erro"}>
+                {e.ok ? "✓" : "✕"}
+              </span>
+              <div className="min-w-0">
+                <p className="font-semibold text-marca-900">
+                  {e.etapa} <span className="font-normal text-slate-400">· {dataHora(e.quando)}</span>
+                </p>
+                <p className="break-words font-mono text-xs text-slate-600">{e.detalhe}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </>
   );

@@ -269,6 +269,43 @@ export async function salvarConfigLoja(c: ConfigLoja): Promise<void> {
   if (error) throw error;
 }
 
+/* ---------- Registro das matrículas (para ver no painel sem abrir os logs da Vercel) ---------- */
+
+export interface EventoMatricula {
+  quando: string;
+  etapa: string;
+  ok: boolean;
+  detalhe: string;
+}
+const LIMITE_EVENTOS = 40;
+const gEventos = globalThis as unknown as { __eventosDemo?: EventoMatricula[] };
+
+/** Guarda um evento (aviso do Asaas, resposta da Escola Avançada, erro). Nunca derruba quem chamou. */
+export async function registrarEventoMatricula(etapa: string, ok: boolean, detalhe: string): Promise<void> {
+  const ev: EventoMatricula = { quando: new Date().toISOString(), etapa, ok, detalhe: detalhe.slice(0, 600) };
+  try {
+    if (bancoEmDemonstracao) {
+      gEventos.__eventosDemo = [ev, ...(gEventos.__eventosDemo ?? [])].slice(0, LIMITE_EVENTOS);
+      return;
+    }
+    const atuais = await eventosMatricula();
+    await db()
+      .from("configuracoes_loja")
+      .upsert(
+        { chave: "eventos_matricula", valor: [ev, ...atuais].slice(0, LIMITE_EVENTOS), atualizado_em: ev.quando },
+        { onConflict: "chave" },
+      );
+  } catch (e) {
+    console.error("[dados] eventos_matricula", e instanceof Error ? e.message : e);
+  }
+}
+
+export async function eventosMatricula(): Promise<EventoMatricula[]> {
+  if (bancoEmDemonstracao) return gEventos.__eventosDemo ?? [];
+  const { data } = await db().from("configuracoes_loja").select("valor").eq("chave", "eventos_matricula").maybeSingle();
+  return Array.isArray(data?.valor) ? (data.valor as EventoMatricula[]) : [];
+}
+
 export interface AlunoListado extends RegistroAluno {
   criadoEm: string | null;
 }

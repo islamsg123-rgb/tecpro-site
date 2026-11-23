@@ -138,6 +138,16 @@ export async function criarCobrancaAsaas(n: NovaCobranca): Promise<Cobranca> {
   return paraCobranca(await chamar("/payments", { method: "POST", body: corpo }));
 }
 
+/** Dados para refazer a liberação de uma cobrança já paga (botão "Matricular de novo" do painel). */
+export async function cobrancaParaLiberacao(id: string): Promise<{ pago: boolean; comprador: Comprador; produto: Cobranca["produto"] }> {
+  const p = await chamar(`/payments/${encodeURIComponent(id)}`);
+  return {
+    pago: traduzirStatus(String(p.status)) === "pago",
+    comprador: await compradorDoClienteAsaas(String(p.customer)),
+    produto: produtoDaReferencia(p.externalReference),
+  };
+}
+
 export async function consultarCobrancaAsaas(id: string): Promise<Cobranca | null> {
   try {
     return paraCobranca(await chamar(`/payments/${encodeURIComponent(id)}`));

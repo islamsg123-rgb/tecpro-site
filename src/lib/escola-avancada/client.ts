@@ -1,6 +1,7 @@
 import "server-only";
 import type { EAAulaRaw, EACursoRaw, EAResposta } from "./types";
 import { aulasMock, cursosMock } from "./mock";
+import { registrarEventoMatricula } from "../dados";
 
 /**
  * Conversa com a API V2 da Escola Avançada.
@@ -108,10 +109,14 @@ async function chamar<T>(recurso: string, campos: Record<string, string> = {}): 
 async function chamarComLog<T>(recurso: string, campos: Record<string, string> = {}): Promise<T> {
   try {
     const r = await chamar<T>(recurso, campos);
-    console.info(`[escola-avancada] ${recurso} respondeu:`, JSON.stringify(r).slice(0, 500));
+    const texto = JSON.stringify(r).slice(0, 500);
+    console.info(`[escola-avancada] ${recurso} respondeu:`, texto);
+    await registrarEventoMatricula(recurso, true, `respondeu: ${texto}`);
     return r;
   } catch (e) {
-    console.error(`[escola-avancada] ${recurso} falhou:`, e instanceof Error ? e.message : e);
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[escola-avancada] ${recurso} falhou:`, msg);
+    await registrarEventoMatricula(recurso, false, msg);
     throw e;
   }
 }
