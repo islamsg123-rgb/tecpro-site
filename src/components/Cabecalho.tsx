@@ -27,7 +27,7 @@ export function Cabecalho() {
 
         <div className="hidden items-center gap-3 md:flex">
           <Link
-            href="/entrar"
+            href="/minha-conta"
             className="rounded-full px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
           >
             Área do aluno
@@ -51,7 +51,7 @@ export function Cabecalho() {
                 {l.rotulo}
               </Link>
             ))}
-            <Link href="/entrar" className="mt-1 block rounded-xl bg-laranja-500 px-4 py-3 text-center text-sm font-bold text-marca-900">
+            <Link href="/minha-conta" className="mt-1 block rounded-xl bg-laranja-500 px-4 py-3 text-center text-sm font-bold text-marca-900">
               Área do aluno
             </Link>
           </div>

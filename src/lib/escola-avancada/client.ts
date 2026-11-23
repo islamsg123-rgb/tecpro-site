@@ -39,7 +39,7 @@ export async function listarAulasRaw(cursoId: string): Promise<EAAulaRaw[]> {
   return chamar<EAAulaRaw[]>("cursos/aulas", { curso: cursoId }, true);
 }
 
-/* ---------- Matrícula (usada depois que o pagamento é confirmado) ---------- */
+/* ---------- Alunos e matrículas (a Escola Avançada é a fonte oficial) ---------- */
 
 export interface NovoAluno {
   nome: string;
@@ -48,24 +48,58 @@ export interface NovoAluno {
   telefone: string;
 }
 
+// Simulação: vínculos aluno -> cursos, já com o aluno de demonstração em dois cursos.
+const g = globalThis as unknown as { __vinculosDemo?: Map<string, Set<string>> };
+const vinculosDemo = (g.__vinculosDemo ??= new Map([["sim-demo", new Set(["101", "104"])]]));
+
 /**
- * Cria o aluno (ou reaproveita, se já existir), libera o curso e dispara o e-mail de acesso.
- * SUPOSIÇÃO: nomes dos campos e formato da resposta. Conferir com a API real.
+ * IDs dos cursos liberados para o aluno, via `usuarios/cursosvinculados`.
+ * SUPOSIÇÃO: nome do campo do usuário e formato da resposta. Conferir com a API real.
  */
-export async function matricularAluno(aluno: NovoAluno, cursoId: string): Promise<{ usuarioId: string }> {
+export async function cursosVinculados(usuarioId: string): Promise<string[]> {
+  if (usandoDadosDeExemplo) return Array.from(vinculosDemo.get(usuarioId) ?? []);
+  const lista = await chamar<{ curso?: string | number; id?: string | number; situacao?: string }[]>(
+    "usuarios/cursosvinculados",
+    { usuario: usuarioId },
+  );
+  return (lista ?? []).map((c) => String(c.curso ?? c.id));
+}
+
+/**
+ * Garante que o aluno existe e tem o curso liberado na Escola Avançada.
+ * Seguro para chamar mais de uma vez: só cria o aluno se ainda não tiver o código dele,
+ * e só vincula (e dispara o e-mail de acesso) se o curso ainda não estiver vinculado.
+ * SUPOSIÇÃO: nomes dos campos e formato das respostas. Conferir com a API real.
+ */
+export async function matricularAluno(
+  aluno: NovoAluno,
+  cursoId: string,
+  usuarioIdExistente?: string,
+): Promise<{ usuarioId: string; novoVinculo: boolean }> {
+  let usuarioId = usuarioIdExistente;
+
   if (usandoDadosDeExemplo) {
-    console.info(`[escola-avancada:simulação] matricular ${aluno.email} no curso ${cursoId}`);
-    return { usuarioId: `sim-${aluno.cpf}` };
+    usuarioId ??= `sim-${aluno.cpf || aluno.email}`;
+    const cursos = vinculosDemo.get(usuarioId) ?? new Set<string>();
+    const novoVinculo = !cursos.has(cursoId);
+    cursos.add(cursoId);
+    vinculosDemo.set(usuarioId, cursos);
+    if (novoVinculo) console.info(`[escola-avancada:simulação] curso ${cursoId} liberado para ${aluno.email}`);
+    return { usuarioId, novoVinculo };
   }
-  const usuario = await chamar<{ id?: string | number; usuario?: string | number }>("usuarios/novo", {
-    nome: aluno.nome,
-    email: aluno.email,
-    cpf: aluno.cpf,
-    telefone: aluno.telefone,
-  });
-  const usuarioId = String(usuario.id ?? usuario.usuario ?? "");
-  if (!usuarioId) throw new Error("Escola Avançada não devolveu o id do aluno");
+
+  if (!usuarioId) {
+    const r = await chamar<{ id?: string | number; usuario?: string | number }>("usuarios/novo", {
+      nome: aluno.nome,
+      email: aluno.email,
+      cpf: aluno.cpf,
+      telefone: aluno.telefone,
+    });
+    usuarioId = String(r.id ?? r.usuario ?? "");
+    if (!usuarioId) throw new Error("Escola Avançada não devolveu o código do aluno");
+  }
+  if ((await cursosVinculados(usuarioId)).includes(cursoId)) return { usuarioId, novoVinculo: false };
   await chamar("usuarios/vinculocurso", { usuario: usuarioId, curso: cursoId });
   await chamar("usuarios/envioemail", { usuario: usuarioId });
-  return { usuarioId };
+  return { usuarioId, novoVinculo: true };
 }
