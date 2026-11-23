@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { cursoDoAluno, exigirAluno } from "@/lib/area-aluno";
 import { alternarAula } from "@/app/minha-conta/acoes";
 import { BarraProgresso } from "@/components/aluno/Progresso";
+import { apostilaDoCurso, conteudoDaAula } from "@/lib/conteudo-escola";
 import { IconeCheck, IconeChevron, IconePlay, IconeSeta } from "@/components/Icones";
 
 export const metadata: Metadata = { title: "Aula", robots: { index: false } };
@@ -21,6 +22,8 @@ export default async function Aula({ params }: Props) {
   const anterior = c.aulas[i - 1];
   const proxima = c.aulas[i + 1];
   const feita = c.concluidas.has(aula.id);
+  const conteudo = conteudoDaAula(c.curso.id, i);
+  const apostila = apostilaDoCurso(c.curso.id);
   const link = (id: string) => `/minha-conta/cursos/${slug}/aulas/${encodeURIComponent(id)}`;
 
   return (
@@ -30,7 +33,18 @@ export default async function Aula({ params }: Props) {
           <IconeChevron className="h-4 w-4 rotate-90" /> {c.curso.nome}
         </Link>
 
-        {/* Etapa 4: aqui entra o player do Vimeo quando a Escola Avançada enviar os IDs dos vídeos. */}
+        {conteudo ? (
+          <div className="mt-4 aspect-video overflow-hidden rounded-3xl bg-marca-950">
+            <iframe
+              src={conteudo.embed}
+              title={aula.titulo}
+              className="h-full w-full border-0"
+              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          </div>
+        ) : (
         <div className="relative mt-4 flex aspect-video items-center justify-center overflow-hidden rounded-3xl bg-marca-950 text-center text-white">
           <div className="fundo-grade absolute inset-0" />
           <div className="relative px-6">
@@ -39,6 +53,7 @@ export default async function Aula({ params }: Props) {
             <p className="mt-1 text-sm text-slate-400">Aguardando os vídeos da Escola Avançada</p>
           </div>
         </div>
+        )}
 
         <p className="mt-6 text-sm font-semibold text-laranja-600">{aula.modulo} · Aula {i + 1} de {c.total}</p>
         <h1 className="mt-1 text-2xl font-extrabold text-marca-900 sm:text-3xl">{aula.titulo}</h1>
@@ -57,6 +72,11 @@ export default async function Aula({ params }: Props) {
               <IconeCheck className="h-5 w-5" /> {feita ? "Aula concluída" : proxima ? "Concluir e ir para a próxima" : "Concluir aula"}
             </button>
           </form>
+          {apostila && (
+            <a href={apostila} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full border-2 border-marca-900 px-5 py-2.5 text-sm font-bold text-marca-900 hover:bg-marca-50">
+              Baixar apostila (PDF)
+            </a>
+          )}
           <div className="ml-auto flex gap-2">
             {anterior && (
               <Link href={link(anterior.id)} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 hover:border-marca-900">
