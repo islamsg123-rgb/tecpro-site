@@ -39,10 +39,28 @@ function campo(raw: object, ...nomes: string[]): string {
   return "";
 }
 
+/** "INFORMÁTICA E TECNOLOGIA" -> "Informática e Tecnologia" */
+function tituloCategoria(t: string): string {
+  const pequenas = new Set(["e", "de", "da", "do", "das", "dos"]);
+  const r = t
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((p, i) => (i > 0 && pequenas.has(p) ? p : p.charAt(0).toUpperCase() + p.slice(1)))
+    .join(" ");
+  return r || "Geral";
+}
+
 /** Converte um item da API em Curso; devolve null se faltar id ou nome. */
 export function adaptarCurso(raw: EACursoRaw): Curso | null {
-  const id = campo(raw, "id", "id_curso", "curso_id", "idcurso", "codigo", "cod", "cod_curso");
   const nome = campo(raw, "nome", "titulo", "name", "title", "curso").trim();
+  const capa = campo(raw, "capa_image", "capa", "imagem", "foto", "image", "thumb", "banner");
+  // A API da Escola Avançada não manda o código do curso; ele aparece no nome da imagem da capa
+  // (".../imagemcursos/16.jpg" -> 16). SUPOSIÇÃO a confirmar com cursos/aulas e com o suporte.
+  const id =
+    campo(raw, "id", "id_curso", "curso_id", "idcurso", "codigo", "cod", "cod_curso") ||
+    (capa.match(/imagemcursos\/(\d+)\./)?.[1] ?? "");
   if (!id || !nome) return null;
   // Cursos inativos na Escola Avançada não aparecem no site.
   const status = campo(raw, "status", "situacao").toUpperCase();
@@ -59,10 +77,10 @@ export function adaptarCurso(raw: EACursoRaw): Curso | null {
     precoCentavos: paraCentavos(valor),
     precoEscolaCentavos: paraCentavos(valor),
     visivel: true,
-    destaque: false,
-    capaUrl: campo(raw, "capa", "imagem", "foto", "image", "thumb", "banner") || null,
+    destaque: /^(destacar|sim|1|true)$/i.test(campo(raw, "destaque")),
+    capaUrl: capa || null,
     cargaHoraria: parseInt(campo(raw, "carga_horaria", "cargahoraria", "carga", "horas", "duracao"), 10) || 0,
-    categoria: campo(raw, "categoria", "category", "area").trim() || "Geral",
+    categoria: tituloCategoria(campo(raw, "categoria_loja", "categoria", "categoria_interna", "category", "area")),
   };
 }
 
