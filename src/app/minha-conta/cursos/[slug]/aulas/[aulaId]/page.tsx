@@ -5,6 +5,8 @@ import { cursoDoAluno, exigirAluno } from "@/lib/area-aluno";
 import { alternarAula } from "@/app/minha-conta/acoes";
 import { BarraProgresso } from "@/components/aluno/Progresso";
 import { apostilaDoCurso, conteudoDaAula } from "@/lib/conteudo-escola";
+import { provaDaAula } from "@/lib/provas";
+import { ProvaAula } from "@/components/aluno/ProvaAula";
 import { IconeCheck, IconeChevron, IconePlay, IconeSeta } from "@/components/Icones";
 
 export const metadata: Metadata = { title: "Aula", robots: { index: false } };
@@ -24,6 +26,7 @@ export default async function Aula({ params }: Props) {
   const feita = c.concluidas.has(aula.id);
   const conteudo = conteudoDaAula(c.curso.id, i, aula.titulo);
   const apostila = apostilaDoCurso(c.curso.id);
+  const prova = provaDaAula(c.curso.nome, i, aula.titulo);
   const link = (id: string) => `/minha-conta/cursos/${slug}/aulas/${encodeURIComponent(id)}`;
 
   return (
@@ -90,6 +93,8 @@ export default async function Aula({ params }: Props) {
             )}
           </div>
         </div>
+
+        {prova.length > 0 && <ProvaAula key={aula.id} slug={slug} aulaId={aula.id} perguntas={prova} />}
       </div>
 
       <aside className="h-fit overflow-hidden rounded-3xl border border-slate-200 bg-white lg:sticky lg:top-24">
