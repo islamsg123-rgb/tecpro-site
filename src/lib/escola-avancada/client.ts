@@ -115,6 +115,32 @@ export async function listarAulasRaw(cursoId: string): Promise<EAAulaRaw[]> {
 
 /* ---------- Alunos e matrículas (a Escola Avançada é a fonte oficial) ---------- */
 
+/** Regras da matrícula na Escola Avançada. */
+export const configMatricula = {
+  /** Prazo de acesso do aluno (campo datafinal). */
+  diasDeAcesso: 365,
+  /** Liberar o certificado da própria Escola Avançada? O site já emite o certificado Tecpro. */
+  certificadoNaEscola: false,
+};
+
+/** Acha o código do aluno na resposta de usuarios/novo, aceitando formatos comuns. */
+function idDoAluno(r: unknown): string {
+  if (typeof r === "string" || typeof r === "number") return String(r).trim();
+  if (Array.isArray(r)) return r.length ? idDoAluno(r[0]) : "";
+  if (r && typeof r === "object") {
+    const o = r as Record<string, unknown>;
+    for (const k of ["id", "aluno", "idaluno", "id_aluno", "usuario", "idusuario", "codigo"]) {
+      const v = o[k];
+      if ((typeof v === "string" || typeof v === "number") && String(v).trim()) return String(v).trim();
+    }
+    for (const v of Object.values(o)) {
+      const dentro = idDoAluno(v);
+      if (dentro && /^\d+$/.test(dentro)) return dentro;
+    }
+  }
+  return "";
+}
+
 export interface NovoAluno {
   nome: string;
   email: string;
@@ -163,13 +189,26 @@ export async function matricularAluno(
   }
 
   if (!usuarioId) {
-    const r = await chamar<{ id?: string | number; usuario?: string | number }>("usuarios/novo", {
+    // Campos confirmados no manual (usuarios/novo).
+    const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+    const final = new Date(Date.now() + configMatricula.diasDeAcesso * 86_400_000).toLocaleDateString("sv-SE", {
+      timeZone: "America/Sao_Paulo",
+    });
+    const r = await chamar<unknown>("usuarios/novo", {
       nome: aluno.nome,
       email: aluno.email,
       cpf: aluno.cpf,
-      telefone: aluno.telefone,
+      fone: aluno.telefone,
+      status: "ativo",
+      apostila: "liberar",
+      datacadastro: hoje,
+      datafinal: final,
+      certificado: configMatricula.certificadoNaEscola ? "S" : "N",
+      bolsista: "N",
+      funcionario_cadastro: "Site Tecpro",
+      obs: "Cadastro automático pela compra no site Tecpro",
     });
-    usuarioId = String(r.id ?? r.usuario ?? "");
+    usuarioId = idDoAluno(r);
     if (!usuarioId) throw new Error("Escola Avançada não devolveu o código do aluno");
   }
   if ((await cursosVinculados(usuarioId)).includes(cursoId)) return { usuarioId, novoVinculo: false };
