@@ -87,7 +87,7 @@ export function adaptarCurso(raw: EACursoRaw): Curso | null {
 export function adaptarAula(raw: EAAulaRaw, indice: number): Aula {
   return {
     id: campo(raw, "id", "id_aula", "aula_id", "codigo") || String(indice + 1),
-    titulo: campo(raw, "titulo", "nome", "title", "name").trim() || `Aula ${indice + 1}`,
+    titulo: campo(raw, "aula", "titulo", "nome", "title", "name").trim() || `Aula ${indice + 1}`,
     modulo: campo(raw, "modulo", "modulo_nome", "secao", "capitulo").trim() || "Conteúdo do curso",
     ordem: Number(campo(raw, "ordem", "posicao", "order")) || indice + 1,
   };
