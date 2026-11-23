@@ -1,3 +1,4 @@
+import { urlSupabase } from "@/lib/supabase-url";
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -9,7 +10,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * Sem SUPABASE_SERVICE_ROLE_KEY, usa um banco de DEMONSTRAÇÃO em memória.
  */
 
-const URL_SUPABASE = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const URL_SUPABASE = urlSupabase();
 const CHAVE_SERVICO = process.env.SUPABASE_SERVICE_ROLE_KEY;
 export const bancoEmDemonstracao = !URL_SUPABASE || !CHAVE_SERVICO;
 
