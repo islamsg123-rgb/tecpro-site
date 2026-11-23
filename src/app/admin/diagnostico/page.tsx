@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { respostaCrua, usandoDadosDeExemplo } from "@/lib/escola-avancada/client";
+import { respostaCrua, testarVariacoes, usandoDadosDeExemplo } from "@/lib/escola-avancada/client";
 import { getCursos } from "@/lib/cursos";
 
 export const metadata: Metadata = { title: "Diagnóstico da API" };
@@ -29,7 +29,7 @@ export default async function Diagnostico({ searchParams }: Props) {
     );
   }
   const { curso } = await searchParams;
-  const [lista, cursos] = await Promise.all([testar("cursos/listar"), getCursos()]);
+  const [lista, cursos, variacoes] = await Promise.all([testar("cursos/listar"), getCursos(), testarVariacoes("cursos/listar")]);
   const aulas = curso ? await testar("cursos/aulas", { curso }) : null;
   const blocos = [{ titulo: "cursos/listar", r: lista }, ...(aulas ? [{ titulo: `cursos/aulas (curso ${curso})`, r: aulas }] : [])];
 
@@ -40,6 +40,21 @@ export default async function Diagnostico({ searchParams }: Props) {
         Cursos que o site conseguiu entender: <strong className="text-marca-900">{cursos.length}</strong>. Para ver as aulas de um curso,
         acrescente <code>?curso=ID</code> no endereço.
       </p>
+      <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
+        <h2 className="font-bold text-marca-900">Formas de chamar cursos/listar</h2>
+        <p className="mt-1 text-sm text-slate-500">O site testa cada jeito de enviar o token. O que der status 200 com a lista de cursos é o certo.</p>
+        <table className="mt-3 w-full text-left text-xs">
+          <tbody>
+            {variacoes.map((v) => (
+              <tr key={v.nome} className="border-t border-slate-100 align-top">
+                <td className="py-2 pr-3 font-semibold text-marca-900">{v.nome}</td>
+                <td className={`py-2 pr-3 font-bold ${v.status === 200 ? "text-green-700" : "text-red-700"}`}>{v.status}</td>
+                <td className="break-all py-2 font-mono text-slate-600">{v.trecho.slice(0, 200) || "(vazio)"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
       {blocos.map(({ titulo, r }) => (
         <section key={titulo} className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="font-bold text-marca-900">{titulo}</h2>
