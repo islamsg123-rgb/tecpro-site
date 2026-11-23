@@ -93,8 +93,14 @@ export default async function Pedido({ params }: Props) {
 
   /* ----- Aguardando: Pix ou boleto ----- */
   const ePix = cobranca.forma === "PIX";
-  const pix = ePix ? await dadosPix(id) : null;
-  const boleto = cobranca.forma === "BOLETO" ? await dadosBoleto(cobranca) : null;
+  // Se o Asaas não devolver o QR Code/linha digitável (ex.: conta sem chave Pix), a página não quebra:
+  // mostra o link da fatura do Asaas, onde o aluno também consegue pagar.
+  const pix = ePix ? await dadosPix(id).catch((e) => (console.error("[pedido] pix", id, e), null)) : null;
+  const boleto =
+    cobranca.forma === "BOLETO"
+      ? await dadosBoleto(cobranca).catch((e) => (console.error("[pedido] boleto", id, e), null))
+      : null;
+  const semDados = !pix && !boleto;
 
   return (
     <section className="bg-[#f3f6fb] px-4 py-12 sm:py-16">
@@ -150,6 +156,25 @@ export default async function Pedido({ params }: Props) {
                 Vencimento: <strong className="text-marca-900">{dataBR(cobranca.vencimento)}</strong>. Após o pagamento, a compensação leva até 3 dias úteis.
               </p>
             </>
+          )}
+          {semDados && (
+            <div className="text-center">
+              <p className="text-slate-600">
+                Não conseguimos mostrar o {ePix ? "código Pix" : "boleto"} aqui agora. Você pode pagar pela página segura da fatura.
+              </p>
+              {cobranca.linkFatura ? (
+                <a
+                  href={cobranca.linkFatura}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-5 inline-flex items-center justify-center rounded-full bg-laranja-500 px-8 py-3 font-bold text-marca-900 hover:bg-laranja-400"
+                >
+                  Abrir fatura para pagar
+                </a>
+              ) : (
+                <p className="mt-3 text-sm text-slate-500">Atualize a página em alguns instantes ou fale com a gente.</p>
+              )}
+            </div>
           )}
           <div className="mt-6 border-t border-slate-100 pt-5 text-center">
             <AcompanharPagamento id={id} />
