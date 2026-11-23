@@ -269,6 +269,24 @@ export async function salvarConfigLoja(c: ConfigLoja): Promise<void> {
   if (error) throw error;
 }
 
+export interface AlunoListado extends RegistroAluno {
+  criadoEm: string | null;
+}
+
+/** Alunos que já compraram pelo site (mais recentes primeiro). */
+export async function listarAlunos(limite = 200): Promise<AlunoListado[]> {
+  if (bancoEmDemonstracao) {
+    return Array.from(mem.alunos, ([email, a]) => ({ email, ...a, criadoEm: null }));
+  }
+  const { data, error } = await db()
+    .from("alunos")
+    .select("email, ea_usuario_id, nome, criado_em")
+    .order("criado_em", { ascending: false })
+    .limit(limite);
+  if (error) throw error;
+  return (data ?? []).map((d) => ({ email: d.email, eaUsuarioId: d.ea_usuario_id, nome: d.nome, criadoEm: d.criado_em }));
+}
+
 /** Totais simples para a visão geral do painel. */
 export async function contagens(): Promise<{ alunos: number; certificados: number }> {
   if (bancoEmDemonstracao) return { alunos: mem.alunos.size, certificados: certs().size };
