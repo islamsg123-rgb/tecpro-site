@@ -1,6 +1,7 @@
 import type { Cobranca } from "@/lib/pagamentos/tipos";
 import { formatarPreco } from "@/lib/formatar";
 import { EtiquetaSituacao, nomeForma } from "./EtiquetaSituacao";
+import Link from "next/link";
 import { matricularDeNovo } from "@/app/admin/acoes";
 
 function data(iso?: string) {
@@ -15,10 +16,11 @@ export function TabelaVendas({ vendas }: { vendas: Cobranca[] }) {
   }
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-      <table className="w-full min-w-[760px] text-left text-sm">
+      <table className="w-full min-w-[860px] text-left text-sm">
         <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
           <tr>
             <th className="px-5 py-3 font-semibold">Data</th>
+            <th className="px-5 py-3 font-semibold">Pago em</th>
             <th className="px-5 py-3 font-semibold">Descrição</th>
             <th className="px-5 py-3 font-semibold">Cliente</th>
             <th className="px-5 py-3 font-semibold">Forma</th>
@@ -31,8 +33,13 @@ export function TabelaVendas({ vendas }: { vendas: Cobranca[] }) {
           {vendas.map((v) => (
             <tr key={v.id} className="hover:bg-marca-50/50">
               <td className="whitespace-nowrap px-5 py-3 text-slate-500">{data(v.criadoEm)}</td>
+              <td className="whitespace-nowrap px-5 py-3 text-slate-500">{v.situacao === "pago" ? data(v.pagoEm) : v.situacao === "aguardando" ? `vence ${data(v.vencimento)}` : "—"}</td>
               <td className="px-5 py-3 font-medium text-marca-900">{v.descricao ?? v.id}</td>
-              <td className="px-5 py-3 text-slate-600">{v.cliente ?? "—"}</td>
+              <td className="px-5 py-3 text-slate-600">
+                {v.clienteEmail ? (
+                  <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(v.clienteEmail)}`} className="hover:text-marca-900 hover:underline">{v.cliente ?? v.clienteEmail}</Link>
+                ) : (v.cliente ?? "—")}
+              </td>
               <td className="px-5 py-3 text-slate-600">{nomeForma[v.forma] ?? v.forma}</td>
               <td className="whitespace-nowrap px-5 py-3 text-right font-semibold text-marca-900">{formatarPreco(v.valorCentavos)}</td>
               <td className="px-5 py-3"><EtiquetaSituacao s={v.situacao} /></td>

@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { exigirAluno } from "@/lib/area-aluno";
 import { loginEmDemonstracao } from "@/lib/auth";
+import { eAdmin } from "@/lib/admin";
 import { sair } from "../entrar/acoes";
 
 export const dynamic = "force-dynamic";
 
 export default async function LayoutAluno({ children }: { children: React.ReactNode }) {
   const aluno = await exigirAluno();
+  const temPainel = await eAdmin().catch(() => false);
   return (
     <div className="min-h-[calc(100vh-72px)] bg-[#f3f6fb]">
       <div className="border-b border-slate-200 bg-white">
@@ -14,6 +16,7 @@ export default async function LayoutAluno({ children }: { children: React.ReactN
           <nav className="flex items-center gap-1 text-sm font-semibold">
             <Link href="/minha-conta" className="rounded-full px-4 py-2 text-marca-900 hover:bg-marca-50">Meus cursos</Link>
             <Link href="/cursos" className="rounded-full px-4 py-2 text-slate-500 hover:bg-marca-50 hover:text-marca-900">Novos cursos</Link>
+            {temPainel && <Link href="/admin" className="rounded-full bg-marca-900 px-4 py-2 text-white hover:bg-marca-800">Painel</Link>}
           </nav>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden max-w-[220px] truncate text-slate-500 sm:inline">{aluno.email}</span>

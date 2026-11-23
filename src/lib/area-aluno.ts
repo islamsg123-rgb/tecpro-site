@@ -4,6 +4,7 @@ import { alunoLogado, type Aluno } from "./auth";
 import { getCursoPorSlug, getCursos, getModulos } from "./cursos";
 import { aulasConcluidas, obterAluno } from "./dados";
 import { cursosVinculados } from "./escola-avancada/client";
+import { cursosRemovidos } from "./dados/painel";
 import type { Aula, Curso, Modulo } from "./types";
 
 export async function exigirAluno(): Promise<Aluno> {
@@ -47,7 +48,13 @@ async function montar(email: string, curso: Curso): Promise<CursoDoAluno> {
 async function idsDosCursos(email: string): Promise<string[]> {
   const aluno = await obterAluno(email);
   if (!aluno) return [];
-  const brutos = await cursosVinculados(aluno.eaUsuarioId);
+  const [ids, removidos] = await Promise.all([idsNaEscola(aluno.eaUsuarioId), cursosRemovidos(email)]);
+  // Cursos tirados do aluno pelo painel (aba Alunos > ficha) deixam de aparecer para ele.
+  return removidos.size ? ids.filter((id) => !removidos.has(id)) : ids;
+}
+
+async function idsNaEscola(eaUsuarioId: string): Promise<string[]> {
+  const brutos = await cursosVinculados(eaUsuarioId);
   if (!brutos.some((b) => b.startsWith("nome:"))) return brutos;
   // A Escola Avançada às vezes só informa o nome do curso: casamos pelo nome.
   const norm = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();

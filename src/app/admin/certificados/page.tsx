@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { exigirAdmin } from "@/lib/admin";
 import Link from "next/link";
 import { getCursos } from "@/lib/cursos";
 import { listarCertificados, listarCertificadosPagos } from "@/lib/dados";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 type Props = { searchParams: Promise<{ busca?: string }> };
 
 export default async function Certificados({ searchParams }: Props) {
+  await exigirAdmin("alunos");
   const [emitidos, pagos, cursos, { busca = "" }] = await Promise.all([listarCertificados(), listarCertificadosPagos(), getCursos(), searchParams]);
   const pago = new Set(pagos.map((p) => `${p.email}|${p.cursoId}`));
   const termo = busca.trim().toLowerCase();

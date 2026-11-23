@@ -6,6 +6,8 @@ import { BarraProgresso } from "@/components/aluno/Progresso";
 import { apostilaDoCurso, conteudoDaAula } from "@/lib/conteudo-escola";
 import { provaDaAula } from "@/lib/provas";
 import { AulaInterativa } from "@/components/aluno/AulaInterativa";
+import { BotaoPesquisa } from "@/components/aluno/BotaoPesquisa";
+import { obterConfigLoja } from "@/lib/dados";
 import { situacaoDaAula } from "@/lib/regras-aula";
 import { IconeCadeado, IconeCheck, IconeChevron, IconeSeta } from "@/components/Icones";
 
@@ -29,7 +31,7 @@ export default async function Aula({ params }: Props) {
   const conteudo = conteudoDaAula(c.curso.id, i, aula.titulo);
   const apostila = apostilaDoCurso(c.curso.id);
   const prova = provaDaAula(c.curso.nome, i, aula.titulo);
-  const sit = await situacaoDaAula(aluno.email, c, i);
+  const [sit, loja] = await Promise.all([situacaoDaAula(aluno.email, c, i), obterConfigLoja()]);
   const link = (id: string) => `/minha-conta/cursos/${slug}/aulas/${encodeURIComponent(id)}`;
 
   return (
@@ -56,6 +58,8 @@ export default async function Aula({ params }: Props) {
           perguntas={prova}
           apostila={apostila}
         />
+
+        {loja.pesquisaNasAulas && <BotaoPesquisa slug={slug} aulaId={aula.id} />}
 
         <div className="mt-8 flex gap-2">
           {anterior && (

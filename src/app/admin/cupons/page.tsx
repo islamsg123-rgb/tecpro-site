@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { exigirAdmin } from "@/lib/admin";
 import { getCursos } from "@/lib/cursos";
 import { listarCupons, type Cupom } from "@/lib/dados/carrinhos";
 import { formatarPreco } from "@/lib/formatar";
@@ -19,6 +20,7 @@ const aplica: Record<Cupom["aplicaEm"], string> = { tudo: "Cursos e certificados
 type Props = { searchParams: Promise<{ erro?: string; criado?: string }> };
 
 export default async function Cupons({ searchParams }: Props) {
+  await exigirAdmin("vendas");
   const [{ lista, tabelaFaltando }, cursos, sp] = await Promise.all([listarCupons(), getCursos(), searchParams]);
   const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
   const campo = "mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm";
