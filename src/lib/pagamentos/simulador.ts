@@ -32,7 +32,7 @@ export async function criarCobrancaSimulada(n: NovaCobranca): Promise<{ cobranca
     forma: n.forma,
     situacao: n.forma === "CREDIT_CARD" ? "pago" : "aguardando",
     valorCentavos: n.valorCentavos,
-    cursoId: n.cursoId,
+    produto: n.produto,
     vencimento: hojeMais(n.forma === "BOLETO" ? configLoja.diasVencimentoBoleto : 1),
   };
   banco.set(cobranca.id, { cobranca, comprador: n.comprador, criadoEm: Date.now() });

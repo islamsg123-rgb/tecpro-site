@@ -25,6 +25,8 @@ function db(): SupabaseClient {
 
 /* ---------- Demonstração (memória) ---------- */
 interface Memoria {
+  certificadosPagos?: Map<string, string>; // "email|curso" -> cobrança
+  certificados?: Map<string, Certificado>; // código -> certificado
   alunos: Map<string, { eaUsuarioId: string; nome: string | null }>;
   progresso: Map<string, Set<string>>; // "email|curso" -> aulas concluídas
 }
@@ -93,4 +95,81 @@ export async function definirAulaConcluida(emailAluno: string, cursoId: string, 
     ? await t.upsert({ email, curso_id: cursoId, aula_id: aulaId }, { onConflict: "email,curso_id,aula_id", ignoreDuplicates: true })
     : await t.delete().eq("email", email).eq("curso_id", cursoId).eq("aula_id", aulaId);
   if (error) throw error;
+}
+
+/* ---------- Certificados ---------- */
+
+export interface Certificado {
+  codigo: string;
+  email: string;
+  cursoId: string;
+  nomeAluno: string;
+  cursoNome: string;
+  cargaHoraria: number;
+  emitidoEm: string;
+}
+
+const certPagos = () => (mem.certificadosPagos ??= new Map());
+const certs = () => (mem.certificados ??= new Map());
+
+export async function registrarCertificadoPago(emailAluno: string, cursoId: string, cobrancaId: string): Promise<void> {
+  const email = norm(emailAluno);
+  if (bancoEmDemonstracao) {
+    if (!certPagos().has(`${email}|${cursoId}`)) certPagos().set(`${email}|${cursoId}`, cobrancaId);
+    return;
+  }
+  const { error } = await db()
+    .from("certificados_pagos")
+    .upsert({ email, curso_id: cursoId, cobranca_id: cobrancaId }, { onConflict: "email,curso_id", ignoreDuplicates: true });
+  if (error) throw error;
+}
+
+export async function certificadoFoiPago(emailAluno: string, cursoId: string): Promise<boolean> {
+  const email = norm(emailAluno);
+  if (bancoEmDemonstracao) return certPagos().has(`${email}|${cursoId}`);
+  const { data, error } = await db().from("certificados_pagos").select("email").eq("email", email).eq("curso_id", cursoId).maybeSingle();
+  if (error) throw error;
+  return Boolean(data);
+}
+
+type LinhaCert = { codigo: string; email: string; curso_id: string; nome_aluno: string; curso_nome: string; carga_horaria: number; emitido_em: string };
+const daLinha = (r: LinhaCert): Certificado => ({
+  codigo: r.codigo, email: r.email, cursoId: r.curso_id, nomeAluno: r.nome_aluno,
+  cursoNome: r.curso_nome, cargaHoraria: r.carga_horaria, emitidoEm: r.emitido_em,
+});
+
+export async function certificadoDoAluno(emailAluno: string, cursoId: string): Promise<Certificado | null> {
+  const email = norm(emailAluno);
+  if (bancoEmDemonstracao) return Array.from(certs().values()).find((c) => c.email === email && c.cursoId === cursoId) ?? null;
+  const { data, error } = await db().from("certificados").select("*").eq("email", email).eq("curso_id", cursoId).maybeSingle();
+  if (error) throw error;
+  return data ? daLinha(data as LinhaCert) : null;
+}
+
+export async function certificadoPorCodigo(codigo: string): Promise<Certificado | null> {
+  const c = codigo.trim().toUpperCase();
+  if (bancoEmDemonstracao) return certs().get(c) ?? null;
+  const { data, error } = await db().from("certificados").select("*").eq("codigo", c).maybeSingle();
+  if (error) throw error;
+  return data ? daLinha(data as LinhaCert) : null;
+}
+
+/** Grava o certificado. Se o aluno já tinha um para esse curso, devolve o existente. */
+export async function gravarCertificado(c: Certificado): Promise<Certificado> {
+  const existente = await certificadoDoAluno(c.email, c.cursoId);
+  if (existente) return existente;
+  const novo = { ...c, email: norm(c.email) };
+  if (bancoEmDemonstracao) {
+    certs().set(novo.codigo, novo);
+    return novo;
+  }
+  const { error } = await db().from("certificados").insert({
+    codigo: novo.codigo, email: novo.email, curso_id: novo.cursoId, nome_aluno: novo.nomeAluno,
+    curso_nome: novo.cursoNome, carga_horaria: novo.cargaHoraria, emitido_em: novo.emitidoEm,
+  });
+  if (error) {
+    if (error.code === "23505") return (await certificadoDoAluno(novo.email, novo.cursoId))!;
+    throw error;
+  }
+  return novo;
 }

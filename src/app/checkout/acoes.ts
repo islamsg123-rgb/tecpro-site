@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 import { getCursos } from "@/lib/cursos";
 import { opcoesParcelas } from "@/lib/config-loja";
 import { criarCobranca } from "@/lib/pagamentos";
-import { ErroPagamento, type FormaPagamento, type NovaCobranca } from "@/lib/pagamentos/tipos";
+import { ErroPagamento, type FormaPagamento, type NovaCobranca, type Produto } from "@/lib/pagamentos/tipos";
+import { alunoLogado } from "@/lib/auth";
+import { cursoDoAluno } from "@/lib/area-aluno";
+import { situacaoCertificado } from "@/lib/certificados";
+import type { Curso } from "@/lib/types";
 import {
   cartaoValido, cepValido, cpfValido, emailValido, soDigitos, telefoneValido, validadeValida,
 } from "@/lib/validacao";
@@ -17,10 +21,31 @@ export interface EstadoCheckout {
 
 const texto = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
+type Item = { produto: Produto; descricao: string; valorCentavos: number };
+
+async function itemDaCompra(tipo: string, curso: Curso): Promise<Item | { erro: string }> {
+  if (tipo !== "certificado") {
+    return { produto: { tipo: "curso", cursoId: curso.id }, descricao: `Curso online: ${curso.nome}`, valorCentavos: curso.precoCentavos };
+  }
+  // Certificado: só para o aluno logado, que concluiu o curso e ainda não pagou.
+  const aluno = await alunoLogado();
+  if (!aluno) return { erro: "Entre na área do aluno para pagar o certificado." };
+  const c = await cursoDoAluno(aluno.email, curso.slug);
+  const s = await situacaoCertificado(aluno.email, c);
+  if (s.estado !== "aguardando_pagamento" || s.regra.modo !== "pago") return { erro: "Este certificado não está aguardando pagamento." };
+  return {
+    produto: { tipo: "certificado", cursoId: curso.id, email: aluno.email },
+    descricao: `Certificado: ${curso.nome}`,
+    valorCentavos: s.regra.precoCentavos,
+  };
+}
+
 export async function pagar(_anterior: EstadoCheckout, f: FormData): Promise<EstadoCheckout> {
-  // O preço vem SEMPRE do servidor, nunca do formulário.
+  // O que está sendo comprado e o preço vêm SEMPRE do servidor, nunca do formulário.
   const curso = (await getCursos()).find((c) => c.id === texto(f, "cursoId"));
   if (!curso) return { erro: "Curso não encontrado." };
+  const item = await itemDaCompra(texto(f, "tipo"), curso);
+  if ("erro" in item) return item;
 
   const forma = texto(f, "forma") as FormaPagamento;
   if (!["PIX", "BOLETO", "CREDIT_CARD"].includes(forma)) return { erro: "Escolha a forma de pagamento." };
@@ -38,9 +63,9 @@ export async function pagar(_anterior: EstadoCheckout, f: FormData): Promise<Est
   if (!telefoneValido(comprador.telefone)) campos.telefone = "Telefone inválido.";
 
   const nova: NovaCobranca = {
-    cursoId: curso.id,
-    descricao: `Curso online: ${curso.nome}`,
-    valorCentavos: curso.precoCentavos,
+    produto: item.produto,
+    descricao: item.descricao,
+    valorCentavos: item.valorCentavos,
     forma,
     comprador,
   };
@@ -62,7 +87,7 @@ export async function pagar(_anterior: EstadoCheckout, f: FormData): Promise<Est
     if (!cepValido(cartao.cep)) campos.cep = "CEP inválido.";
     if (!cartao.numeroEndereco) campos.numeroEndereco = "Informe o número.";
     const parcelas = Number(texto(f, "parcelas")) || 1;
-    if (!opcoesParcelas(curso.precoCentavos).includes(parcelas)) campos.parcelas = "Parcelamento inválido.";
+    if (!opcoesParcelas(item.valorCentavos).includes(parcelas)) campos.parcelas = "Parcelamento inválido.";
     nova.cartao = cartao;
     nova.parcelas = parcelas;
     const h = await headers();

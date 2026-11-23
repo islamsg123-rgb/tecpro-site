@@ -1,7 +1,8 @@
 import "server-only";
 import { matricularAluno } from "../escola-avancada/client";
 import { obterAluno, salvarAluno } from "../dados";
-import type { Comprador } from "./tipos";
+import { liberarCertificadoPago } from "../certificados";
+import type { Comprador, Produto } from "./tipos";
 
 /**
  * Depois do pagamento confirmado: cria o aluno na Escola Avançada (se ainda não existir),
@@ -14,6 +15,12 @@ import type { Comprador } from "./tipos";
 
 const g = globalThis as unknown as { __liberacoesEmAndamento?: Set<string> };
 const emAndamento = (g.__liberacoesEmAndamento ??= new Set());
+
+/** Chamado quando um pagamento é confirmado (webhook do Asaas ou simulador). */
+export async function processarPagamento(cobrancaId: string, comprador: Comprador, produto: Produto): Promise<void> {
+  if (produto.tipo === "curso") return liberarAcesso(cobrancaId, comprador, produto.cursoId);
+  await liberarCertificadoPago(produto.email, produto.cursoId, cobrancaId);
+}
 
 export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cursoId: string): Promise<void> {
   if (emAndamento.has(cobrancaId)) return;

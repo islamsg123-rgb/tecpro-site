@@ -22,10 +22,31 @@ export default async function Pedido({ params }: Props) {
   const { id } = await params;
   const cobranca = await consultarCobranca(id);
   if (!cobranca) notFound();
-  const curso = (await getCursos()).find((c) => c.id === cobranca.cursoId);
+  const curso = (await getCursos()).find((c) => c.id === cobranca.produto?.cursoId);
+  const eCertificado = cobranca.produto?.tipo === "certificado";
   const nomeCurso = curso?.nome ?? "Curso Tecpro";
 
   /* ----- Pago ----- */
+  if (cobranca.situacao === "pago" && eCertificado) {
+    return (
+      <section className="mx-auto max-w-xl px-4 py-16 text-center sm:py-24">
+        <span className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-100 text-green-600">
+          <IconeCheck className="h-10 w-10" />
+        </span>
+        <h1 className="mt-6 text-3xl font-extrabold text-marca-900 sm:text-4xl">Certificado liberado!</h1>
+        <p className="mt-4 text-lg text-slate-600">
+          Pagamento recebido. Agora é só confirmar o seu nome e emitir o certificado de <strong className="text-marca-900">{nomeCurso}</strong>.
+        </p>
+        <Link
+          href={curso ? `/minha-conta/cursos/${curso.slug}#certificado` : "/minha-conta"}
+          className="mt-8 inline-flex items-center gap-2 rounded-full bg-laranja-500 px-8 py-4 font-bold text-marca-900 hover:bg-laranja-400"
+        >
+          Emitir meu certificado <IconeSeta className="h-5 w-5" />
+        </Link>
+      </section>
+    );
+  }
+
   if (cobranca.situacao === "pago") {
     return (
       <section className="mx-auto max-w-xl px-4 py-16 text-center sm:py-24">

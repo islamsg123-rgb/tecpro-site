@@ -1,6 +1,6 @@
 import "server-only";
 import type { Cobranca, Comprador, DadosBoleto, DadosPix, NovaCobranca, Situacao } from "./tipos";
-import { ErroPagamento } from "./tipos";
+import { ErroPagamento, produtoDaReferencia, referenciaProduto } from "./tipos";
 import { configLoja } from "../config-loja";
 
 /**
@@ -56,10 +56,6 @@ export function traduzirStatus(status: string): Situacao {
   }
 }
 
-const PREFIXO_REF = "curso:";
-export const referenciaCurso = (cursoId: string) => `${PREFIXO_REF}${cursoId}`;
-export const cursoDaReferencia = (ref: unknown) =>
-  typeof ref === "string" && ref.startsWith(PREFIXO_REF) ? ref.slice(PREFIXO_REF.length) : null;
 
 export function paraCobranca(p: Json): Cobranca {
   return {
@@ -67,7 +63,7 @@ export function paraCobranca(p: Json): Cobranca {
     forma: p.billingType as Cobranca["forma"],
     situacao: traduzirStatus(String(p.status)),
     valorCentavos: Math.round(Number(p.value) * 100),
-    cursoId: cursoDaReferencia(p.externalReference),
+    produto: produtoDaReferencia(p.externalReference),
     vencimento: String(p.dueDate),
     linkFatura: (p.bankSlipUrl as string) || (p.invoiceUrl as string) || undefined,
   };
@@ -92,7 +88,7 @@ export async function criarCobrancaAsaas(n: NovaCobranca): Promise<Cobranca> {
     billingType: n.forma,
     dueDate: hojeMais(n.forma === "BOLETO" ? configLoja.diasVencimentoBoleto : 1),
     description: n.descricao,
-    externalReference: referenciaCurso(n.cursoId),
+    externalReference: referenciaProduto(n.produto),
   };
 
   if (n.forma === "CREDIT_CARD") {

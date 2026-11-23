@@ -2,16 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cursoDoAluno, exigirAluno } from "@/lib/area-aluno";
 import { AnelProgresso } from "@/components/aluno/Progresso";
-import { IconeCertificado, IconeCheck, IconeChevron, IconePlay } from "@/components/Icones";
+import { CartaoCertificado } from "@/components/aluno/CartaoCertificado";
+import { situacaoCertificado } from "@/lib/certificados";
+import { obterAluno } from "@/lib/dados";
+import { IconeCheck, IconeChevron, IconePlay } from "@/components/Icones";
 
 export const metadata: Metadata = { title: "Meu curso", robots: { index: false } };
 
-type Props = { params: Promise<{ slug: string }> };
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ erroNome?: string }> };
 
-export default async function MeuCurso({ params }: Props) {
+export default async function MeuCurso({ params, searchParams }: Props) {
   const aluno = await exigirAluno();
   const { slug } = await params;
   const c = await cursoDoAluno(aluno.email, slug);
+  const [cert, registro, { erroNome }] = await Promise.all([situacaoCertificado(aluno.email, c), obterAluno(aluno.email), searchParams]);
+  const nomeSugerido = registro?.nome ?? "";
   const link = (id: string) => `/minha-conta/cursos/${slug}/aulas/${encodeURIComponent(id)}`;
 
   return (
@@ -66,15 +71,7 @@ export default async function MeuCurso({ params }: Props) {
           })}
         </div>
 
-        <aside className="h-fit rounded-3xl border border-slate-200 bg-white p-6">
-          <IconeCertificado className="h-8 w-8 text-laranja-600" />
-          <h2 className="mt-3 font-bold text-marca-900">Certificado</h2>
-          {c.pct === 100 ? (
-            <p className="mt-2 text-sm text-slate-600">Parabéns, você concluiu o curso! A emissão do certificado chega na próxima etapa do site.</p>
-          ) : (
-            <p className="mt-2 text-sm text-slate-600">Conclua todas as aulas para liberar o seu certificado. Faltam {c.total - c.feitas}.</p>
-          )}
-        </aside>
+        <CartaoCertificado s={cert} slug={slug} faltam={c.total - c.feitas} nomeSugerido={nomeSugerido} erroNome={erroNome === "1"} />
       </div>
     </>
   );

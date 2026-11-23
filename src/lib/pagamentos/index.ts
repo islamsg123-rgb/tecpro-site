@@ -6,7 +6,7 @@ import {
 import {
   boletoSimulado, consultarCobrancaSimulada, criarCobrancaSimulada, pixSimulado,
 } from "./simulador";
-import { liberarAcesso } from "./liberacao";
+import { processarPagamento } from "./liberacao";
 
 /**
  * Porta de entrada dos pagamentos. As páginas só usam estas funções;
@@ -18,7 +18,7 @@ export const pagamentoEmSimulacao = !asaasConfigurado;
 export async function criarCobranca(n: NovaCobranca): Promise<Cobranca> {
   if (pagamentoEmSimulacao) {
     const { cobranca, comprador } = await criarCobrancaSimulada(n);
-    if (cobranca.situacao === "pago") await liberarAcesso(cobranca.id, comprador, n.cursoId);
+    if (cobranca.situacao === "pago") await processarPagamento(cobranca.id, comprador, n.produto);
     return cobranca;
   }
   // No Asaas real, a liberação acontece quando o aviso (webhook) de pagamento chega.
@@ -29,7 +29,7 @@ export async function consultarCobranca(id: string): Promise<Cobranca | null> {
   if (pagamentoEmSimulacao) {
     const r = consultarCobrancaSimulada(id);
     if (!r) return null;
-    if (r.acabouDePagar && r.cobranca.cursoId) await liberarAcesso(id, r.comprador, r.cobranca.cursoId);
+    if (r.acabouDePagar && r.cobranca.produto) await processarPagamento(id, r.comprador, r.cobranca.produto);
     return r.cobranca;
   }
   return consultarCobrancaAsaas(id);

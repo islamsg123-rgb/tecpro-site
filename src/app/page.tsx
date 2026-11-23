@@ -245,7 +245,7 @@ export default async function Inicio() {
                   <div className="rounded-md bg-marca-900 px-2 py-1.5">
                     <Image src="/logo-tecpro-transparente.png" alt="" width={88} height={32} />
                   </div>
-                  <p className="text-[10px] text-slate-400">Código de validação<br /><span className="font-mono text-marca-900">TP-2026-XXXX</span></p>
+                  <p className="text-[10px] text-slate-400">Código de validação<br /><span className="font-mono text-marca-900">TP-XXXX-XXXX</span></p>
                 </div>
               </div>
             </div>
