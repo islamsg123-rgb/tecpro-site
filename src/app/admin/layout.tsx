@@ -13,6 +13,8 @@ const menu = [
   { href: "/admin", rotulo: "Visão geral" },
   { href: "/admin/cursos", rotulo: "Cursos" },
   { href: "/admin/vendas", rotulo: "Vendas" },
+  { href: "/admin/carrinhos", rotulo: "Carrinhos" },
+  { href: "/admin/cupons", rotulo: "Cupons" },
   { href: "/admin/alunos", rotulo: "Alunos" },
   { href: "/admin/certificados", rotulo: "Certificados" },
   { href: "/admin/configuracoes", rotulo: "Configurações" },
