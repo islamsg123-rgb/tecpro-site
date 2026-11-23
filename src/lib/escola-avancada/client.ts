@@ -93,7 +93,11 @@ async function chamar<T>(recurso: string, campos: Record<string, string> = {}): 
   if (r.status >= 400) throw new ErroEscolaAvancada(`HTTP ${r.status} em ${recurso}: ${r.texto.slice(0, 300)}`);
   try {
     const json = JSON.parse(r.texto) as EAResposta<T> & Record<string, unknown>;
-    return (json.dados ?? json.data ?? json) as T;
+    // A API responde {"erro": "", "resultado": ...}; "erro" preenchido indica falha.
+    if (typeof json.erro === "string" && json.erro.trim()) {
+      throw new ErroEscolaAvancada(`Escola Avançada recusou ${recurso}: ${json.erro}`);
+    }
+    return (json.resultado ?? json.dados ?? json.data ?? json) as T;
   } catch {
     throw new ErroEscolaAvancada(`Resposta não é JSON em ${recurso}: ${r.texto.slice(0, 300)}`);
   }
@@ -169,7 +173,8 @@ export async function matricularAluno(
     if (!usuarioId) throw new Error("Escola Avançada não devolveu o código do aluno");
   }
   if ((await cursosVinculados(usuarioId)).includes(cursoId)) return { usuarioId, novoVinculo: false };
-  await chamar("usuarios/vinculocurso", { usuario: usuarioId, curso: cursoId });
-  await chamar("usuarios/envioemail", { usuario: usuarioId });
+  // Campos confirmados no manual: vinculocurso {aluno, idcurso}; envioemail {aluno}.
+  await chamar("usuarios/vinculocurso", { aluno: usuarioId, idcurso: cursoId });
+  await chamar("usuarios/envioemail", { aluno: usuarioId });
   return { usuarioId, novoVinculo: true };
 }
