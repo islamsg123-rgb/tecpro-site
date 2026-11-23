@@ -7,6 +7,9 @@ import { getCursos } from "@/lib/cursos";
 import { configuracoesDosCursos, definirCursoGratuito, definirCursosGratuitos, registrarEventoMatricula, salvarConfigLoja, salvarConfiguracaoCurso, salvarConfiguracoesCursos } from "@/lib/dados";
 import { asaasConfigurado, cobrancaParaLiberacao } from "@/lib/pagamentos/asaas";
 import { processarPagamento } from "@/lib/pagamentos/liberacao";
+import {
+  apagarCupom, marcarContatado, MENSAGENS_PADRAO, normCupom, obterCupom, salvarCupom, salvarMensagensProntas,
+} from "@/lib/dados/carrinhos";
 
 /** "197,90" / "197.90" / "R$ 197" -> centavos. Vazio -> null. */
 function lerPreco(v: FormDataEntryValue | null): number | null | "invalido" {
@@ -107,4 +110,67 @@ export async function matricularDeNovo(f: FormData) {
   }
   revalidatePath("/admin/alunos");
   redirect("/admin/alunos#eventos");
+}
+
+/* ---------- Carrinhos abandonados e cupons ---------- */
+
+export async function alternarContatado(f: FormData) {
+  await exigirAdmin();
+  const tipo = String(f.get("tipo")) === "certificado" ? "certificado" : "curso";
+  await marcarContatado(String(f.get("email")), String(f.get("cursoId")), tipo, String(f.get("contatado")) === "1");
+  revalidatePath("/admin/carrinhos");
+}
+
+export async function salvarMensagens(f: FormData) {
+  await exigirAdmin();
+  const titulos = f.getAll("titulo").map(String);
+  const textos = f.getAll("texto").map(String);
+  const lista = titulos
+    .map((t, i) => ({ titulo: t.trim().slice(0, 60), texto: (textos[i] ?? "").trim().slice(0, 1000) }))
+    .filter((m) => m.titulo && m.texto);
+  await salvarMensagensProntas(lista.length ? lista : MENSAGENS_PADRAO);
+  redirect("/admin/carrinhos?mensagens=1#mensagens");
+}
+
+export async function criarCupom(f: FormData) {
+  await exigirAdmin();
+  const codigo = normCupom(String(f.get("codigo") ?? ""));
+  const tipo = String(f.get("tipo")) === "valor" ? "valor" : "percentual";
+  const aplicaEm = (["tudo", "cursos", "certificados"].includes(String(f.get("aplicaEm"))) ? String(f.get("aplicaEm")) : "tudo") as "tudo" | "cursos" | "certificados";
+  const erro = (e: string) => redirect(`/admin/cupons?erro=${e}`);
+  if (!/^[A-Z0-9_-]{3,30}$/.test(codigo)) erro("codigo");
+  let valor: number;
+  if (tipo === "percentual") {
+    valor = Number(String(f.get("valor") ?? "").replace(",", "."));
+    if (!Number.isInteger(valor) || valor < 1 || valor > 100) erro("valor");
+  } else {
+    const v = lerPreco(f.get("valor"));
+    if (v === null || v === "invalido") erro("valor");
+    valor = v as number;
+  }
+  const cursoId = String(f.get("cursoId") ?? "").trim() || null;
+  const validade = String(f.get("validade") ?? "").trim() || null;
+  if (validade && !/^\d{4}-\d{2}-\d{2}$/.test(validade)) erro("validade");
+  const limite = String(f.get("limite") ?? "").trim();
+  const limiteUsos = limite ? Number(limite) : null;
+  if (limiteUsos !== null && (!Number.isInteger(limiteUsos) || limiteUsos < 1)) erro("limite");
+  try {
+    await salvarCupom({ codigo, tipo, valor: valor!, aplicaEm, cursoId, validade, limiteUsos, ativo: true });
+  } catch {
+    erro("banco");
+  }
+  redirect(`/admin/cupons?criado=${codigo}`);
+}
+
+export async function alternarCupom(f: FormData) {
+  await exigirAdmin();
+  const c = await obterCupom(String(f.get("codigo")));
+  if (c) await salvarCupom({ ...c, ativo: !c.ativo });
+  revalidatePath("/admin/cupons");
+}
+
+export async function excluirCupom(f: FormData) {
+  await exigirAdmin();
+  await apagarCupom(normCupom(String(f.get("codigo"))));
+  revalidatePath("/admin/cupons");
 }

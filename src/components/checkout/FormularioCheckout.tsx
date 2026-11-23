@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useActionState, useState } from "react";
-import { pagar, type EstadoCheckout } from "@/app/checkout/acoes";
+import { conferirCupom, pagar, salvarContato, type EstadoCheckout } from "@/app/checkout/acoes";
 import { formatarPreco } from "@/lib/formatar";
 import {
   mascaraCartao, mascaraCep, mascaraCpf, mascaraTelefone,
@@ -53,13 +53,55 @@ export function FormularioCheckout({
 }) {
   const [estado, acao, enviando] = useActionState<EstadoCheckout, FormData>(pagar, {});
   const [forma, setForma] = useState<Forma>("PIX");
-  const e = estado.campos ?? {};
-  const maxParcelas = parcelas[parcelas.length - 1] ?? 1;
+  // Etapa 1: dados de contato (já ficam guardados). Etapa 2: pagamento.
+  const [etapa, setEtapa] = useState<1 | 2>(1);
+  const [salvandoContato, setSalvandoContato] = useState(false);
+  const [contato, setContato] = useState<EstadoCheckout>({});
+  // Cupom
+  const [cupomDigitado, setCupomDigitado] = useState("");
+  const [cupom, setCupom] = useState<{ codigo: string; rotulo: string; descontoCentavos: number } | null>(null);
+  const [erroCupom, setErroCupom] = useState("");
+  const [conferindo, setConferindo] = useState(false);
+  const [valor, setValor] = useState(precoCentavos);
+  const [opcoes, setOpcoes] = useState(parcelas);
+
+  const e = { ...(contato.campos ?? {}), ...(estado.campos ?? {}) };
+  const maxParcelas = opcoes[opcoes.length - 1] ?? 1;
   const formas = formasBase.map((f) =>
     f.id === "CREDIT_CARD" && maxParcelas > 1 ? { ...f, detalhe: `Em até ${maxParcelas}x` } : f,
   );
   const textoBotao =
-    forma === "PIX" ? "Gerar Pix" : forma === "BOLETO" ? "Gerar boleto" : `Pagar ${formatarPreco(precoCentavos)}`;
+    forma === "PIX" ? "Gerar Pix" : forma === "BOLETO" ? "Gerar boleto" : `Pagar ${formatarPreco(valor)}`;
+
+  async function continuar(form: HTMLFormElement) {
+    setSalvandoContato(true);
+    const r = await salvarContato(new FormData(form));
+    setSalvandoContato(false);
+    setContato(r);
+    if (r.ok) setEtapa(2);
+  }
+
+  async function aplicarCupom() {
+    if (!cupomDigitado.trim()) return;
+    setConferindo(true);
+    setErroCupom("");
+    const r = await conferirCupom(cursoId, tipo, cupomDigitado);
+    setConferindo(false);
+    if (!r.ok) {
+      setErroCupom(r.erro);
+      return;
+    }
+    setCupom({ codigo: r.codigo, rotulo: r.rotulo, descontoCentavos: r.descontoCentavos });
+    setValor(r.valorCentavos);
+    setOpcoes(r.parcelas);
+  }
+
+  function tirarCupom() {
+    setCupom(null);
+    setCupomDigitado("");
+    setValor(precoCentavos);
+    setOpcoes(parcelas);
+  }
 
   return (
     <form
@@ -75,6 +117,7 @@ export function FormularioCheckout({
       <input type="hidden" name="cursoId" value={cursoId} />
       <input type="hidden" name="tipo" value={tipo} />
       <input type="hidden" name="forma" value={forma} />
+      <input type="hidden" name="cupom" value={cupom?.codigo ?? ""} />
 
       <fieldset className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
         <legend className="sr-only">Seus dados</legend>
@@ -90,6 +133,57 @@ export function FormularioCheckout({
           <Campo nome="email" rotulo="E-mail" type="email" autoComplete="email" defaultValue={emailInicial} erro={e.email} className="sm:col-span-2" required />
           <Campo nome="cpf" rotulo="CPF" inputMode="numeric" placeholder="000.000.000-00" mascara={mascaraCpf} erro={e.cpf} required />
           <Campo nome="telefone" rotulo="Celular (WhatsApp)" inputMode="tel" autoComplete="tel" placeholder="(00) 00000-0000" mascara={mascaraTelefone} erro={e.telefone} required />
+        </div>
+        {etapa === 1 && (
+          <>
+            {contato.erro && <p role="alert" className="mt-5 text-sm font-medium text-red-600">{contato.erro}</p>}
+            <button
+              type="button"
+              disabled={salvandoContato}
+              onClick={(ev) => continuar(ev.currentTarget.form!)}
+              className="mt-6 w-full rounded-full bg-laranja-500 py-4 text-lg font-bold text-marca-900 shadow-lg shadow-laranja-500/30 transition hover:bg-laranja-400 disabled:cursor-wait disabled:opacity-70"
+            >
+              {salvandoContato ? "Salvando…" : "Continuar para o pagamento"}
+            </button>
+          </>
+        )}
+      </fieldset>
+
+      {etapa === 2 && (
+      <>
+
+      <fieldset className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+        <legend className="sr-only">Cupom de desconto</legend>
+        {cupom ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-green-50 p-4 text-sm text-green-800">
+            <span>Cupom <strong>{cupom.codigo}</strong> aplicado: {cupom.rotulo} (−{formatarPreco(cupom.descontoCentavos)})</span>
+            <button type="button" onClick={tirarCupom} className="font-semibold underline">remover</button>
+          </div>
+        ) : (
+          <div>
+            <label htmlFor="campo-cupom" className="mb-1.5 block text-sm font-medium text-slate-700">Tem um cupom de desconto?</label>
+            <div className="flex gap-2">
+              <input
+                id="campo-cupom"
+                value={cupomDigitado}
+                onChange={(ev) => setCupomDigitado(ev.currentTarget.value.toUpperCase())}
+                onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); aplicarCupom(); } }}
+                placeholder="CÓDIGO"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-[15px] uppercase outline-none focus:border-marca-500 focus:ring-4 focus:ring-marca-100"
+              />
+              <button type="button" onClick={aplicarCupom} disabled={conferindo} className="shrink-0 rounded-xl bg-marca-900 px-5 font-semibold text-white hover:bg-marca-800 disabled:opacity-70">
+                {conferindo ? "…" : "Aplicar"}
+              </button>
+            </div>
+            {erroCupom && <p className="mt-1 text-xs font-medium text-red-600">{erroCupom}</p>}
+          </div>
+        )}
+        <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+          <span className="font-semibold text-slate-600">Total</span>
+          <span className="text-right">
+            {cupom && <span className="mr-2 text-sm text-slate-400 line-through">{formatarPreco(precoCentavos)}</span>}
+            <span className="font-display text-2xl font-extrabold text-marca-900">{formatarPreco(valor)}</span>
+          </span>
         </div>
       </fieldset>
 
@@ -140,9 +234,9 @@ export function FormularioCheckout({
             <label className="block sm:col-span-6">
               <span className="mb-1.5 block text-sm font-medium text-slate-700">Parcelas</span>
               <select name="parcelas" className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-[15px]">
-                {parcelas.map((n) => (
+                {opcoes.map((n) => (
                   <option key={n} value={n}>
-                    {n === 1 ? `À vista: ${formatarPreco(precoCentavos)}` : `${n}x de ${formatarPreco(Math.round(precoCentavos / n))}`}
+                    {n === 1 ? `À vista: ${formatarPreco(valor)}` : `${n}x de ${formatarPreco(Math.round(valor / n))} sem juros`}
                   </option>
                 ))}
               </select>
@@ -167,6 +261,8 @@ export function FormularioCheckout({
       <p className="flex items-center justify-center gap-2 text-xs text-slate-500">
         <IconeCadeado className="h-4 w-4" /> Pagamento processado com segurança pelo Asaas
       </p>
+      </>
+      )}
     </form>
   );
 }

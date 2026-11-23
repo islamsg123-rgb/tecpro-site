@@ -19,7 +19,7 @@ export const EMAIL_DEMO = "aluno@demo.tecpro";
 const norm = (email: string) => email.trim().toLowerCase();
 
 let cliente: SupabaseClient | null = null;
-function db(): SupabaseClient {
+export function db(): SupabaseClient {
   cliente ??= createClient(URL_SUPABASE!, CHAVE_SERVICO!, { auth: { persistSession: false } });
   return cliente;
 }
