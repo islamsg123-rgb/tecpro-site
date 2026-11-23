@@ -31,6 +31,7 @@ interface Memoria {
   certificados?: Map<string, Certificado>; // código -> certificado
   alunos: Map<string, { eaUsuarioId: string; nome: string | null }>;
   progresso: Map<string, Set<string>>; // "email|curso" -> aulas concluídas
+  etapas?: Map<string, Date>; // "email|curso|aula#etapa" -> quando
 }
 const g = globalThis as unknown as { __bancoDemo?: Memoria };
 const mem: Memoria = (g.__bancoDemo ??= {
@@ -96,6 +97,53 @@ export async function definirAulaConcluida(emailAluno: string, cursoId: string, 
   const { error } = concluida
     ? await t.upsert({ email, curso_id: cursoId, aula_id: aulaId }, { onConflict: "email,curso_id,aula_id", ignoreDuplicates: true })
     : await t.delete().eq("email", email).eq("curso_id", cursoId).eq("aula_id", aulaId);
+  if (error) throw error;
+}
+
+/* ---------- Etapas da aula (vídeo assistido, prova aprovada) ----------
+ * Guardadas na mesma tabela "progresso", com o id da aula seguido de "#etapa"
+ * (ex.: "123#video"). Assim não é preciso criar tabela nova no banco.
+ * Essas linhas não contam como aula concluída, porque o site só conta ids de aulas reais. */
+
+export type EtapaAula = "inicio" | "video" | "prova";
+const ETAPAS: EtapaAula[] = ["inicio", "video", "prova"];
+
+export async function etapasDaAula(emailAluno: string, cursoId: string, aulaId: string): Promise<Partial<Record<EtapaAula, Date>>> {
+  const email = norm(emailAluno);
+  const out: Partial<Record<EtapaAula, Date>> = {};
+  if (bancoEmDemonstracao) {
+    for (const e of ETAPAS) {
+      const d = mem.etapas?.get(`${email}|${cursoId}|${aulaId}#${e}`);
+      if (d) out[e] = d;
+    }
+    return out;
+  }
+  const { data, error } = await db()
+    .from("progresso")
+    .select("aula_id, concluida_em")
+    .eq("email", email)
+    .eq("curso_id", cursoId)
+    .in("aula_id", ETAPAS.map((e) => `${aulaId}#${e}`));
+  if (error) throw error;
+  for (const r of data ?? []) {
+    const e = String(r.aula_id).split("#").pop() as EtapaAula;
+    out[e] = new Date(r.concluida_em as string);
+  }
+  return out;
+}
+
+/** Registra uma etapa (só a primeira vez; a data fica a do primeiro registro). */
+export async function marcarEtapa(emailAluno: string, cursoId: string, aulaId: string, etapa: EtapaAula): Promise<void> {
+  const email = norm(emailAluno);
+  if (bancoEmDemonstracao) {
+    mem.etapas ??= new Map();
+    const k = `${email}|${cursoId}|${aulaId}#${etapa}`;
+    if (!mem.etapas.has(k)) mem.etapas.set(k, new Date());
+    return;
+  }
+  const { error } = await db()
+    .from("progresso")
+    .upsert({ email, curso_id: cursoId, aula_id: `${aulaId}#${etapa}` }, { onConflict: "email,curso_id,aula_id", ignoreDuplicates: true });
   if (error) throw error;
 }
 
