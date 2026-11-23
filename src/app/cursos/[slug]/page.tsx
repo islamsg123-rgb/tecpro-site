@@ -12,7 +12,13 @@ import {
 type Props = { params: Promise<{ slug: string }> };
 
 export async function generateStaticParams() {
-  return (await getCursosPublicos()).map((c) => ({ slug: c.slug }));
+  // Se a API falhar na hora do build, as páginas são geradas na primeira visita.
+  try {
+    return (await getCursosPublicos()).map((c) => ({ slug: c.slug }));
+  } catch (e) {
+    console.error("[cursos/slug] generateStaticParams", e);
+    return [];
+  }
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

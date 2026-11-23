@@ -12,16 +12,17 @@ import type { Curso, Modulo } from "./types";
 /** Todos os cursos, inclusive os escondidos (para a área do aluno e o painel). */
 export async function getCursos(): Promise<Curso[]> {
   const [raw, cfg] = await Promise.all([listarCursosRaw(), configuracoesDosCursos()]);
-  return raw.map((r) => {
+  return raw.flatMap((r) => {
     const c = adaptarCurso(r);
+    if (!c) return [];
     const ajuste = cfg.get(c.id);
-    if (!ajuste) return c;
-    return {
+    if (!ajuste) return [c];
+    return [{
       ...c,
       precoCentavos: ajuste.precoCentavos ?? c.precoCentavos,
       visivel: ajuste.visivel,
       destaque: ajuste.destaque,
-    };
+    }];
   });
 }
 

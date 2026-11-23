@@ -13,7 +13,41 @@ const TOKEN = process.env.ESCOLA_AVANCADA_TOKEN;
 
 export const usandoDadosDeExemplo = !URL_BASE || !TOKEN;
 
-async function chamar<T>(recurso: string, campos: Record<string, string> = {}, guardarCache = false): Promise<T> {
+/** Erro da API da Escola Avançada, com um trecho da resposta para diagnóstico (sem o token). */
+export class ErroEscolaAvancada extends Error {}
+
+/** Resposta crua de um recurso: usada pela página de diagnóstico do painel. */
+export async function respostaCrua(recurso: string, campos: Record<string, string> = {}) {
+  const form = new FormData();
+  form.set("token", TOKEN!); // SUPOSIÇÃO: confirmar se o token vai no corpo ou no cabeçalho.
+  for (const [k, v] of Object.entries(campos)) form.set(k, v);
+  const url = `${URL_BASE}/api/v2/?${recurso}`;
+  const resp = await fetch(url, { method: "POST", body: form, cache: "no-store" });
+  const texto = await resp.text();
+  return { url, status: resp.status, texto };
+}
+
+/** Acha a lista dentro da resposta, aceitando formatos comuns: [..], {dados:[..]}, {data:[..]}, etc. */
+function extrairLista(json: unknown): unknown[] | null {
+  if (Array.isArray(json)) return json;
+  if (json && typeof json === "object") {
+    const o = json as Record<string, unknown>;
+    for (const chave of ["dados", "data", "cursos", "aulas", "result", "resultado", "items"]) {
+      const v = o[chave];
+      if (Array.isArray(v)) return v;
+      if (v && typeof v === "object") {
+        const dentro = extrairLista(v);
+        if (dentro) return dentro;
+      }
+    }
+    // Objeto de objetos ({"1": {...}, "2": {...}})
+    const valores = Object.values(o);
+    if (valores.length && valores.every((v) => v && typeof v === "object" && !Array.isArray(v))) return valores;
+  }
+  return null;
+}
+
+async function chamarLista<T>(recurso: string, campos: Record<string, string> = {}, guardarCache = false): Promise<T[]> {
   const form = new FormData();
   form.set("token", TOKEN!); // SUPOSIÇÃO: confirmar se o token vai no corpo ou no cabeçalho.
   for (const [k, v] of Object.entries(campos)) form.set(k, v);
@@ -24,19 +58,48 @@ async function chamar<T>(recurso: string, campos: Record<string, string> = {}, g
     // Guarda a resposta por 10 minutos para o site ficar rápido e não sobrecarregar a API.
     ...(guardarCache ? { next: { revalidate: 600 } } : { cache: "no-store" as const }),
   });
-  if (!resp.ok) throw new Error(`Escola Avançada respondeu ${resp.status} em ${recurso}`);
-  const json = (await resp.json()) as EAResposta<T>;
-  return json.dados;
+  const texto = await resp.text();
+  if (!resp.ok) throw new ErroEscolaAvancada(`HTTP ${resp.status} em ${recurso}: ${texto.slice(0, 300)}`);
+  let json: unknown;
+  try {
+    json = JSON.parse(texto);
+  } catch {
+    throw new ErroEscolaAvancada(`Resposta não é JSON em ${recurso}: ${texto.slice(0, 300)}`);
+  }
+  const lista = extrairLista(json);
+  if (!lista) throw new ErroEscolaAvancada(`Formato inesperado em ${recurso}: ${texto.slice(0, 300)}`);
+  return lista as T[];
+}
+
+/** Chama a API sem derrubar o site: se falhar, registra no log e devolve lista vazia. */
+async function listaSegura<T>(recurso: string, campos: Record<string, string> = {}): Promise<T[]> {
+  try {
+    return await chamarLista<T>(recurso, campos, true);
+  } catch (e) {
+    console.error("[escola-avancada]", e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
+async function chamar<T>(recurso: string, campos: Record<string, string> = {}): Promise<T> {
+  const r = await respostaCrua(recurso, campos);
+  if (r.status >= 400) throw new ErroEscolaAvancada(`HTTP ${r.status} em ${recurso}: ${r.texto.slice(0, 300)}`);
+  try {
+    const json = JSON.parse(r.texto) as EAResposta<T> & Record<string, unknown>;
+    return (json.dados ?? json.data ?? json) as T;
+  } catch {
+    throw new ErroEscolaAvancada(`Resposta não é JSON em ${recurso}: ${r.texto.slice(0, 300)}`);
+  }
 }
 
 export async function listarCursosRaw(): Promise<EACursoRaw[]> {
   if (usandoDadosDeExemplo) return cursosMock;
-  return chamar<EACursoRaw[]>("cursos/listar", {}, true);
+  return listaSegura<EACursoRaw>("cursos/listar");
 }
 
 export async function listarAulasRaw(cursoId: string): Promise<EAAulaRaw[]> {
   if (usandoDadosDeExemplo) return aulasMock[cursoId] ?? [];
-  return chamar<EAAulaRaw[]>("cursos/aulas", { curso: cursoId }, true);
+  return listaSegura<EAAulaRaw>("cursos/aulas", { curso: cursoId });
 }
 
 /* ---------- Alunos e matrículas (a Escola Avançada é a fonte oficial) ---------- */

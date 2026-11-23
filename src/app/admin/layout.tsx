@@ -13,6 +13,7 @@ const menu = [
   { href: "/admin", rotulo: "Visão geral" },
   { href: "/admin/cursos", rotulo: "Cursos" },
   { href: "/admin/vendas", rotulo: "Vendas" },
+  { href: "/admin/diagnostico", rotulo: "API" },
 ];
 
 export default async function LayoutAdmin({ children }: { children: React.ReactNode }) {
