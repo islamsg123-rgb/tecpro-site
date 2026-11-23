@@ -117,8 +117,6 @@ export async function listarAulasRaw(cursoId: string): Promise<EAAulaRaw[]> {
 
 /** Regras da matrícula na Escola Avançada. */
 export const configMatricula = {
-  /** Prazo de acesso do aluno (campo datafinal). */
-  diasDeAcesso: 365,
   /** Liberar o certificado da própria Escola Avançada? O site já emite o certificado Tecpro. */
   certificadoNaEscola: false,
 };
@@ -153,16 +151,26 @@ const g = globalThis as unknown as { __vinculosDemo?: Map<string, Set<string>> }
 const vinculosDemo = (g.__vinculosDemo ??= new Map([["sim-demo", new Set(["101", "104"])]]));
 
 /**
- * IDs dos cursos liberados para o aluno, via `usuarios/cursosvinculados`.
- * SUPOSIÇÃO: nome do campo do usuário e formato da resposta. Conferir com a API real.
+ * Cursos liberados para o aluno, via `usuarios/cursosvinculados` (campo confirmado: id_aluno).
+ * A resposta pode não trazer o código do curso; nesse caso devolvemos "nome:<nome do curso>"
+ * e a área do aluno faz a correspondência pelo nome.
  */
 export async function cursosVinculados(usuarioId: string): Promise<string[]> {
   if (usandoDadosDeExemplo) return Array.from(vinculosDemo.get(usuarioId) ?? []);
-  const lista = await chamar<{ curso?: string | number; id?: string | number; situacao?: string }[]>(
-    "usuarios/cursosvinculados",
-    { usuario: usuarioId },
-  );
-  return (lista ?? []).map((c) => String(c.curso ?? c.id));
+  const r = await chamar<unknown>("usuarios/cursosvinculados", { id_aluno: usuarioId });
+  const lista = (Array.isArray(r) ? r : r && typeof r === "object" ? Object.values(r) : []) as Record<string, unknown>[];
+  return lista.flatMap((c) => {
+    if (!c || typeof c !== "object") return [];
+    for (const k of ["idcurso", "id_curso", "curso_id", "curso", "id"]) {
+      const v = c[k];
+      if ((typeof v === "string" || typeof v === "number") && /^\d+$/.test(String(v).trim())) return [String(v).trim()];
+    }
+    const capa = String(c.capa_image ?? c.capa ?? "");
+    const doCapa = capa.match(/imagemcursos\/(\d+)\./)?.[1];
+    if (doCapa) return [doCapa];
+    const nome = String(c.nome ?? c.curso ?? "").trim();
+    return nome ? [`nome:${nome}`] : [];
+  });
 }
 
 /**
@@ -175,6 +183,8 @@ export async function matricularAluno(
   aluno: NovoAluno,
   cursoId: string,
   usuarioIdExistente?: string,
+  /** Prazo de acesso em meses (painel > Configurações); null = vitalício. */
+  mesesDeAcesso: number | null = null,
 ): Promise<{ usuarioId: string; novoVinculo: boolean }> {
   let usuarioId = usuarioIdExistente;
 
@@ -191,9 +201,10 @@ export async function matricularAluno(
   if (!usuarioId) {
     // Campos confirmados no manual (usuarios/novo).
     const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
-    const final = new Date(Date.now() + configMatricula.diasDeAcesso * 86_400_000).toLocaleDateString("sv-SE", {
-      timeZone: "America/Sao_Paulo",
-    });
+    // Vitalício: a Escola Avançada pede uma data, então usamos uma bem distante.
+    const fim = new Date();
+    if (mesesDeAcesso) fim.setMonth(fim.getMonth() + mesesDeAcesso);
+    const final = mesesDeAcesso ? fim.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : "2099-12-31";
     const r = await chamar<unknown>("usuarios/novo", {
       nome: aluno.nome,
       email: aluno.email,

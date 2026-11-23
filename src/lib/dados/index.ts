@@ -238,6 +238,37 @@ export async function salvarConfiguracaoCurso(c: ConfigCurso): Promise<void> {
   if (error) throw error;
 }
 
+/* ---------- Configurações gerais da loja ---------- */
+
+export interface ConfigLoja {
+  /** Prazo de acesso do aluno em meses; null = vitalício. */
+  mesesDeAcesso: number | null;
+}
+const CONFIG_LOJA_PADRAO: ConfigLoja = { mesesDeAcesso: null };
+
+const gLoja = globalThis as unknown as { __configLojaDemo?: ConfigLoja };
+
+export async function obterConfigLoja(): Promise<ConfigLoja> {
+  if (bancoEmDemonstracao) return { ...CONFIG_LOJA_PADRAO, ...gLoja.__configLojaDemo };
+  const { data, error } = await db().from("configuracoes_loja").select("valor").eq("chave", "geral").maybeSingle();
+  if (error) {
+    console.error("[dados] configuracoes_loja", error.message);
+    return CONFIG_LOJA_PADRAO;
+  }
+  return { ...CONFIG_LOJA_PADRAO, ...((data?.valor as Partial<ConfigLoja>) ?? {}) };
+}
+
+export async function salvarConfigLoja(c: ConfigLoja): Promise<void> {
+  if (bancoEmDemonstracao) {
+    gLoja.__configLojaDemo = c;
+    return;
+  }
+  const { error } = await db()
+    .from("configuracoes_loja")
+    .upsert({ chave: "geral", valor: c, atualizado_em: new Date().toISOString() }, { onConflict: "chave" });
+  if (error) throw error;
+}
+
 /** Totais simples para a visão geral do painel. */
 export async function contagens(): Promise<{ alunos: number; certificados: number }> {
   if (bancoEmDemonstracao) return { alunos: mem.alunos.size, certificados: certs().size };

@@ -5,7 +5,7 @@ import { getCursos } from "@/lib/cursos";
 export const metadata: Metadata = { title: "Diagnóstico da API" };
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Promise<{ curso?: string }> };
+type Props = { searchParams: Promise<{ curso?: string; aluno?: string }> };
 
 async function testar(recurso: string, campos: Record<string, string> = {}) {
   try {
@@ -28,17 +28,20 @@ export default async function Diagnostico({ searchParams }: Props) {
       </div>
     );
   }
-  const { curso } = await searchParams;
+  const { curso, aluno } = await searchParams;
   const [lista, cursos] = await Promise.all([testar("cursos/listar"), getCursos()]);
   const aulas = curso ? await testar("cursos/aulas", { curso }) : null;
-  const blocos = [{ titulo: "cursos/listar", r: lista }, ...(aulas ? [{ titulo: `cursos/aulas (curso ${curso})`, r: aulas }] : [])];
+  const doAluno = aluno ? await testar("usuarios/cursosvinculados", { id_aluno: aluno }) : null;
+  const blocos = [{ titulo: "cursos/listar", r: lista }, ...(aulas ? [{ titulo: `cursos/aulas (curso ${curso})`, r: aulas }] : []),
+    ...(doAluno ? [{ titulo: `usuarios/cursosvinculados (aluno ${aluno})`, r: doAluno }] : []),
+  ];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <h1 className="text-2xl font-extrabold text-marca-900">Diagnóstico da API da Escola Avançada</h1>
       <p className="mt-2 text-slate-600">
         Cursos que o site conseguiu entender: <strong className="text-marca-900">{cursos.length}</strong>. Para ver as aulas de um curso,
-        acrescente <code>?curso=ID</code> no endereço.
+        acrescente <code>?curso=ID</code> no endereço; para ver os cursos de um aluno, <code>?aluno=ID</code>.
       </p>
       {blocos.map(({ titulo, r }) => (
         <section key={titulo} className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">

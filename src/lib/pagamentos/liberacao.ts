@@ -1,6 +1,6 @@
 import "server-only";
 import { matricularAluno } from "../escola-avancada/client";
-import { obterAluno, salvarAluno } from "../dados";
+import { obterAluno, obterConfigLoja, salvarAluno } from "../dados";
 import { liberarCertificadoPago } from "../certificados";
 import type { Comprador, Produto } from "./tipos";
 
@@ -26,8 +26,13 @@ export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cu
   if (emAndamento.has(cobrancaId)) return;
   emAndamento.add(cobrancaId);
   try {
-    const existente = await obterAluno(comprador.email);
-    const { usuarioId, novoVinculo } = await matricularAluno(comprador, cursoId, existente?.eaUsuarioId);
+    const [existente, loja] = await Promise.all([obterAluno(comprador.email), obterConfigLoja()]);
+    const { usuarioId, novoVinculo } = await matricularAluno(
+      comprador,
+      cursoId,
+      existente?.eaUsuarioId,
+      loja.mesesDeAcesso,
+    );
     if (!existente) await salvarAluno({ email: comprador.email, eaUsuarioId: usuarioId, nome: comprador.nome });
     if (novoVinculo) console.info(`[liberacao] cobrança ${cobrancaId}: curso ${cursoId} liberado para ${comprador.email}`);
   } catch (e) {
