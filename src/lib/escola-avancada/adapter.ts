@@ -25,30 +25,45 @@ function resumir(texto: string, max = 140): string {
   return t.slice(0, t.lastIndexOf(" ", max)) + "…";
 }
 
-export function adaptarCurso(raw: EACursoRaw): Curso {
-  const id = String(raw.id);
+/** Pega o primeiro campo preenchido entre vários nomes possíveis (a API real pode usar outro nome). */
+function campo(raw: object, ...nomes: string[]): string {
+  const o = raw as Record<string, unknown>;
+  for (const n of nomes) {
+    const v = o[n];
+    if (v !== undefined && v !== null && String(v).trim() !== "") return String(v);
+  }
+  return "";
+}
+
+/** Converte um item da API em Curso; devolve null se faltar id ou nome. */
+export function adaptarCurso(raw: EACursoRaw): Curso | null {
+  const id = campo(raw, "id", "id_curso", "curso_id", "codigo");
+  const nome = campo(raw, "nome", "titulo", "name", "title", "curso").trim();
+  if (!id || !nome) return null;
+  const descricao = campo(raw, "descricao", "description", "resumo", "sobre");
+  const valor = campo(raw, "valor", "preco", "price", "valor_venda");
   return {
     id,
     // O id no fim garante que o link é único mesmo se dois cursos tiverem o mesmo nome.
-    slug: `${slugify(raw.nome)}-${id}`,
-    nome: raw.nome.trim(),
-    descricao: raw.descricao ?? "",
-    resumo: resumir(raw.descricao ?? ""),
-    precoCentavos: paraCentavos(raw.valor),
-    precoEscolaCentavos: paraCentavos(raw.valor),
+    slug: `${slugify(nome)}-${slugify(id)}`,
+    nome,
+    descricao,
+    resumo: resumir(descricao),
+    precoCentavos: paraCentavos(valor),
+    precoEscolaCentavos: paraCentavos(valor),
     visivel: true,
     destaque: false,
-    capaUrl: raw.capa ? raw.capa : null,
-    cargaHoraria: Number(raw.carga_horaria) || 0,
-    categoria: raw.categoria?.trim() || "Geral",
+    capaUrl: campo(raw, "capa", "imagem", "foto", "image", "thumb", "banner") || null,
+    cargaHoraria: parseInt(campo(raw, "carga_horaria", "cargahoraria", "carga", "horas", "duracao"), 10) || 0,
+    categoria: campo(raw, "categoria", "category", "area").trim() || "Geral",
   };
 }
 
 export function adaptarAula(raw: EAAulaRaw, indice: number): Aula {
   return {
-    id: String(raw.id),
-    titulo: raw.titulo.trim(),
-    modulo: raw.modulo?.trim() || "Conteúdo do curso",
-    ordem: Number(raw.ordem) || indice + 1,
+    id: campo(raw, "id", "id_aula", "aula_id", "codigo") || String(indice + 1),
+    titulo: campo(raw, "titulo", "nome", "title", "name").trim() || `Aula ${indice + 1}`,
+    modulo: campo(raw, "modulo", "modulo_nome", "secao", "capitulo").trim() || "Conteúdo do curso",
+    ordem: Number(campo(raw, "ordem", "posicao", "order")) || indice + 1,
   };
 }
