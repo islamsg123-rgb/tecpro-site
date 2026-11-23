@@ -1,7 +1,7 @@
 import "server-only";
 import { adaptarAula, adaptarCurso } from "./escola-avancada/adapter";
 import { listarAulasRaw, listarCursosRaw } from "./escola-avancada/client";
-import { configuracoesDosCursos } from "./dados";
+import { configuracoesDosCursos, cursosGratuitos } from "./dados";
 import { titulosLocais } from "./conteudo-escola";
 import type { Curso, Modulo } from "./types";
 import type { EAAulaRaw } from "./escola-avancada/types";
@@ -13,18 +13,16 @@ import type { EAAulaRaw } from "./escola-avancada/types";
 
 /** Todos os cursos, inclusive os escondidos (para a área do aluno e o painel). */
 export async function getCursos(): Promise<Curso[]> {
-  const [raw, cfg] = await Promise.all([listarCursosRaw(), configuracoesDosCursos()]);
+  const [raw, cfg, gratis] = await Promise.all([listarCursosRaw(), configuracoesDosCursos(), cursosGratuitos()]);
   return raw.flatMap((r) => {
-    const c = adaptarCurso(r);
-    if (!c) return [];
-    const ajuste = cfg.get(c.id);
-    if (!ajuste) return [c];
-    return [{
-      ...c,
-      precoCentavos: ajuste.precoCentavos ?? c.precoCentavos,
-      visivel: ajuste.visivel,
-      destaque: ajuste.destaque,
-    }];
+    const base = adaptarCurso(r);
+    if (!base) return [];
+    const ajuste = cfg.get(base.id);
+    const c: Curso = ajuste
+      ? { ...base, precoCentavos: ajuste.precoCentavos ?? base.precoCentavos, visivel: ajuste.visivel, destaque: ajuste.destaque }
+      : base;
+    // Curso gratuito: preço zero na vitrine; a matrícula é feita sem pagamento.
+    return [gratis.has(c.id) ? { ...c, gratuito: true, precoCentavos: 0 } : c];
   });
 }
 
@@ -56,4 +54,4 @@ export async function getModulos(cursoId: string): Promise<Modulo[]> {
   return modulos;
 }
 
-export { formatarPreco } from "./formatar";
+export { formatarPreco, precoDoCurso } from "./formatar";

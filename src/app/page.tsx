@@ -264,7 +264,11 @@ export default async function Inicio() {
         </div>
         {vitrine && (
           <p className="mt-10 text-center text-slate-600">
-            Cursos a partir de <strong className="text-marca-900">{formatarPreco(Math.min(...cursos.map((c) => c.precoCentavos)))}</strong>.{" "}
+            {cursos.some((c) => c.gratuito) ? (
+              <>Temos cursos <strong className="text-marca-900">gratuitos</strong>.{" "}</>
+            ) : (
+              <>Cursos a partir de <strong className="text-marca-900">{formatarPreco(Math.min(...cursos.map((c) => c.precoCentavos)))}</strong>.{" "}</>
+            )}
             <Link href="/cursos" className="font-bold text-marca-700 underline decoration-laranja-500 decoration-2 underline-offset-4">
               Ver todos
             </Link>

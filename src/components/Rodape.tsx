@@ -24,6 +24,7 @@ export function Rodape() {
           <ul className="mt-4 space-y-3">
             <li><Link href="/minha-conta" className="hover:text-white">Área do aluno</Link></li>
             <li><Link href="/#duvidas" className="hover:text-white">Dúvidas frequentes</Link></li>
+            <li><Link href="/termos" className="hover:text-white">Termos de uso</Link></li>
           </ul>
         </div>
         <div className="text-sm">

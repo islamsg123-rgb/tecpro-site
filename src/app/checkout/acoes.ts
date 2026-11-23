@@ -9,6 +9,8 @@ import { ErroPagamento, type FormaPagamento, type NovaCobranca, type Produto } f
 import { alunoLogado } from "@/lib/auth";
 import { cursoDoAluno } from "@/lib/area-aluno";
 import { situacaoCertificado } from "@/lib/certificados";
+import { liberarAcesso } from "@/lib/pagamentos/liberacao";
+import { randomUUID } from "node:crypto";
 import type { Curso } from "@/lib/types";
 import {
   cartaoValido, cepValido, cpfValido, emailValido, soDigitos, telefoneValido, validadeValida,
@@ -26,6 +28,7 @@ type Item = { produto: Produto; descricao: string; valorCentavos: number };
 async function itemDaCompra(tipo: string, curso: Curso): Promise<Item | { erro: string }> {
   if (tipo !== "certificado") {
     if (!curso.visivel) return { erro: "Este curso não está disponível para venda no momento." };
+    if (curso.gratuito) return { erro: "Este curso é gratuito: volte à página do curso para se matricular." };
     return { produto: { tipo: "curso", cursoId: curso.id }, descricao: `Curso online: ${curso.nome}`, valorCentavos: curso.precoCentavos };
   }
   // Certificado: só para o aluno logado, que concluiu o curso e ainda não pagou.
@@ -106,4 +109,40 @@ export async function pagar(_anterior: EstadoCheckout, f: FormData): Promise<Est
     return { erro: "Não conseguimos concluir agora. Tente novamente em instantes." };
   }
   redirect(`/checkout/pedido/${id}`);
+}
+
+export interface EstadoGratis {
+  erro?: string;
+  campos?: Record<string, string>;
+  /** E-mail do aluno, quando a matrícula deu certo. */
+  matriculadoEm?: string;
+}
+
+/** Matrícula em curso gratuito: cria o aluno e libera o curso na Escola Avançada, sem cobrança. */
+export async function matricularGratis(_anterior: EstadoGratis, f: FormData): Promise<EstadoGratis> {
+  const curso = (await getCursos()).find((c) => c.id === texto(f, "cursoId"));
+  // O servidor confere de novo que o curso é mesmo gratuito e está na vitrine.
+  if (!curso || !curso.visivel || !curso.gratuito) return { erro: "Este curso não está disponível para matrícula gratuita." };
+
+  const comprador = {
+    nome: texto(f, "nome"),
+    email: texto(f, "email").toLowerCase(),
+    cpf: soDigitos(texto(f, "cpf")),
+    telefone: soDigitos(texto(f, "telefone")),
+  };
+  const campos: Record<string, string> = {};
+  if (comprador.nome.split(/\s+/).length < 2) campos.nome = "Informe nome e sobrenome.";
+  if (!emailValido(comprador.email)) campos.email = "E-mail inválido.";
+  if (!cpfValido(comprador.cpf)) campos.cpf = "CPF inválido.";
+  if (!telefoneValido(comprador.telefone)) campos.telefone = "Telefone inválido.";
+  if (f.get("termos") !== "on") campos.termos = "Para continuar, aceite os termos de uso.";
+  if (Object.keys(campos).length) return { erro: "Confira os campos destacados.", campos };
+
+  try {
+    await liberarAcesso(`gratis-${randomUUID().slice(0, 8)}`, comprador, curso.id);
+  } catch (e) {
+    console.error("[matricula-gratis]", e);
+    return { erro: "Não conseguimos concluir a matrícula agora. Tente novamente em alguns minutos." };
+  }
+  return { matriculadoEm: comprador.email };
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { formatarPreco, getCursoPublicoPorSlug, getCursosPublicos, getModulos } from "@/lib/cursos";
+import { precoDoCurso, getCursoPublicoPorSlug, getCursosPublicos, getModulos } from "@/lib/cursos";
 import { CapaCurso } from "@/components/CapaCurso";
 import { CartaoCurso } from "@/components/CartaoCurso";
 import { Duvidas } from "@/components/Duvidas";
@@ -34,7 +34,8 @@ export default async function PaginaCurso({ params }: Props) {
   const relacionados = todos.filter((c) => c.id !== curso.id && c.categoria === curso.categoria).concat(
     todos.filter((c) => c.id !== curso.id && c.categoria !== curso.categoria),
   ).slice(0, 3);
-  const preco = formatarPreco(curso.precoCentavos);
+  const preco = precoDoCurso(curso);
+  const gratis = curso.gratuito;
 
   const itens = [
     { i: IconeRelogio, t: `${curso.cargaHoraria} horas de carga horária` },
@@ -113,7 +114,12 @@ export default async function PaginaCurso({ params }: Props) {
             <div className="mt-5">
               <Duvidas
                 perguntas={[
-                  { p: "Quando começo a estudar?", r: "Assim que o pagamento for confirmado, você recebe o acesso por e-mail e pode começar na hora." },
+                  {
+                    p: "Quando começo a estudar?",
+                    r: gratis
+                      ? "Assim que fizer a matrícula, você recebe o acesso por e-mail e pode começar na hora."
+                      : "Assim que o pagamento for confirmado, você recebe o acesso por e-mail e pode começar na hora.",
+                  },
                   { p: "Preciso de algum conhecimento prévio?", r: "Não. O curso foi pensado para quem está começando e evolui passo a passo." },
                   { p: "Como funciona o certificado?", r: `Ao concluir as ${totalAulas} aulas, você emite o certificado de ${curso.cargaHoraria} horas na área do aluno.` },
                 ]}
@@ -127,23 +133,25 @@ export default async function PaginaCurso({ params }: Props) {
           <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-marca-900/10 lg:sticky lg:top-24">
             <CapaCurso curso={curso} />
             <div className="p-7">
-              <p className="text-sm text-slate-500">Investimento</p>
+              <p className="text-sm text-slate-500">{gratis ? "Matrícula" : "Investimento"}</p>
               <p className="font-display text-4xl font-extrabold text-marca-900">{preco}</p>
-              <p className="mt-1 text-sm text-slate-500">no Pix, boleto ou cartão de crédito</p>
+              <p className="mt-1 text-sm text-slate-500">{gratis ? "sem pagamento para começar" : "no Pix, boleto ou cartão de crédito"}</p>
               <Link
                 href={`/checkout/${curso.slug}`}
                 className="mt-6 block rounded-full bg-laranja-500 py-4 text-center font-bold text-marca-900 shadow-lg shadow-laranja-500/30 transition hover:bg-laranja-400"
               >
-                Quero me matricular
+                {gratis ? "Matricular grátis" : "Quero me matricular"}
               </Link>
               <ul className="mt-6 space-y-3 text-sm text-slate-600">
-                {["Acesso liberado após o pagamento", "Estude no seu ritmo", "Certificado ao concluir"].map((t) => (
+                {[gratis ? "Acesso liberado na hora" : "Acesso liberado após o pagamento", "Estude no seu ritmo", "Certificado ao concluir"].map((t) => (
                   <li key={t} className="flex items-center gap-2"><IconeCheck className="h-5 w-5 text-laranja-600" /> {t}</li>
                 ))}
               </ul>
-              <p className="mt-6 flex items-center justify-center gap-2 border-t border-slate-100 pt-5 text-xs text-slate-400">
-                <IconeCadeado className="h-4 w-4" /> Pagamento 100% seguro
-              </p>
+              {!gratis && (
+                <p className="mt-6 flex items-center justify-center gap-2 border-t border-slate-100 pt-5 text-xs text-slate-400">
+                  <IconeCadeado className="h-4 w-4" /> Pagamento 100% seguro
+                </p>
+              )}
             </div>
           </div>
         </aside>
@@ -167,7 +175,7 @@ export default async function PaginaCurso({ params }: Props) {
           <p className="font-display text-xl font-bold text-marca-900">{preco}</p>
         </div>
         <Link href={`/checkout/${curso.slug}`} className="rounded-full bg-laranja-500 px-6 py-3 text-sm font-bold text-marca-900">
-          Matricular
+          {gratis ? "Matricular grátis" : "Matricular"}
         </Link>
       </div>
     </>

@@ -14,6 +14,7 @@ const menu = [
   { href: "/admin/cursos", rotulo: "Cursos" },
   { href: "/admin/vendas", rotulo: "Vendas" },
   { href: "/admin/alunos", rotulo: "Alunos" },
+  { href: "/admin/certificados", rotulo: "Certificados" },
   { href: "/admin/configuracoes", rotulo: "Configurações" },
   { href: "/admin/diagnostico", rotulo: "API" },
 ];
@@ -32,7 +33,7 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center gap-4">
             <span className="rounded-lg bg-marca-900 px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-laranja-500">Painel</span>
-            <nav className="flex gap-1 text-sm font-semibold">
+            <nav className="flex flex-wrap gap-1 text-sm font-semibold">
               {menu.map((m) => (
                 <Link key={m.href} href={m.href} className="rounded-full px-4 py-2 text-slate-600 hover:bg-marca-50 hover:text-marca-900">
                   {m.rotulo}
