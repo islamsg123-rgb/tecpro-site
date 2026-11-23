@@ -91,15 +91,28 @@ async function listaSegura<T>(recurso: string, campos: Record<string, string> = 
 async function chamar<T>(recurso: string, campos: Record<string, string> = {}): Promise<T> {
   const r = await respostaCrua(recurso, campos);
   if (r.status >= 400) throw new ErroEscolaAvancada(`HTTP ${r.status} em ${recurso}: ${r.texto.slice(0, 300)}`);
+  let json: EAResposta<T> & Record<string, unknown>;
   try {
-    const json = JSON.parse(r.texto) as EAResposta<T> & Record<string, unknown>;
-    // A API responde {"erro": "", "resultado": ...}; "erro" preenchido indica falha.
-    if (typeof json.erro === "string" && json.erro.trim()) {
-      throw new ErroEscolaAvancada(`Escola Avançada recusou ${recurso}: ${json.erro}`);
-    }
-    return (json.resultado ?? json.dados ?? json.data ?? json) as T;
+    json = JSON.parse(r.texto) as EAResposta<T> & Record<string, unknown>;
   } catch {
     throw new ErroEscolaAvancada(`Resposta não é JSON em ${recurso}: ${r.texto.slice(0, 300)}`);
+  }
+  // A API responde {"erro": "", "resultado": ...}; "erro" preenchido indica falha.
+  if (typeof json.erro === "string" && json.erro.trim()) {
+    throw new ErroEscolaAvancada(`Escola Avançada recusou ${recurso}: ${json.erro}`);
+  }
+  return (json.resultado ?? json.dados ?? json.data ?? json) as T;
+}
+
+/** Igual a `chamar`, mas registra a resposta crua no log (para conferir o formato real). */
+async function chamarComLog<T>(recurso: string, campos: Record<string, string> = {}): Promise<T> {
+  try {
+    const r = await chamar<T>(recurso, campos);
+    console.info(`[escola-avancada] ${recurso} respondeu:`, JSON.stringify(r).slice(0, 500));
+    return r;
+  } catch (e) {
+    console.error(`[escola-avancada] ${recurso} falhou:`, e instanceof Error ? e.message : e);
+    throw e;
   }
 }
 
@@ -157,7 +170,7 @@ const vinculosDemo = (g.__vinculosDemo ??= new Map([["sim-demo", new Set(["101",
  */
 export async function cursosVinculados(usuarioId: string): Promise<string[]> {
   if (usandoDadosDeExemplo) return Array.from(vinculosDemo.get(usuarioId) ?? []);
-  const r = await chamar<unknown>("usuarios/cursosvinculados", { id_aluno: usuarioId });
+  const r = await chamarComLog<unknown>("usuarios/cursosvinculados", { id_aluno: usuarioId });
   const lista = (Array.isArray(r) ? r : r && typeof r === "object" ? Object.values(r) : []) as Record<string, unknown>[];
   return lista.flatMap((c) => {
     if (!c || typeof c !== "object") return [];
@@ -185,6 +198,8 @@ export async function matricularAluno(
   usuarioIdExistente?: string,
   /** Prazo de acesso em meses (painel > Configurações); null = vitalício. */
   mesesDeAcesso: number | null = null,
+  /** Chamado logo depois de criar o aluno, para guardar o código antes das próximas etapas. */
+  aoCriarAluno?: (usuarioId: string) => Promise<void>,
 ): Promise<{ usuarioId: string; novoVinculo: boolean }> {
   let usuarioId = usuarioIdExistente;
 
@@ -205,7 +220,7 @@ export async function matricularAluno(
     const fim = new Date();
     if (mesesDeAcesso) fim.setMonth(fim.getMonth() + mesesDeAcesso);
     const final = mesesDeAcesso ? fim.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : "2099-12-31";
-    const r = await chamar<unknown>("usuarios/novo", {
+    const r = await chamarComLog<unknown>("usuarios/novo", {
       nome: aluno.nome,
       email: aluno.email,
       cpf: aluno.cpf,
@@ -220,11 +235,13 @@ export async function matricularAluno(
       obs: "Cadastro automático pela compra no site Tecpro",
     });
     usuarioId = idDoAluno(r);
-    if (!usuarioId) throw new Error("Escola Avançada não devolveu o código do aluno");
+    if (!usuarioId) throw new Error("Escola Avançada não devolveu o código do aluno (ver resposta no log acima)");
+    // Guarda já: se uma etapa seguinte falhar, a nova tentativa do Asaas não cria o aluno de novo.
+    await aoCriarAluno?.(usuarioId);
   }
   if ((await cursosVinculados(usuarioId)).includes(cursoId)) return { usuarioId, novoVinculo: false };
   // Campos confirmados no manual: vinculocurso {aluno, idcurso}; envioemail {aluno}.
-  await chamar("usuarios/vinculocurso", { aluno: usuarioId, idcurso: cursoId });
-  await chamar("usuarios/envioemail", { aluno: usuarioId });
+  await chamarComLog("usuarios/vinculocurso", { aluno: usuarioId, idcurso: cursoId });
+  await chamarComLog("usuarios/envioemail", { aluno: usuarioId });
   return { usuarioId, novoVinculo: true };
 }

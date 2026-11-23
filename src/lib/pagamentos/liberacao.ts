@@ -25,15 +25,16 @@ export async function processarPagamento(cobrancaId: string, comprador: Comprado
 export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cursoId: string): Promise<void> {
   if (emAndamento.has(cobrancaId)) return;
   emAndamento.add(cobrancaId);
+  console.info(`[liberacao] cobrança ${cobrancaId}: matriculando ${comprador.email} no curso ${cursoId}`);
   try {
     const [existente, loja] = await Promise.all([obterAluno(comprador.email), obterConfigLoja()]);
-    const { usuarioId, novoVinculo } = await matricularAluno(
+    const { novoVinculo } = await matricularAluno(
       comprador,
       cursoId,
       existente?.eaUsuarioId,
       loja.mesesDeAcesso,
+      (usuarioId) => salvarAluno({ email: comprador.email, eaUsuarioId: usuarioId, nome: comprador.nome }),
     );
-    if (!existente) await salvarAluno({ email: comprador.email, eaUsuarioId: usuarioId, nome: comprador.nome });
     if (novoVinculo) console.info(`[liberacao] cobrança ${cobrancaId}: curso ${cursoId} liberado para ${comprador.email}`);
   } catch (e) {
     console.error(`[liberacao] falhou para a cobrança ${cobrancaId}`, e);
