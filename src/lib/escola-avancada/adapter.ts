@@ -10,8 +10,12 @@ export function slugify(texto: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+/** Aceita "350,00", "1.350,00", "350.00" ou 350. */
 function paraCentavos(valor: string | number): number {
-  const n = typeof valor === "number" ? valor : Number(String(valor).replace(",", "."));
+  if (typeof valor === "number") return Math.round(valor * 100);
+  let t = String(valor).replace(/[^\d.,-]/g, "");
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  const n = Number(t);
   return Number.isFinite(n) ? Math.round(n * 100) : 0;
 }
 
@@ -37,10 +41,13 @@ function campo(raw: object, ...nomes: string[]): string {
 
 /** Converte um item da API em Curso; devolve null se faltar id ou nome. */
 export function adaptarCurso(raw: EACursoRaw): Curso | null {
-  const id = campo(raw, "id", "id_curso", "curso_id", "codigo");
+  const id = campo(raw, "id", "id_curso", "curso_id", "idcurso", "codigo", "cod", "cod_curso");
   const nome = campo(raw, "nome", "titulo", "name", "title", "curso").trim();
   if (!id || !nome) return null;
-  const descricao = campo(raw, "descricao", "description", "resumo", "sobre");
+  // Cursos inativos na Escola Avançada não aparecem no site.
+  const status = campo(raw, "status", "situacao").toUpperCase();
+  if (status && status !== "ATIVO") return null;
+  const descricao = campo(raw, "descricao", "description", "resumo", "sobre", "obs");
   const valor = campo(raw, "valor", "preco", "price", "valor_venda");
   return {
     id,
