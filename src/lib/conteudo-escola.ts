@@ -53,3 +53,8 @@ export function apostilaDoCurso(cursoId: string): string | null {
 export function temConteudo(cursoId: string): boolean {
   return Boolean(CURSOS[cursoId]?.aulas.length);
 }
+
+/** Títulos das aulas guardados no site (reserva para quando a API da Escola Avançada falhar). */
+export function titulosLocais(cursoId: string): string[] {
+  return (CURSOS[cursoId]?.aulas ?? []).map((a) => a.titulo || "");
+}
