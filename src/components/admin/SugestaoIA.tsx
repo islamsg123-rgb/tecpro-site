@@ -1,25 +1,27 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { sugerirResposta } from "@/app/admin/mensagens/acoes";
+import { prepararPedidoClaude } from "@/app/admin/mensagens/acoes";
 
 /**
- * Caixa "Resposta sugerida pela IA": gera um texto pronto para responder a pessoa,
- * que dá para ajustar e copiar para colar no Gmail.
+ * "Preparar resposta no Claude" (gratuito): o painel monta um pedido com a dúvida,
+ * a página de onde veio, os dados do curso e as regras da escola. A equipe abre o
+ * Claude (claude.ai) na própria conta, envia o pedido e cola a resposta no Gmail.
  */
-export function SugestaoIA({ id, ligada }: { id: number; ligada: boolean }) {
+const LIMITE_LINK = 6000; // links muito longos podem não abrir; acima disso, só copia.
+
+export function SugestaoIA({ id }: { id: number }) {
   const [texto, setTexto] = useState("");
   const [erro, setErro] = useState("");
   const [copiado, setCopiado] = useState(false);
-  const [gerando, iniciar] = useTransition();
+  const [preparando, iniciar] = useTransition();
 
-  function gerar() {
+  function preparar() {
     setErro("");
-    setCopiado(false);
     iniciar(async () => {
-      const r = await sugerirResposta(id);
+      const r = await prepararPedidoClaude(id);
       if (r.texto) setTexto(r.texto);
-      else setErro(r.erro ?? "Não foi possível gerar.");
+      else setErro(r.erro ?? "Não foi possível preparar.");
     });
   }
 
@@ -27,13 +29,16 @@ export function SugestaoIA({ id, ligada }: { id: number; ligada: boolean }) {
     try {
       await navigator.clipboard.writeText(texto);
     } catch {
-      // Navegadores antigos: seleciona o texto para a pessoa copiar com Ctrl+C.
-      (document.getElementById(`sugestao-${id}`) as HTMLTextAreaElement | null)?.select();
+      const campo = document.getElementById(`pedido-${id}`) as HTMLTextAreaElement | null;
+      campo?.select();
       document.execCommand?.("copy");
     }
     setCopiado(true);
-    setTimeout(() => setCopiado(false), 2500);
+    setTimeout(() => setCopiado(false), 3000);
   }
+
+  const q = encodeURIComponent(texto);
+  const link = q.length <= LIMITE_LINK ? `https://claude.ai/new?q=${q}` : "https://claude.ai/new";
 
   const icone = (
     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -46,12 +51,12 @@ export function SugestaoIA({ id, ligada }: { id: number; ligada: boolean }) {
       <div className="mt-3">
         <button
           type="button"
-          onClick={gerar}
-          disabled={gerando}
-          title={ligada ? "A IA lê a mensagem e a página de onde veio e escreve uma resposta para você revisar" : "Falta ligar a IA na Vercel"}
+          onClick={preparar}
+          disabled={preparando}
+          title="Monta um pedido com a dúvida e os dados do curso para o Claude escrever a resposta (grátis, na sua conta do Claude)"
           className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-800 hover:border-violet-400 disabled:opacity-60"
         >
-          {icone} {gerando ? "Escrevendo a resposta…" : "Sugerir resposta com IA"}
+          {icone} {preparando ? "Preparando…" : "Preparar resposta no Claude"}
         </button>
         {erro && <p className="mt-2 text-sm text-red-700" role="alert">{erro}</p>}
       </div>
@@ -60,26 +65,33 @@ export function SugestaoIA({ id, ligada }: { id: number; ligada: boolean }) {
 
   return (
     <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50/60 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-2 text-sm font-semibold text-violet-900">{icone} Resposta sugerida pela IA</p>
-        <span className="text-xs text-violet-700/80">Revise antes de enviar. Você pode editar aqui.</span>
-      </div>
-      <textarea
-        id={`sugestao-${id}`}
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-        rows={Math.min(14, Math.max(6, texto.split("\n").length + 2))}
-        className="mt-2 block w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-[15px] leading-relaxed text-slate-800"
-      />
+      <p className="flex items-center gap-2 text-sm font-semibold text-violet-900">{icone} Pedido pronto para o Claude</p>
+      <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-700">
+        <li>Clique em <b>Abrir o Claude</b>. O pedido já vai copiado{q.length <= LIMITE_LINK ? " e escrito lá" : ""}.</li>
+        <li>Se a caixa do Claude estiver vazia, cole com <b>Ctrl+V</b> (no celular, toque e segure e escolha Colar). Depois envie.</li>
+        <li>Copie a resposta do Claude, clique em <b>Responder pelo Gmail</b> e cole.</li>
+      </ol>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={copiar} className="rounded-full bg-violet-700 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-800">
-          {copiado ? "Copiado ✓" : "Copiar resposta"}
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={copiar}
+          className="rounded-full bg-violet-700 px-5 py-2 text-sm font-semibold text-white hover:bg-violet-800"
+        >
+          Abrir o Claude ↗
+        </a>
+        <button type="button" onClick={copiar} className="rounded-full px-4 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-100">
+          {copiado ? "Copiado ✓" : "Só copiar o pedido"}
         </button>
-        <button type="button" onClick={gerar} disabled={gerando} className="rounded-full px-4 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-100 disabled:opacity-60">
-          {gerando ? "Escrevendo…" : "Gerar outra"}
+        <button type="button" onClick={() => setTexto("")} className="rounded-full px-4 py-2 text-sm text-slate-500 hover:bg-slate-100">
+          Fechar
         </button>
-        {erro && <p className="text-sm text-red-700" role="alert">{erro}</p>}
       </div>
+      <details className="mt-3">
+        <summary className="cursor-pointer text-xs text-violet-700/80">Ver o texto do pedido</summary>
+        <textarea id={`pedido-${id}`} readOnly value={texto} rows={10} className="mt-2 block w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs leading-relaxed text-slate-700" />
+      </details>
     </div>
   );
 }
