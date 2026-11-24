@@ -27,11 +27,11 @@ const filtros = [
   { id: "7", rotulo: "Parados há 7+ dias" },
 ];
 
-type Props = { searchParams: Promise<{ filtro?: string; busca?: string }> };
+type Props = { searchParams: Promise<{ filtro?: string; busca?: string; excluido?: string; ea?: string; certs?: string; pedidos?: string }> };
 
 export default async function Alunos({ searchParams }: Props) {
   await exigirAdmin("alunos");
-  const [todos, eventos, cursos, { filtro = "", busca = "" }] = await Promise.all([pessoasDoPainel(), eventosMatricula(), getCursos(), searchParams]);
+  const [todos, eventos, cursos, { filtro = "", busca = "", excluido, ea, certs, pedidos }] = await Promise.all([pessoasDoPainel(), eventosMatricula(), getCursos(), searchParams]);
   const termo = busca.trim().toLowerCase();
   const nomeCurso = (id: string | null) => (id ? cursos.find((c) => c.id === id)?.nome ?? "" : "");
   const conta = (s: string) => todos.filter((p) => p.situacao === s).length;
@@ -51,6 +51,15 @@ export default async function Alunos({ searchParams }: Props) {
       >
         Alunos
       </Titulo>
+      {excluido && (
+        <div className="mb-5 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+          <p><strong>{excluido === "1" ? "Aluno excluído" : `Aluno excluído: ${excluido}`}.</strong> O login e os dados pessoais foram apagados do site.
+            {Number(pedidos) > 0 && ` ${pedidos} ${Number(pedidos) === 1 ? "pagamento continua" : "pagamentos continuam"} no Financeiro como "Aluno excluído".`}
+            {Number(certs) > 0 && ` ${certs} ${Number(certs) === 1 ? "certificado emitido continua válido" : "certificados emitidos continuam válidos"} na validação.`}
+          </p>
+          <p className="mt-1">Na Escola Avançada o aluno continua cadastrado{ea ? ` (código ${ea})` : ""}. Se quiser, remova por lá.</p>
+        </div>
+      )}
       <div className="mb-5 grid gap-3 sm:grid-cols-4">
         <Numero rotulo="Total" valor={String(todos.length)} detalhe={`${todos.filter((p) => p.matriculado).length} matriculados`} />
         <Numero rotulo="Ativos" valor={String(conta("ativo"))} cor="verde" href="/admin/alunos?filtro=ativo" />

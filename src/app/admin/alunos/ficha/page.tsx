@@ -6,17 +6,17 @@ import { atividadesDoAluno, obterAluno, saldoCreditos } from "@/lib/dados";
 import { provaDaAula } from "@/lib/provas";
 import { dataBR, diasDesde } from "@/lib/admin-relatorios";
 import { BarraProgresso } from "@/components/aluno/Progresso";
-import { exigirAdmin } from "@/lib/admin";
+import { eDono, exigirAdmin } from "@/lib/admin";
 import { getCursos } from "@/lib/cursos";
 import { formatarPreco } from "@/lib/formatar";
 import { cobrancasDoEmail, clientePorEmail } from "@/lib/pagamentos";
 import { listarCarrinhos } from "@/lib/dados/carrinhos";
-import { cursosRemovidos, dadosExtrasAluno, listarPesquisas } from "@/lib/dados/painel";
+import { cursosRemovidos, dadosExtrasAluno, listarPesquisas, obterFuncionario } from "@/lib/dados/painel";
 import { ESTADOS } from "@/lib/estados";
 import { DIAS_PARA_INATIVO } from "@/lib/painel-resumo";
 import { TabelaVendas } from "@/components/admin/TabelaVendas";
 import { EtiquetaAluno } from "@/components/admin/Blocos";
-import { adicionarCursoAluno, concluirCursosTesteAcao, desfazerCursosTesteAcao, removerCursoAluno, salvarDadosAlunoAcao } from "../../acoes";
+import { adicionarCursoAluno, concluirCursosTesteAcao, desfazerCursosTesteAcao, removerCursoAluno, salvarDadosAlunoAcao, excluirAlunoAcao } from "../../acoes";
 import { IconeChevron } from "@/components/Icones";
 
 export const metadata: Metadata = { title: "Ficha do aluno" };
@@ -37,6 +37,12 @@ const avisos: Record<string, [string, boolean]> = {
   "salvo:teste-desfeito": ["Modo teste desfeito: o progresso voltou ao que era antes.", true],
   "erro:teste": ["Não foi possível concluir agora (a Escola Avançada ou o banco não respondeu). Tente de novo.", false],
   "erro:dono": ["Só o dono do site pode usar o modo teste.", false],
+  "erro:excluir-dono": ["Só o dono do site pode excluir alunos.", false],
+  "erro:excluir-admin": ["Não é possível excluir o dono do site nem a sua própria conta.", false],
+  "erro:excluir-funcionario": ["Esta pessoa é funcionária do painel. Tire-a da aba Funcionários antes de excluir.", false],
+  "erro:excluir-confirmacao": ["O e-mail digitado não confere. Nada foi excluído.", false],
+  "erro:excluir-demo": ["No modo demonstração não dá para excluir alunos.", false],
+  "erro:excluir-falhou": ["Não foi possível excluir agora (o banco não respondeu). Tente de novo; se continuar, veja a aba Diagnóstico.", false],
   "erro:banco": ["Não foi possível salvar agora.", false],
   "erro:curso": ["Escolha um curso.", false],
   "erro:matricula": ["A Escola Avançada não aceitou a matrícula. Veja o motivo em Alunos > Últimas tentativas de matrícula (no fim da página Alunos). Se faltar CPF ou telefone, preencha os dados acima.", false],
@@ -93,6 +99,12 @@ export default async function Ficha({ searchParams }: Props) {
   const pagos = (pagamentos ?? []).filter((p) => p.situacao === "pago");
   const aviso = params.salvo ? avisos[`salvo:${params.salvo}`] : params.erro ? avisos[`erro:${params.erro}`] : null;
   const campo = "mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal";
+  const funcionario = acesso.dono ? await obterFuncionario(email).catch(() => null) : null;
+  const protegido =
+    email === acesso.email.toLowerCase() ? "Esta é a sua própria conta. Ela não pode ser excluída por aqui."
+    : eDono(email) ? "Este e-mail é do dono do site e não pode ser excluído por aqui."
+    : funcionario ? "Esta pessoa é funcionária do painel. Para excluí-la, tire-a primeiro da aba Funcionários."
+    : null;
 
   const tituloAula = (cursoId: string, aulaId: string) => {
     const c = cursos?.find((x) => x.curso.id === cursoId);
@@ -326,7 +338,58 @@ export default async function Ficha({ searchParams }: Props) {
           })}
         </ul>
       )}
+
+      {acesso.dono && (registro || carrinhos.length > 0) && (
+        <ZonaExcluir email={email} nome={nome} protegido={protegido} cursos={cursos?.length ?? 0} eaUsuarioId={registro?.eaUsuarioId ?? null} />
+      )}
     </>
+  );
+}
+
+function ZonaExcluir({ email, nome, protegido, cursos, eaUsuarioId }: { email: string; nome: string; protegido: string | null; cursos: number; eaUsuarioId: string | null }) {
+  return (
+    <section id="excluir" className="mt-14 scroll-mt-24 rounded-2xl border-2 border-red-200 bg-white p-5 text-sm">
+      <h2 className="text-lg font-bold text-red-700">Excluir aluno</h2>
+      {protegido ? (
+        <p className="mt-2 text-slate-600">{protegido}</p>
+      ) : (
+        <details className="mt-2">
+          <summary className="cursor-pointer font-semibold text-red-700 hover:text-red-800">Quero excluir {nome === email ? "esta pessoa" : nome} do site</summary>
+          <form action={excluirAlunoAcao} className="mt-4 space-y-4 rounded-xl bg-red-50 p-4 text-red-900">
+            <input type="hidden" name="email" value={email} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="font-bold">Apaga de vez (não dá para desfazer)</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                  <li>o login: o aluno não consegue mais entrar com este e-mail</li>
+                  <li>nome, CPF, telefone, cidade e observações</li>
+                  <li>o progresso nas aulas e as provas feitas</li>
+                  <li>os contatos do checkout (carrinhos)</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-bold">Continua guardado, sem os dados pessoais</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                  <li>pagamentos: o valor continua no Financeiro, como &quot;Aluno excluído&quot;</li>
+                  <li>certificados já emitidos: o código continua válido na página de validação</li>
+                  <li>notas das pesquisas de satisfação, sem nome</li>
+                </ul>
+              </div>
+            </div>
+            <p className="rounded-lg bg-white/70 p-3">
+              <strong>Na Escola Avançada o aluno continua cadastrado</strong>
+              {eaUsuarioId ? <> (código {eaUsuarioId}{cursos ? `, ${cursos} ${cursos === 1 ? "curso" : "cursos"}` : ""})</> : null}.
+              Se quiser tirá-lo de lá também, faça pelo painel da Escola Avançada.
+            </p>
+            <label className="block font-semibold">
+              Para confirmar, digite o e-mail do aluno: <span className="font-mono">{email}</span>
+              <input name="confirmacao" required autoComplete="off" spellCheck={false} placeholder={email} className="mt-1 w-full rounded-xl border border-red-300 bg-white px-3 py-2 font-normal text-slate-900" />
+            </label>
+            <button className="rounded-full bg-red-600 px-6 py-2.5 font-bold text-white hover:bg-red-700">Excluir aluno definitivamente</button>
+          </form>
+        </details>
+      )}
+    </section>
   );
 }
 
