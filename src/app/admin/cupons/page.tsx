@@ -4,6 +4,7 @@ import { getCursos } from "@/lib/cursos";
 import { listarCupons, type Cupom } from "@/lib/dados/carrinhos";
 import { formatarPreco } from "@/lib/formatar";
 import { alternarCupom, criarCupom, excluirCupom } from "../acoes";
+import { Dica } from "@/components/admin/Dica";
 
 export const metadata: Metadata = { title: "Cupons" };
 export const dynamic = "force-dynamic";
@@ -98,7 +99,11 @@ export default async function Cupons({ searchParams }: Props) {
               {lista.map((c) => {
                 const vencido = Boolean(c.validade && c.validade < hoje);
                 const esgotado = c.limiteUsos !== null && c.usos >= c.limiteUsos;
-                const situacao = !c.ativo ? ["Pausado", "bg-slate-100 text-slate-600"] : vencido ? ["Vencido", "bg-red-100 text-red-700"] : esgotado ? ["Esgotado", "bg-red-100 text-red-700"] : ["Ativo", "bg-green-100 text-green-800"];
+                const situacao = !c.ativo
+                  ? ["Pausado", "bg-slate-100 text-slate-600", "Você pausou este cupom. Ninguém consegue usar até clicar em Ativar."]
+                  : vencido ? ["Vencido", "bg-red-100 text-red-700", "Passou da data de validade. Não funciona mais no site."]
+                  : esgotado ? ["Esgotado", "bg-red-100 text-red-700", "Já foi usado o número máximo de vezes."]
+                  : ["Ativo", "bg-green-100 text-green-800", "Funcionando: os clientes já podem usar no pagamento."];
                 return (
                   <tr key={c.codigo}>
                     <td className="px-5 py-3 font-mono font-bold text-marca-900">{c.codigo}</td>
@@ -109,7 +114,7 @@ export default async function Cupons({ searchParams }: Props) {
                     </td>
                     <td className="px-5 py-3 text-slate-600">{c.validade ? new Date(`${c.validade}T12:00:00`).toLocaleDateString("pt-BR") : "sem prazo"}</td>
                     <td className="px-5 py-3 text-slate-600">{c.usos}{c.limiteUsos !== null ? ` de ${c.limiteUsos}` : ""}</td>
-                    <td className="px-5 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${situacao[1]}`}>{situacao[0]}</span></td>
+                    <td className="px-5 py-3"><Dica texto={situacao[2]}><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${situacao[1]}`}>{situacao[0]}</span></Dica></td>
                     <td className="whitespace-nowrap px-5 py-3 text-right">
                       <form action={alternarCupom} className="inline">
                         <input type="hidden" name="codigo" value={c.codigo} />

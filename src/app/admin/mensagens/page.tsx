@@ -4,6 +4,7 @@ import { exigirAdmin } from "@/lib/admin";
 import { listarMensagens, TIPOS_AJUDA, type MensagemAjuda } from "@/lib/dados/mensagens";
 import { AvisoSql, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { anotarMensagem, excluirMensagem, marcarResolvida } from "./acoes";
+import { Dica } from "@/components/admin/Dica";
 
 export const metadata: Metadata = { title: "Mensagens" };
 export const dynamic = "force-dynamic";
@@ -45,13 +46,15 @@ function Cartao({ m }: { m: MensagemAjuda }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${corTipo[m.tipo] ?? corTipo.outro}`}>{TIPOS_AJUDA[m.tipo]}</span>
+            <Dica texto="O assunto que a pessoa escolheu ao mandar a mensagem."><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${corTipo[m.tipo] ?? corTipo.outro}`}>{TIPOS_AJUDA[m.tipo]}</span></Dica>
             {m.status === "nova"
-              ? <span className="rounded-full bg-laranja-500 px-2.5 py-1 text-xs font-bold text-marca-900">Nova</span>
-              : <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">Resolvida</span>}
-            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${m.origem === "aluno" ? "bg-marca-50 text-marca-700" : "bg-slate-100 text-slate-600"}`}>
-              {m.origem === "aluno" ? "Veio da Área do aluno" : m.logado ? "Veio da Loja virtual (com login)" : "Veio da Loja virtual"}
-            </span>
+              ? <Dica texto="Ainda não foi resolvida. Depois de responder, clique em Marcar como resolvida."><span className="rounded-full bg-laranja-500 px-2.5 py-1 text-xs font-bold text-marca-900">Nova</span></Dica>
+              : <Dica texto="Já foi marcada como resolvida."><span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">Resolvida</span></Dica>}
+            <Dica texto={m.origem === "aluno" ? "Enviada pelo botão de ajuda dentro da área do aluno (aulas, meus cursos)." : m.logado ? "Enviada pelo botão de ajuda nas páginas de venda, por alguém que já tinha entrado na conta." : "Enviada pelo botão de ajuda nas páginas de venda, por um visitante sem login."}>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${m.origem === "aluno" ? "bg-marca-50 text-marca-700" : "bg-slate-100 text-slate-600"}`}>
+                {m.origem === "aluno" ? "Veio da Área do aluno" : m.logado ? "Veio da Loja virtual (com login)" : "Veio da Loja virtual"}
+              </span>
+            </Dica>
             <span className="text-xs text-slate-500">{quando(m.criadoEm)}</span>
           </div>
           <p className="mt-2 font-semibold text-marca-900">
@@ -123,9 +126,9 @@ export default async function Mensagens({ searchParams }: Props) {
       {tabelaFaltando && <AvisoSql arquivo="mensagens-ajuda.sql" />}
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Numero rotulo="Novas (para resolver)" valor={String(novas)} cor={novas ? "laranja" : "cinza"} href={filtro("novas", "")} />
-        <Numero rotulo="Resolvidas" valor={String(resolvidas)} cor="verde" href={filtro("resolvidas", "")} />
-        <Numero rotulo="Total recebidas" valor={String(todas.length)} href={filtro("todas", "")} />
+        <Numero rotulo="Novas (para resolver)" valor={String(novas)} cor={novas ? "laranja" : "cinza"} href={filtro("novas", "")} dica="Mensagens do botão de ajuda que ainda esperam resposta." />
+        <Numero rotulo="Resolvidas" valor={String(resolvidas)} cor="verde" href={filtro("resolvidas", "")} dica="Mensagens que já foram marcadas como resolvidas." />
+        <Numero rotulo="Total recebidas" valor={String(todas.length)} href={filtro("todas", "")} dica="Todas as mensagens que chegaram pelo botão de ajuda do site." />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">

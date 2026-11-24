@@ -7,6 +7,7 @@ import { getCursos } from "@/lib/cursos";
 import { DIAS_PARA_INATIVO, pessoasDoPainel } from "@/lib/painel-resumo";
 import { EtiquetaAluno, Numero, Titulo } from "@/components/admin/Blocos";
 import { BotaoExportar } from "@/components/admin/BotaoExportar";
+import { Dica } from "@/components/admin/Dica";
 
 export const metadata: Metadata = { title: "Alunos" };
 export const dynamic = "force-dynamic";
@@ -61,10 +62,10 @@ export default async function Alunos({ searchParams }: Props) {
         </div>
       )}
       <div className="mb-5 grid gap-3 sm:grid-cols-4">
-        <Numero rotulo="Total" valor={String(todos.length)} detalhe={`${todos.filter((p) => p.matriculado).length} matriculados`} />
-        <Numero rotulo="Ativos" valor={String(conta("ativo"))} cor="verde" href="/admin/alunos?filtro=ativo" />
-        <Numero rotulo="Inativos" valor={String(conta("inativo"))} cor="vermelho" href="/admin/alunos?filtro=inativo" />
-        <Numero rotulo="Interessados" valor={String(conta("interessado"))} cor="laranja" href="/admin/alunos?filtro=interessado" />
+        <Numero rotulo="Total" valor={String(todos.length)} detalhe={`${todos.filter((p) => p.matriculado).length} matriculados`} dica="Todas as pessoas cadastradas no site. Matriculados são os que têm pelo menos um curso." />
+        <Numero rotulo="Ativos" valor={String(conta("ativo"))} cor="verde" href="/admin/alunos?filtro=ativo" dica={`Estudaram alguma aula nos últimos ${DIAS_PARA_INATIVO} dias.`} />
+        <Numero rotulo="Inativos" valor={String(conta("inativo"))} cor="vermelho" href="/admin/alunos?filtro=inativo" dica={`Têm curso, mas não estudam há ${DIAS_PARA_INATIVO} dias ou mais.`} />
+        <Numero rotulo="Interessados" valor={String(conta("interessado"))} cor="laranja" href="/admin/alunos?filtro=interessado" dica="Se cadastraram, mas ainda não abriram nenhuma aula." />
       </div>
       <form className="flex flex-wrap items-center gap-2">
         {filtros.map((f) => (
@@ -105,7 +106,7 @@ export default async function Alunos({ searchParams }: Props) {
                     {!a.matriculado && a.cursoInteresse && <span className="block text-xs font-normal text-slate-500">olhou: {nomeCurso(a.cursoInteresse)}</span>}
                   </td>
                   <td className="px-5 py-3 text-slate-600">{a.email}{a.telefone && <span className="block text-xs text-slate-500">{a.telefone}</span>}</td>
-                  <td className="px-5 py-3"><EtiquetaAluno s={a.situacao} />{!a.matriculado && <span className="ml-1 text-xs text-slate-400">sem matrícula</span>}</td>
+                  <td className="px-5 py-3"><EtiquetaAluno s={a.situacao} />{!a.matriculado && <Dica texto="Ainda não tem nenhum curso liberado. Pode ter começado uma compra sem terminar." className="ml-1"><span className="text-xs text-slate-400">sem matrícula</span></Dica>}</td>
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">{data(a.desde)}</td>
                   <td className="whitespace-nowrap px-5 py-3">{a.matriculado ? <Atividade iso={a.ultimaAtividade} /> : <span className="text-xs text-slate-400">—</span>}</td>
                 </tr>
@@ -128,9 +129,11 @@ export default async function Alunos({ searchParams }: Props) {
         <ul className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
           {eventos.map((e, i) => (
             <li key={i} className="flex gap-3 px-5 py-3">
-              <span className={e.ok ? "text-emerald-600" : "text-red-600"} aria-label={e.ok ? "ok" : "erro"}>
-                {e.ok ? "✓" : "✕"}
-              </span>
+              <Dica texto={e.ok ? "Esta etapa deu certo." : "Esta etapa deu erro. Veja o detalhe ao lado."} className="self-start rounded-full">
+                <span className={e.ok ? "text-emerald-600" : "text-red-600"} aria-label={e.ok ? "ok" : "erro"}>
+                  {e.ok ? "✓" : "✕"}
+                </span>
+              </Dica>
               <div className="min-w-0">
                 <p className="font-semibold text-marca-900">
                   {e.etapa} <span className="font-normal text-slate-400">· {dataHora(e.quando)}</span>
@@ -147,7 +150,8 @@ export default async function Alunos({ searchParams }: Props) {
 
 function Atividade({ iso }: { iso: string | null }) {
   const dias = diasDesde(iso);
-  if (dias === null) return <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">nunca estudou</span>;
+  if (dias === null) return <Dica texto="Tem curso, mas ainda não abriu nenhuma aula."><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">nunca estudou</span></Dica>;
   const cor = dias >= 30 ? "bg-red-100 text-red-700" : dias >= 7 ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800";
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cor}`}>{dias === 0 ? "hoje" : dias === 1 ? "ontem" : `há ${dias} dias`}</span>;
+  const explica = dias >= 30 ? "Parado há 30 dias ou mais (vermelho)." : dias >= 7 ? "Parado há 7 dias ou mais (amarelo). Vale um lembrete." : "Estudou nos últimos 7 dias (verde).";
+  return <Dica texto={`Última vez que estudou uma aula. ${explica}`}><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cor}`}>{dias === 0 ? "hoje" : dias === 1 ? "ontem" : `há ${dias} dias`}</span></Dica>;
 }

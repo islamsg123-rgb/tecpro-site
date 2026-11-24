@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatarPreco } from "@/lib/formatar";
 import { nomeMes } from "@/lib/painel-resumo";
+import { Dica } from "./Dica";
 
 /** Peças visuais reaproveitadas nas páginas do painel. */
 
@@ -16,7 +17,7 @@ export function Titulo({ children, acao, descricao }: { children: React.ReactNod
   );
 }
 
-export function Numero({ rotulo, valor, detalhe, href, cor = "marca" }: { rotulo: string; valor: string; detalhe?: string; href?: string; cor?: "marca" | "verde" | "laranja" | "vermelho" | "cinza" }) {
+export function Numero({ rotulo, valor, detalhe, href, cor = "marca", dica }: { rotulo: string; valor: string; detalhe?: string; href?: string; cor?: "marca" | "verde" | "laranja" | "vermelho" | "cinza"; dica?: React.ReactNode }) {
   const barra = { marca: "bg-marca-700", verde: "bg-emerald-500", laranja: "bg-laranja-500", vermelho: "bg-red-500", cinza: "bg-slate-400" }[cor];
   const conteudo = (
     <>
@@ -26,8 +27,14 @@ export function Numero({ rotulo, valor, detalhe, href, cor = "marca" }: { rotulo
       {detalhe && <p className="mt-1 text-xs text-slate-500">{detalhe}</p>}
     </>
   );
-  const cls = "relative block rounded-2xl border border-slate-200 bg-white p-5 pl-6";
-  return href ? <Link href={href} className={`${cls} transition-colors hover:border-marca-700`}>{conteudo}</Link> : <div className={cls}>{conteudo}</div>;
+  const cls = "relative block h-full rounded-2xl border border-slate-200 bg-white p-5 pl-6";
+  const cartao = href ? <Link href={href} className={`${cls} transition-colors hover:border-marca-700`}>{conteudo}</Link> : <div className={cls}>{conteudo}</div>;
+  if (!dica) return cartao;
+  return (
+    <Dica texto={<>{dica}{href && <span className="mt-1 block text-white/70">Clique para ver a lista.</span>}</>} bloco temLink={Boolean(href)}>
+      {cartao}
+    </Dica>
+  );
 }
 
 export function Caixa({ titulo, acao, children, className = "" }: { titulo: string; acao?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -126,8 +133,18 @@ const corSituacao = {
   interessado: "bg-blue-100 text-blue-800",
 } as const;
 
+const dicaSituacao: Record<keyof typeof corSituacao, string> = {
+  ativo: "Estudou alguma aula nos últimos 30 dias.",
+  inativo: "Tem curso, mas não estuda há mais de 30 dias. Bom momento para chamar no WhatsApp.",
+  interessado: "Fez cadastro, mas ainda não abriu nenhuma aula (ou não tem curso).",
+};
+
 export function EtiquetaAluno({ s }: { s: keyof typeof corSituacao }) {
-  return <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${corSituacao[s]}`}>{s}</span>;
+  return (
+    <Dica texto={dicaSituacao[s]}>
+      <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${corSituacao[s]}`}>{s}</span>
+    </Dica>
+  );
 }
 
 export const dataCurta = (iso: string | null | undefined) =>

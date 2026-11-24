@@ -36,9 +36,9 @@ export default async function Pesquisa({ searchParams }: Props) {
         </p>
       )}
       <div className="grid gap-4 sm:grid-cols-3">
-        <Numero rotulo="Respostas" valor={String(lista.length)} />
-        <Numero rotulo="Nota média" valor={lista.length ? `${media.toFixed(1).replace(".", ",")} de 5` : "—"} detalhe={lista.length ? estrelas(Math.round(media)) : undefined} cor="laranja" />
-        <Numero rotulo="Indicaria a um amigo (NPS)" valor={nps === null ? "—" : String(nps)} detalhe="de -100 a 100; acima de 50 é muito bom" cor="verde" />
+        <Numero rotulo="Respostas" valor={String(lista.length)} dica="Quantas vezes os alunos responderam a pesquisa de satisfação (botão Avaliar o curso nas aulas)." />
+        <Numero rotulo="Nota média" valor={lista.length ? `${media.toFixed(1).replace(".", ",")} de 5` : "—"} detalhe={lista.length ? estrelas(Math.round(media)) : undefined} cor="laranja" dica="Média das notas que os alunos deram, de 1 a 5 estrelas." />
+        <Numero rotulo="Indicaria a um amigo (NPS)" valor={nps === null ? "—" : String(nps)} detalhe="de -100 a 100; acima de 50 é muito bom" cor="verde" dica="Mede se os alunos indicariam a escola: quem dá nota alta menos quem dá nota baixa. Quanto maior, melhor." />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[280px_1fr]">

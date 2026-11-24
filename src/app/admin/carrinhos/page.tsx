@@ -6,6 +6,7 @@ import { listarCarrinhos, listarCupons, mensagensProntas, type Carrinho, type Et
 import { formatarPreco } from "@/lib/formatar";
 import { BotaoWhatsApp } from "@/components/admin/BotaoWhatsApp";
 import { alternarContatado, salvarMensagens } from "../acoes";
+import { Dica } from "@/components/admin/Dica";
 
 export const metadata: Metadata = { title: "Carrinhos abandonados" };
 export const dynamic = "force-dynamic";
@@ -13,11 +14,11 @@ export const dynamic = "force-dynamic";
 /** Depois deste tempo sem concluir, o carrinho conta como abandonado. */
 const MINUTOS_ABANDONO = 30;
 
-const nomeEtapa: Record<EtapaCarrinho, [string, string]> = {
-  contato: ["Preencheu nome e WhatsApp", "bg-amber-100 text-amber-800"],
-  pagamento: ["Gerou o pagamento, não pagou", "bg-orange-100 text-orange-800"],
-  pago: ["Pagou", "bg-green-100 text-green-800"],
-  matriculado: ["Matriculou (grátis)", "bg-green-100 text-green-800"],
+const nomeEtapa: Record<EtapaCarrinho, [string, string, string]> = {
+  contato: ["Preencheu nome e WhatsApp", "bg-amber-100 text-amber-800", "Deixou o contato na primeira etapa da compra, mas não chegou a escolher como pagar."],
+  pagamento: ["Gerou o pagamento, não pagou", "bg-orange-100 text-orange-800", "Chegou a gerar Pix, boleto ou tentar o cartão, mas o pagamento não foi concluído."],
+  pago: ["Pagou", "bg-green-100 text-green-800", "Concluiu a compra. Não precisa contatar."],
+  matriculado: ["Matriculou (grátis)", "bg-green-100 text-green-800", "Entrou num curso grátis. Não precisa contatar."],
 };
 const nomeForma: Record<string, string> = { PIX: "Pix", BOLETO: "boleto", CREDIT_CARD: "cartão" };
 
@@ -71,9 +72,9 @@ export default async function Carrinhos({ searchParams }: Props) {
       )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <Cartao rotulo="Abandonados" valor={String(abandonados.length)} />
-        <Cartao rotulo="Valor que ficou para trás" valor={formatarPreco(valorPerdido)} />
-        <Cartao rotulo="Ainda não contatados" valor={String(abandonados.filter((c) => !c.contatadoEm).length)} />
+        <Cartao rotulo="Abandonados" valor={String(abandonados.length)} dica="Pessoas que começaram uma compra há mais de 30 minutos e não terminaram." />
+        <Cartao rotulo="Valor que ficou para trás" valor={formatarPreco(valorPerdido)} dica="Soma do valor dessas compras não terminadas. É o que dá para recuperar chamando no WhatsApp." />
+        <Cartao rotulo="Ainda não contatados" valor={String(abandonados.filter((c) => !c.contatadoEm).length)} dica="Abandonados que ainda não foram marcados como contatados." />
       </div>
 
       <nav className="mt-8 flex flex-wrap gap-2">
@@ -105,7 +106,7 @@ export default async function Carrinhos({ searchParams }: Props) {
                 const link = c.tipo === "certificado"
                   ? `${site}/minha-conta/cursos/${curso?.slug ?? ""}#certificado`
                   : `${site}/checkout/${curso?.slug ?? ""}`;
-                const [rotulo, cls] = nomeEtapa[c.etapa];
+                const [rotulo, cls, explica] = nomeEtapa[c.etapa];
                 return (
                   <tr key={`${c.email}|${c.cursoId}|${c.tipo}`} className="align-top hover:bg-marca-50/50">
                     <td className="px-5 py-4">
@@ -118,7 +119,7 @@ export default async function Carrinhos({ searchParams }: Props) {
                       {c.valorCentavos ? <span className="block text-xs text-slate-500">{formatarPreco(c.valorCentavos)}{c.cupom ? ` · cupom ${c.cupom}` : ""}</span> : null}
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>{rotulo}</span>
+                      <Dica texto={explica}><span className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>{rotulo}</span></Dica>
                       {c.etapa === "pagamento" && c.forma && <span className="mt-1 block text-xs text-slate-500">por {nomeForma[c.forma] ?? c.forma}</span>}
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 text-slate-500">{quando(c.atualizadoEm)}</td>
@@ -169,12 +170,14 @@ export default async function Carrinhos({ searchParams }: Props) {
   );
 }
 
-function Cartao({ rotulo, valor }: { rotulo: string; valor: string }) {
+function Cartao({ rotulo, valor, dica }: { rotulo: string; valor: string; dica: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5">
-      <p className="text-sm text-slate-500">{rotulo}</p>
-      <p className="mt-2 font-display text-3xl font-bold text-marca-900">{valor}</p>
-    </div>
+    <Dica texto={dica} bloco>
+      <div className="h-full rounded-2xl border border-slate-200 bg-white p-5">
+        <p className="text-sm text-slate-500">{rotulo}</p>
+        <p className="mt-2 font-display text-3xl font-bold text-marca-900">{valor}</p>
+      </div>
+    </Dica>
   );
 }
 

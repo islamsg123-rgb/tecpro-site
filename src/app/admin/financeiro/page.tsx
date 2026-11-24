@@ -38,16 +38,16 @@ export default async function Financeiro({ searchParams }: Props) {
       </form>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Numero rotulo={`Recebido em ${nomeMes(mes)}`} valor={formatarPreco(r.recebidoMesCentavos)} detalhe={`mês anterior: ${formatarPreco(r.recebidoMesAnteriorCentavos)}`} cor="verde" />
-        <Numero rotulo="Líquido (após taxas)" valor={formatarPreco(r.liquidoMesCentavos)} detalhe={`taxas: ${formatarPreco(r.recebidoMesCentavos - r.liquidoMesCentavos)}`} />
-        <Numero rotulo="A receber" valor={formatarPreco(r.aReceberCentavos)} detalhe="Pix e boletos ainda no prazo" href="/admin/financeiro/recebimentos?situacao=aguardando" cor="laranja" />
-        <Numero rotulo="Em atraso" valor={formatarPreco(r.emAtrasoCentavos)} detalhe="ver devedores" href="/admin/financeiro/devedores" cor="vermelho" />
+        <Numero rotulo={`Recebido em ${nomeMes(mes)}`} valor={formatarPreco(r.recebidoMesCentavos)} detalhe={`mês anterior: ${formatarPreco(r.recebidoMesAnteriorCentavos)}`} cor="verde" dica="Total pago pelos clientes no mês escolhido, antes de descontar as taxas." />
+        <Numero rotulo="Líquido (após taxas)" valor={formatarPreco(r.liquidoMesCentavos)} detalhe={`taxas: ${formatarPreco(r.recebidoMesCentavos - r.liquidoMesCentavos)}`} dica="O que sobra para a Tecpro depois das taxas do Mercado Pago ou do Asaas." />
+        <Numero rotulo="A receber" valor={formatarPreco(r.aReceberCentavos)} detalhe="Pix e boletos ainda no prazo" href="/admin/financeiro/recebimentos?situacao=aguardando" cor="laranja" dica="Pix e boletos já gerados que ainda não venceram." />
+        <Numero rotulo="Em atraso" valor={formatarPreco(r.emAtrasoCentavos)} detalhe="ver devedores" href="/admin/financeiro/devedores" cor="vermelho" dica="Pagamentos que passaram do vencimento sem ser pagos." />
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Numero rotulo="Matrículas pagas" valor={String(r.matriculasMes)} detalhe="cursos pagos no mês" href={`/admin/financeiro/recebimentos?mes=${mes}&tipo=curso&situacao=pago`} />
-        <Numero rotulo="Certificados pagos" valor={String(r.certificadosMes)} detalhe="emissões pagas no mês" href={`/admin/financeiro/recebimentos?mes=${mes}&tipo=certificado&situacao=pago`} />
-        <Numero rotulo="Ticket médio" valor={formatarPreco(r.ticketMedioCentavos)} detalhe="valor médio por pagamento" />
-        <Numero rotulo="Saldo para saque" valor={saldo === null ? "—" : formatarPreco(saldo)} detalhe={saldo === null ? "veja no app do Mercado Pago" : "disponível no Asaas"} cor="cinza" />
+        <Numero rotulo="Matrículas pagas" valor={String(r.matriculasMes)} detalhe="cursos pagos no mês" href={`/admin/financeiro/recebimentos?mes=${mes}&tipo=curso&situacao=pago`} dica="Quantos cursos foram comprados e pagos neste mês." />
+        <Numero rotulo="Certificados pagos" valor={String(r.certificadosMes)} detalhe="emissões pagas no mês" href={`/admin/financeiro/recebimentos?mes=${mes}&tipo=certificado&situacao=pago`} dica="Quantos certificados (ou pacotes de certificados) foram pagos neste mês." />
+        <Numero rotulo="Ticket médio" valor={formatarPreco(r.ticketMedioCentavos)} detalhe="valor médio por pagamento" dica="O valor médio de cada pagamento recebido no mês (total dividido pela quantidade)." />
+        <Numero rotulo="Saldo para saque" valor={saldo === null ? "—" : formatarPreco(saldo)} detalhe={saldo === null ? "veja no app do Mercado Pago" : "disponível no Asaas"} cor="cinza" dica="Dinheiro já liberado para transferir para a sua conta. O do Mercado Pago só aparece no app dele." />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">

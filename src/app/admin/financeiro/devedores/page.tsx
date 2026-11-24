@@ -32,9 +32,9 @@ export default async function Devedores() {
         Devedores
       </Titulo>
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <Numero rotulo="Total em atraso" valor={formatarPreco(total)} cor="vermelho" />
-        <Numero rotulo="Pessoas devendo" valor={String(devedores.length)} cor="laranja" />
-        <Numero rotulo="Certificados a pagar" valor={String(pendentesCert.length)} detalhe="concluíram e ainda não pagaram" />
+        <Numero rotulo="Total em atraso" valor={formatarPreco(total)} cor="vermelho" dica="Soma dos pagamentos que venceram e não foram pagos." />
+        <Numero rotulo="Pessoas devendo" valor={String(devedores.length)} cor="laranja" dica="Quantas pessoas têm pelo menos um pagamento vencido." />
+        <Numero rotulo="Certificados a pagar" valor={String(pendentesCert.length)} detalhe="concluíram e ainda não pagaram" dica="Alunos que concluíram um curso grátis e ainda não pagaram o certificado. Não é dívida vencida: é uma venda que pode acontecer." />
       </div>
 
       <Caixa titulo="Pagamentos vencidos">

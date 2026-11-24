@@ -18,6 +18,7 @@ import { TabelaVendas } from "@/components/admin/TabelaVendas";
 import { EtiquetaAluno } from "@/components/admin/Blocos";
 import { adicionarCursoAluno, concluirCursosTesteAcao, desfazerCursosTesteAcao, removerCursoAluno, salvarDadosAlunoAcao, excluirAlunoAcao } from "../../acoes";
 import { IconeChevron } from "@/components/Icones";
+import { Dica } from "@/components/admin/Dica";
 
 export const metadata: Metadata = { title: "Ficha do aluno" };
 export const dynamic = "force-dynamic";
@@ -49,11 +50,11 @@ const avisos: Record<string, [string, boolean]> = {
 };
 
 const nomeEtapa: Record<string, string> = { inicio: "abriu a aula", video: "assistiu ao vídeo", prova: "passou na prova", teste: "curso concluído pelo modo teste" };
-const nomeCert: Record<EstadoCertificado, [string, string]> = {
-  em_andamento: ["Em andamento", "bg-slate-100 text-slate-600"],
-  aguardando_pagamento: ["Concluiu, falta pagar", "bg-amber-100 text-amber-800"],
-  disponivel: ["Pode emitir", "bg-blue-100 text-blue-800"],
-  emitido: ["Emitido", "bg-green-100 text-green-800"],
+const nomeCert: Record<EstadoCertificado, [string, string, string]> = {
+  em_andamento: ["Em andamento", "bg-slate-100 text-slate-600", "O aluno ainda não terminou todas as aulas deste curso."],
+  aguardando_pagamento: ["Concluiu, falta pagar", "bg-amber-100 text-amber-800", "Concluiu um curso grátis. O certificado é pago e o aluno ainda não pagou."],
+  disponivel: ["Pode emitir", "bg-blue-100 text-blue-800", "Certificado liberado (curso pago ou certificado já pago), mas o aluno ainda não clicou para gerar."],
+  emitido: ["Emitido", "bg-green-100 text-green-800", "Certificado já gerado. Clique no código ao lado para ver a validação."],
 };
 
 export default async function Ficha({ searchParams }: Props) {
@@ -191,13 +192,13 @@ export default async function Ficha({ searchParams }: Props) {
               atividades.filter((x) => x.cursoId === c.curso.id && x.aulaId.endsWith("#prova")).map((x) => x.aulaId),
             ).size;
             const s = certs[i];
-            const [rotulo, cls] = nomeCert[s.estado];
+            const [rotulo, cls, explica] = nomeCert[s.estado];
             const ultimaNoCurso = atividades.find((x) => x.cursoId === c.curso.id)?.quando;
             return (
               <div key={c.curso.id} className="rounded-2xl border border-slate-200 bg-white p-5">
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-bold text-marca-900">{c.curso.nome}</p>
-                  {c.curso.gratuito && <span className="shrink-0 rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">gratuito</span>}
+                  {c.curso.gratuito && <Dica texto="Curso grátis: o aluno estuda sem pagar e só paga se quiser o certificado no final." className="shrink-0"><span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">gratuito</span></Dica>}
                 </div>
                 <div className="mt-4 flex items-center gap-3">
                   <BarraProgresso pct={c.pct} />
@@ -210,7 +211,7 @@ export default async function Ficha({ searchParams }: Props) {
                   <div>
                     <dt className="text-xs text-slate-500">Certificado</dt>
                     <dd className="mt-0.5">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>{rotulo}</span>
+                      <Dica texto={explica}><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>{rotulo}</span></Dica>
                       {s.certificado && (
                         <Link href={`/validar/${s.certificado.codigo}`} className="ml-2 font-mono text-xs text-marca-700 underline">{s.certificado.codigo}</Link>
                       )}

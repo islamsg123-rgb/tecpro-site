@@ -9,16 +9,17 @@ import {
 import { Caixa, dataCurta, GraficoMensal, LinkVerTudo, Numero, PorForma, Vazio } from "@/components/admin/Blocos";
 import type { Cobranca } from "@/lib/pagamentos/tipos";
 import { contarNovas } from "@/lib/dados/mensagens";
+import { Dica } from "@/components/admin/Dica";
 
 export const dynamic = "force-dynamic";
 
-const iconeEvento: Record<Acontecimento["tipo"], [string, string]> = {
-  pagamento: ["R$", "bg-emerald-100 text-emerald-700"],
-  matricula: ["+", "bg-marca-100 text-marca-700"],
-  certificado: ["✓", "bg-laranja-300/40 text-marca-900"],
-  interesse: ["?", "bg-blue-100 text-blue-700"],
-  pesquisa: ["★", "bg-amber-100 text-amber-700"],
-  atraso: ["!", "bg-red-100 text-red-700"],
+const iconeEvento: Record<Acontecimento["tipo"], [string, string, string]> = {
+  pagamento: ["R$", "bg-emerald-100 text-emerald-700", "Pagamento confirmado."],
+  matricula: ["+", "bg-marca-100 text-marca-700", "Nova matrícula em um curso."],
+  certificado: ["✓", "bg-laranja-300/40 text-marca-900", "Certificado emitido."],
+  interesse: ["?", "bg-blue-100 text-blue-700", "Alguém começou uma compra (curso ou certificado) e ainda não terminou."],
+  pesquisa: ["★", "bg-amber-100 text-amber-700", "Aluno respondeu a pesquisa de satisfação."],
+  atraso: ["!", "bg-red-100 text-red-700", "Pagamento passou do vencimento sem ser pago."],
 };
 
 function quandoFoi(iso: string) {
@@ -91,19 +92,20 @@ export default async function PainelRapido({ searchParams }: Props) {
             detalhe={variacao === null ? `líquido ${formatarPreco(fin.liquidoMesCentavos)}` : `${variacao >= 0 ? "+" : ""}${variacao}% em relação ao mês passado`}
             href="/admin/financeiro"
             cor="verde"
+            dica="Total que entrou de fato neste mês (pagamentos confirmados). Embaixo, a comparação com o mês passado."
           />
-          <Numero rotulo="A receber" valor={formatarPreco(fin.aReceberCentavos)} detalhe="Pix e boletos dentro do prazo" href="/admin/financeiro/recebimentos?situacao=aguardando" />
-          <Numero rotulo="Em atraso" valor={formatarPreco(fin.emAtrasoCentavos)} detalhe={`${devedores.length} ${devedores.length === 1 ? "devedor" : "devedores"}`} href="/admin/financeiro/devedores" cor="vermelho" />
-          <Numero rotulo="Matrículas pagas no mês" valor={String(fin.matriculasMes)} detalhe={`${fin.certificadosMes} certificados pagos · ticket médio ${formatarPreco(fin.ticketMedioCentavos)}`} href="/admin/financeiro/recebimentos" cor="laranja" />
+          <Numero rotulo="A receber" valor={formatarPreco(fin.aReceberCentavos)} detalhe="Pix e boletos dentro do prazo" href="/admin/financeiro/recebimentos?situacao=aguardando" dica="Pix e boletos já gerados que ainda não venceram. Pode virar dinheiro se o aluno pagar." />
+          <Numero rotulo="Em atraso" valor={formatarPreco(fin.emAtrasoCentavos)} detalhe={`${devedores.length} ${devedores.length === 1 ? "devedor" : "devedores"}`} href="/admin/financeiro/devedores" cor="vermelho" dica="Valor de pagamentos que passaram do vencimento sem ser pagos." />
+          <Numero rotulo="Matrículas pagas no mês" valor={String(fin.matriculasMes)} detalhe={`${fin.certificadosMes} certificados pagos · ticket médio ${formatarPreco(fin.ticketMedioCentavos)}`} href="/admin/financeiro/recebimentos" cor="laranja" dica="Quantos cursos foram comprados e pagos neste mês. Ticket médio é o valor médio de cada pagamento." />
         </div>
       )}
 
       <div className={`grid gap-4 sm:grid-cols-3 lg:grid-cols-5 ${verFinanceiro ? "mt-4" : ""}`}>
-        <Numero rotulo="Alunos ativos" valor={String(conta("ativo"))} detalhe={`estudaram nos últimos ${DIAS_PARA_INATIVO} dias`} href={verAlunos ? "/admin/alunos?filtro=ativo" : undefined} cor="verde" />
-        <Numero rotulo="Inativos" valor={String(conta("inativo"))} detalhe={`parados há ${DIAS_PARA_INATIVO}+ dias`} href={verAlunos ? "/admin/alunos?filtro=inativo" : undefined} cor="vermelho" />
-        <Numero rotulo="Interessados" valor={String(conta("interessado"))} detalhe="cadastraram, mas não viram aula" href={verAlunos ? "/admin/alunos?filtro=interessado" : undefined} />
-        <Numero rotulo="Devedores" valor={String(devedores.length)} detalhe={verFinanceiro ? formatarPreco(fin.emAtrasoCentavos) : "pagamentos vencidos"} href={verFinanceiro ? "/admin/financeiro/devedores" : undefined} cor="laranja" />
-        <Numero rotulo="Formados" valor={String(new Set(formados.map((f) => f.email)).size)} detalhe={`${formados.filter((f) => f.certificado).length} certificados emitidos`} href={verAlunos ? "/admin/alunos/formados" : undefined} cor="cinza" />
+        <Numero rotulo="Alunos ativos" valor={String(conta("ativo"))} detalhe={`estudaram nos últimos ${DIAS_PARA_INATIVO} dias`} href={verAlunos ? "/admin/alunos?filtro=ativo" : undefined} cor="verde" dica={`Alunos que estudaram alguma aula nos últimos ${DIAS_PARA_INATIVO} dias.`} />
+        <Numero rotulo="Inativos" valor={String(conta("inativo"))} detalhe={`parados há ${DIAS_PARA_INATIVO}+ dias`} href={verAlunos ? "/admin/alunos?filtro=inativo" : undefined} cor="vermelho" dica={`Alunos com curso que não estudam há ${DIAS_PARA_INATIVO} dias ou mais.`} />
+        <Numero rotulo="Interessados" valor={String(conta("interessado"))} detalhe="cadastraram, mas não viram aula" href={verAlunos ? "/admin/alunos?filtro=interessado" : undefined} dica="Pessoas que se cadastraram, mas ainda não abriram nenhuma aula." />
+        <Numero rotulo="Devedores" valor={String(devedores.length)} detalhe={verFinanceiro ? formatarPreco(fin.emAtrasoCentavos) : "pagamentos vencidos"} href={verFinanceiro ? "/admin/financeiro/devedores" : undefined} cor="laranja" dica="Pessoas com pagamento vencido e não pago." />
+        <Numero rotulo="Formados" valor={String(new Set(formados.map((f) => f.email)).size)} detalhe={`${formados.filter((f) => f.certificado).length} certificados emitidos`} href={verAlunos ? "/admin/alunos/formados" : undefined} cor="cinza" dica="Pessoas que concluíram pelo menos um curso. Embaixo, quantos certificados já foram gerados." />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -124,10 +126,10 @@ export default async function PainelRapido({ searchParams }: Props) {
           ) : (
             <ul className="divide-y divide-slate-100">
               {acontecimentos.map((a, i) => {
-                const [ic, cls] = iconeEvento[a.tipo];
+                const [ic, cls, explica] = iconeEvento[a.tipo];
                 const corpo = (
                   <>
-                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold ${cls}`}>{ic}</span>
+                    <Dica texto={explica} className="shrink-0 rounded-full"><span className={`grid h-9 w-9 place-items-center rounded-full text-xs font-bold ${cls}`}>{ic}</span></Dica>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-marca-900">{a.titulo}</span>
                       <span className="block truncate text-xs text-slate-500">{a.detalhe}</span>
