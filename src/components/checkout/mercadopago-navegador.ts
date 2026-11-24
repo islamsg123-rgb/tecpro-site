@@ -101,3 +101,47 @@ export async function tokenizarCartao(chavePublica: string, c: CartaoDigitado): 
     throw new Error("Confira os dados do cartão (número, validade e código de segurança).");
   }
 }
+
+/** Uma opção de parcelamento como o Mercado Pago calcula (com os juros que o comprador paga, se houver). */
+export interface ParcelaMp {
+  n: number;
+  valorParcelaCentavos: number;
+  totalCentavos: number;
+  juros: boolean;
+}
+
+const cacheParcelas = new Map<string, Promise<ParcelaMp[] | null>>();
+
+/**
+ * Parcelas oferecidas pelo Mercado Pago para este valor, conforme a configuração da conta
+ * (sem juros ou juros por conta do comprador). Com os 8 primeiros dígitos do cartão, usa as regras
+ * do banco dele; sem eles, mostra as de um cartão comum. Devolve null se não conseguir consultar.
+ */
+export function parcelasMp(chavePublica: string, valorCentavos: number, bin = ""): Promise<ParcelaMp[] | null> {
+  const porCartao = bin.length >= 8 ? `bin=${bin.slice(0, 8)}` : "payment_method_id=visa";
+  const chave = `${valorCentavos}|${porCartao}`;
+  let p = cacheParcelas.get(chave);
+  if (!p) {
+    const url =
+      `https://api.mercadopago.com/v1/payment_methods/installments?public_key=${encodeURIComponent(chavePublica)}` +
+      `&amount=${(valorCentavos / 100).toFixed(2)}&${porCartao}&payment_type_id=credit_card`;
+    p = fetch(url)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((lista: { payer_costs?: { installments: number; installment_amount: number; total_amount: number; installment_rate: number }[] }[] | null) => {
+        const custos = Array.isArray(lista) ? lista[0]?.payer_costs ?? [] : [];
+        if (!custos.length) return null;
+        return custos
+          .filter((c) => c.installments >= 1 && c.installments <= 12)
+          .map((c) => ({
+            n: c.installments,
+            valorParcelaCentavos: Math.round(c.installment_amount * 100),
+            totalCentavos: Math.round(c.total_amount * 100),
+            juros: c.installment_rate > 0 || Math.round(c.total_amount * 100) > valorCentavos,
+          }));
+      })
+      .catch(() => null);
+    p.then((r) => { if (!r) cacheParcelas.delete(chave); });
+    cacheParcelas.set(chave, p);
+  }
+  return p;
+}

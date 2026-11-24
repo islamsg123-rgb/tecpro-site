@@ -146,7 +146,8 @@ export async function pagar(_anterior: EstadoCheckout, f: FormData): Promise<Est
     const token = texto(f, "mpToken");
     const bandeira = texto(f, "mpBandeira");
     if (!token || !bandeira) campos.numeroCartao = "Confira os dados do cartão.";
-    if (!opcoesParcelas(item.valorCentavos).includes(parcelas)) campos.parcelas = "Parcelamento inválido.";
+    // As parcelas (e os juros, pagos pelo comprador) vêm do Mercado Pago, que confere de novo ao cobrar.
+    if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > 24) campos.parcelas = "Parcelamento inválido.";
     nova.cartaoMp = { token, bandeira, emissor: texto(f, "mpEmissor") || undefined };
     nova.parcelas = parcelas;
   } else if (forma === "CREDIT_CARD") {

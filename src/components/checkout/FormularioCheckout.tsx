@@ -7,7 +7,7 @@ import { formatarPreco } from "@/lib/formatar";
 import {
   cartaoValido, mascaraCartao, mascaraCep, mascaraCpf, mascaraTelefone, soDigitos, validadeValida,
 } from "@/lib/validacao";
-import { preCarregarSdk, tokenizarCartao } from "./mercadopago-navegador";
+import { parcelasMp, preCarregarSdk, tokenizarCartao, type ParcelaMp } from "./mercadopago-navegador";
 import { IconeCadeado, IconeCartao, IconeCodigoBarras, IconePix } from "../Icones";
 
 type Forma = "PIX" | "CREDIT_CARD" | "BOLETO";
@@ -84,6 +84,27 @@ export function FormularioCheckout({
   const [erroCartao, setErroCartao] = useState("");
   const [protegendo, setProtegendo] = useState(false);
   useEffect(() => { if (mp && forma === "CREDIT_CARD") preCarregarSdk(); }, [mp, forma]);
+  // Mercado Pago: parcelas e juros vêm da configuração da conta (e do banco do cartão, depois dos 8 primeiros dígitos).
+  const [bin, setBin] = useState("");
+  const [detalheMp, setDetalheMp] = useState<Record<number, ParcelaMp>>({});
+  useEffect(() => {
+    if (!mp || !pagamento.chavePublica) return;
+    let vivo = true;
+    parcelasMp(pagamento.chavePublica, valor, bin).then((lista) => {
+      if (!vivo || !lista?.length) return;
+      setDetalheMp(Object.fromEntries(lista.map((p) => [p.n, p])));
+      setOpcoes(lista.map((p) => p.n));
+    });
+    return () => { vivo = false; };
+  }, [mp, pagamento.chavePublica, valor, bin]);
+  function rotuloParcela(n: number): string {
+    const d = mp ? detalheMp[n] : undefined;
+    if (n === 1) return `À vista: ${formatarPreco(d?.totalCentavos ?? valor)}`;
+    if (d) return d.juros
+      ? `${n}x de ${formatarPreco(d.valorParcelaCentavos)} (total ${formatarPreco(d.totalCentavos)})`
+      : `${n}x de ${formatarPreco(d.valorParcelaCentavos)} sem juros`;
+    return `${n}x de ${formatarPreco(Math.round(valor / n))}${mp ? "" : " sem juros"}`;
+  }
 
   const e = { ...(contato.campos ?? {}), ...(estado.campos ?? {}), ...errosCartao };
   const maxParcelas = opcoes[opcoes.length - 1] ?? 1;
@@ -292,7 +313,16 @@ export function FormularioCheckout({
           </>
         )}
         {forma === "CREDIT_CARD" && (
-          <div className="mt-6 grid gap-4 sm:grid-cols-6">
+          <div
+            className="mt-6 grid gap-4 sm:grid-cols-6"
+            onInput={(ev) => {
+              const alvo = ev.target as HTMLInputElement;
+              if (mp && alvo.name === "numeroCartao") {
+                const novo = soDigitos(alvo.value).slice(0, 8);
+                setBin(novo.length === 8 ? novo : "");
+              }
+            }}
+          >
             <Campo nome="numeroCartao" rotulo="Número do cartão" inputMode="numeric" autoComplete="cc-number" placeholder="0000 0000 0000 0000" mascara={mascaraCartao} erro={e.numeroCartao} className="sm:col-span-6" />
             <Campo nome="nomeNoCartao" rotulo="Nome impresso no cartão" autoComplete="cc-name" erro={e.nomeNoCartao} className="sm:col-span-6" />
             <Campo nome="mesValidade" rotulo="Mês" inputMode="numeric" autoComplete="cc-exp-month" placeholder="MM" maxLength={2} erro={e.validade} className="sm:col-span-2" />
@@ -309,7 +339,7 @@ export function FormularioCheckout({
               <select name="parcelas" className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-[15px]">
                 {opcoes.map((n) => (
                   <option key={n} value={n}>
-                    {n === 1 ? `À vista: ${formatarPreco(valor)}` : `${n}x de ${formatarPreco(Math.round(valor / n))} sem juros`}
+                    {rotuloParcela(n)}
                   </option>
                 ))}
               </select>
