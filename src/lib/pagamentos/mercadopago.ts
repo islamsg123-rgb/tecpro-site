@@ -190,6 +190,53 @@ export async function enderecoPorCep(cep: string): Promise<{ rua: string; bairro
   return null;
 }
 
+/* ---------- Referência de reserva no próprio pedido ---------- */
+
+/**
+ * O pedido também leva, no external_reference (só letras, números e "_"), o curso e o tipo de compra.
+ * Serve de reserva se o registro no nosso banco faltar: o e-mail vem do pagador do pedido.
+ *   curso:        c_<curso>_<aleatório>
+ *   certificado:  k_<quantidade>_<curso>_<aleatório>
+ */
+function referenciaExterna(n: NovaCobranca): string {
+  const acaso = randomUUID().replaceAll("-", "").slice(0, 10);
+  const curso = n.produto.cursoId.replace(/[^A-Za-z0-9-]/g, "").slice(0, 30);
+  return n.produto.tipo === "curso" ? `c_${curso}_${acaso}` : `k_${n.produto.quantidade ?? 1}_${curso}_${acaso}`;
+}
+
+/** Monta o registro a partir do próprio pedido, quando ele não está no nosso banco. */
+function pedidoDaReserva(o: Json): PedidoMp | null {
+  const ref = texto(o.external_reference);
+  const payer = (o.payer ?? {}) as Json;
+  const email = texto(payer.email).toLowerCase();
+  if (!email) return null;
+  let referencia = "";
+  const c = ref.match(/^c_([A-Za-z0-9-]+)_[a-f0-9]+$/);
+  const k = ref.match(/^k_(\d+)_([A-Za-z0-9-]+)_[a-f0-9]+$/);
+  if (c) referencia = referenciaProduto({ tipo: "curso", cursoId: c[1] });
+  else if (k) referencia = referenciaProduto({ tipo: "certificado", cursoId: k[2], email, quantidade: Number(k[1]) });
+  else return null;
+  const ident = (payer.identification ?? {}) as Json;
+  const pag = primeiroPagamento(o);
+  const tipo = texto(((pag.payment_method ?? {}) as Json).type);
+  return {
+    id: texto(o.id),
+    referencia,
+    comprador: {
+      nome: [payer.first_name, payer.last_name].filter(Boolean).join(" ") || email,
+      email,
+      cpf: texto(ident.number),
+      telefone: "",
+    },
+    forma: tipo === "credit_card" || tipo === "debit_card" ? "CREDIT_CARD" : tipo === "ticket" ? "BOLETO" : "PIX",
+    valorCentavos: Math.round(Number(o.total_amount ?? pag.amount ?? 0) * 100),
+    descricao: texto(o.description),
+    criadoEm: texto(o.created_date) || new Date().toISOString(),
+    vencimento: dia(pag.date_of_expiration) ?? dia(o.created_date) ?? "",
+    situacao: "aguardando",
+  };
+}
+
 /* ---------- Criar o pedido ---------- */
 
 export async function criarCobrancaMp(n: NovaCobranca): Promise<Cobranca> {
@@ -236,7 +283,7 @@ export async function criarCobrancaMp(n: NovaCobranca): Promise<Cobranca> {
     type: "online",
     processing_mode: "automatic",
     total_amount: valor,
-    external_reference: `tecpro_${randomUUID().replaceAll("-", "").slice(0, 24)}`,
+    external_reference: referenciaExterna(n),
     description: n.descricao.slice(0, 150),
     transactions: { payments: [pagamento] },
     payer,
@@ -287,10 +334,15 @@ export async function pedidoMp(id: string): Promise<Json> {
 
 export async function consultarCobrancaMp(id: string): Promise<Cobranca | null> {
   try {
-    const [p, o] = await Promise.all([obterPedidoMp(id), pedidoMp(id)]);
+    const [guardado, o] = await Promise.all([obterPedidoMp(id).catch(() => null), pedidoMp(id)]);
+    const p = guardado ?? pedidoDaReserva(o);
     if (!p) {
-      console.error("[mercadopago] pedido sem registro no banco", id);
+      console.error("[mercadopago] pedido sem registro no banco e sem referência de reserva", id);
       return null;
+    }
+    if (!guardado) {
+      console.warn("[mercadopago] pedido sem registro no banco; usando a referência do próprio pedido", id);
+      await salvarPedidoMp(p).catch(() => {});
     }
     const c = paraCobranca(p, o);
     await atualizarSituacao(p, c);
