@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { exigirAdmin } from "@/lib/admin";
+import { obterConfigLoja } from "@/lib/dados";
 import { listarMensagens, TIPOS_AJUDA, type MensagemAjuda } from "@/lib/dados/mensagens";
 import { AvisoSql, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { anotarMensagem, excluirMensagem, marcarResolvida } from "./acoes";
@@ -37,9 +38,28 @@ function linkWhats(tel: string) {
   return `https://wa.me/${d.length <= 11 ? `55${d}` : d}`;
 }
 
-function Cartao({ m }: { m: MensagemAjuda }) {
-  const assunto = encodeURIComponent(`Re: ${TIPOS_AJUDA[m.tipo]} · Tecpro Multi Ensino`);
-  const corpo = encodeURIComponent(`Olá${m.nome ? `, ${m.nome.split(" ")[0]}` : ""}!\n\nRecebemos sua mensagem:\n"${m.mensagem.slice(0, 400)}"\n\n`);
+/**
+ * Link que abre o Gmail numa nova aba, já com uma mensagem nova para a pessoa
+ * (destinatário, assunto e a dúvida citada). `conta` escolhe com qual conta Google abrir
+ * (o e-mail de contato da loja), para não abrir na conta pessoal por engano.
+ */
+function linkGmail(m: MensagemAjuda, conta: string) {
+  const primeiro = m.nome?.trim().split(/\s+/)[0];
+  const quando = new Date(m.criadoEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const citacao = m.mensagem.slice(0, 1200).split("\n").map((l) => `> ${l}`).join("\n");
+  const corpo = `Olá${primeiro ? `, ${primeiro}` : ""}!\n\n\n\nAtenciosamente,\nEquipe Tecpro Multi Ensino\n\n---\nSua mensagem em ${quando}${m.cursoNome ? ` (curso ${m.cursoNome})` : ""}:\n${citacao}`;
+  const q = new URLSearchParams({
+    ...(conta ? { authuser: conta } : {}),
+    view: "cm",
+    fs: "1",
+    to: m.email ?? "",
+    su: `Re: ${TIPOS_AJUDA[m.tipo]} · Tecpro Multi Ensino`,
+    body: corpo,
+  });
+  return `https://mail.google.com/mail/?${q.toString().replace(/\+/g, "%20")}`;
+}
+
+function Cartao({ m, conta }: { m: MensagemAjuda; conta: string }) {
   const ap = aparelho(m.navegador);
   return (
     <li id={`m${m.id}`} className={`rounded-2xl border bg-white p-5 ${m.status === "nova" ? "border-laranja-500/60 shadow-sm" : "border-slate-200 opacity-90"}`}>
@@ -92,7 +112,7 @@ function Cartao({ m }: { m: MensagemAjuda }) {
             {m.status === "nova" ? "✓ Marcar como resolvida" : "Reabrir"}
           </button>
         </form>
-        {m.email && <a href={`mailto:${m.email}?subject=${assunto}&body=${corpo}`} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-marca-900 hover:border-marca-900">Responder por e-mail</a>}
+        {m.email && <a href={linkGmail(m, conta)} target="_blank" rel="noopener noreferrer" title="Abre o Gmail numa nova aba, já com a resposta começada" className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-marca-900 hover:border-marca-900">Responder pelo Gmail</a>}
         {m.telefone && <a href={linkWhats(m.telefone)} target="_blank" rel="noopener noreferrer" className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-marca-900">Chamar no WhatsApp</a>}
         <details className="group">
           <summary className="cursor-pointer list-none rounded-full px-3 py-2 text-sm font-semibold text-slate-500 hover:text-marca-900">{m.anotacao ? "Editar anotação" : "Anotar"}</summary>
@@ -114,7 +134,9 @@ function Cartao({ m }: { m: MensagemAjuda }) {
 export default async function Mensagens({ searchParams }: Props) {
   await exigirAdmin("mensagens");
   const { status = "novas", tipo = "" } = await searchParams;
-  const { lista: todas, tabelaFaltando } = await listarMensagens();
+  const [{ lista: todas, tabelaFaltando }, loja] = await Promise.all([listarMensagens(), obterConfigLoja().catch(() => null)]);
+  // Conta do Gmail usada para responder: o e-mail de contato da loja (Configurações da loja).
+  const conta = loja?.emailContato?.trim() || "contato@tecpromultiensino.com.br";
   const novas = todas.filter((m) => m.status === "nova").length;
   const resolvidas = todas.length - novas;
   const lista = todas.filter((m) => (status === "todas" || (status === "resolvidas" ? m.status === "resolvida" : m.status === "nova")) && (!tipo || m.tipo === tipo));
@@ -150,7 +172,7 @@ export default async function Mensagens({ searchParams }: Props) {
         {!lista.length ? (
           <Vazio>{status === "novas" ? "Nenhuma mensagem nova. Tudo em dia!" : "Nenhuma mensagem aqui."}</Vazio>
         ) : (
-          <ul className="space-y-3">{lista.map((m) => <Cartao key={m.id} m={m} />)}</ul>
+          <ul className="space-y-3">{lista.map((m) => <Cartao key={m.id} m={m} conta={conta} />)}</ul>
         )}
       </div>
     </>
