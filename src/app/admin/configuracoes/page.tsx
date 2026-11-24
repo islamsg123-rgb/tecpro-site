@@ -115,8 +115,11 @@ export default async function Configuracoes({ searchParams }: Props) {
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
           <h2 className="text-lg font-bold text-marca-900">Contatos de atendimento</h2>
-          <p className="mt-1 text-sm text-slate-500">Aparecem no rodapé do site. O atendimento é só por e-mail e pelo botão de ajuda: o WhatsApp da escola não aparece no site.</p>
+          <p className="mt-1 text-sm text-slate-500">Aparecem no rodapé do site. Deixe em branco o que não quiser mostrar.</p>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-semibold text-marca-900">WhatsApp
+              <input name="whatsapp" defaultValue={loja.whatsapp} placeholder="(11) 99999-9999" className={`mt-1 ${campo}`} />
+            </label>
             <label className="text-sm font-semibold text-marca-900">E-mail
               <input name="emailContato" type="email" defaultValue={loja.emailContato} placeholder="contato@tecpromultiensino.com.br" className={`mt-1 ${campo}`} />
             </label>
@@ -124,7 +127,7 @@ export default async function Configuracoes({ searchParams }: Props) {
               <input name="instagram" defaultValue={loja.instagram} placeholder="@tecpromultiensino" className={`mt-1 ${campo}`} />
             </label>
           </div>
-          {erro === "contato" && <p className="mt-3 text-sm text-red-700">Confira o e-mail.</p>}
+          {erro === "contato" && <p className="mt-3 text-sm text-red-700">Confira o WhatsApp (DDD + número) e o e-mail.</p>}
         </section>
 
         <div className="flex items-center gap-4">

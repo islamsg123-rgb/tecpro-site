@@ -3,10 +3,9 @@ import { emitir, usarCreditoCertificado } from "@/app/minha-conta/acoes";
 import { formatarPreco } from "@/lib/formatar";
 import type { SituacaoCertificado } from "@/lib/certificados";
 import { IconeCadeado, IconeCertificado, IconeCheck } from "../Icones";
-import { BotaoAbrirAjuda } from "../ajuda/BotaoAbrirAjuda";
 
 export function CartaoCertificado({
-  s, slug, faltam, nomeSugerido, erroNome, creditos = 0, emailSuporte = "", email = "", cursoNome = "",
+  s, slug, faltam, nomeSugerido, erroNome, creditos = 0, whatsappSuporte = "", emailSuporte = "", email = "", cursoNome = "",
 }: {
   s: SituacaoCertificado;
   slug: string;
@@ -15,15 +14,18 @@ export function CartaoCertificado({
   erroNome?: boolean;
   /** Certificados que sobraram de pacotes comprados */
   creditos?: number;
-  /** E-mail da escola (Configurações da loja), para pedir correção do nome */
+  /** WhatsApp da escola (Configurações da loja), para pedir correção do nome */
+  whatsappSuporte?: string;
   emailSuporte?: string;
   email?: string;
   cursoNome?: string;
 }) {
-  // Correção do nome: só pelo botão de ajuda do site ou por e-mail (sem WhatsApp da escola).
-  const textoNomeErrado = `Concluí o curso ${cursoNome} e o meu nome está errado no certificado. Meu cadastro: ${nomeSugerido || "(sem nome)"}, ${email}. Nome correto: `;
-  const emailEscola = emailSuporte || "contato@tecpromultiensino.com.br";
-  const linkEmail = `mailto:${emailEscola}?subject=${encodeURIComponent("Correção do nome no certificado")}&body=${encodeURIComponent(`Olá! ${textoNomeErrado}`)}`;
+  const zap = whatsappSuporte.replace(/\D/g, "");
+  const linkSuporte = zap
+    ? `https://wa.me/${zap.length <= 11 ? `55${zap}` : zap}?text=${encodeURIComponent(
+        `Olá! Concluí o curso ${cursoNome} e o meu nome está errado no certificado. Meu cadastro: ${nomeSugerido || "(sem nome)"}, ${email}. Nome correto: `,
+      )}`
+    : "";
   const pago = s.regra.modo === "pago";
   return (
     <aside id="certificado" className="h-fit scroll-mt-24 overflow-hidden rounded-3xl border border-slate-200 bg-white">
@@ -82,10 +84,13 @@ export function CartaoCertificado({
             )}
             {erroNome && <p className="text-xs font-medium text-red-600">Seu cadastro está sem nome completo. Fale com o suporte para corrigir.</p>}
             <p className="text-xs text-slate-500">Depois de emitido, o certificado não pode ser alterado. Se o nome estiver errado, fale com o suporte: confirmamos a sua identidade e corrigimos para você.</p>
-            <BotaoAbrirAjuda tipo="certificado" mensagem={textoNomeErrado} className="block w-full rounded-full border border-marca-900 py-3 text-center font-semibold text-marca-900 hover:bg-slate-50">
-              Nome errado? Falar com o suporte
-            </BotaoAbrirAjuda>
-            <a href={linkEmail} className="block text-center text-xs text-slate-500 underline">ou escreva para {emailEscola}</a>
+            {linkSuporte ? (
+              <a href={linkSuporte} target="_blank" rel="noreferrer" className="block rounded-full border border-emerald-600 py-3 text-center font-semibold text-emerald-700 hover:bg-emerald-50">
+                Nome errado? Falar no WhatsApp
+              </a>
+            ) : (
+              emailSuporte && <a href={`mailto:${emailSuporte}`} className="block text-center text-sm font-semibold text-marca-700 underline">Nome errado? Escreva para {emailSuporte}</a>
+            )}
           </div>
         )}
 

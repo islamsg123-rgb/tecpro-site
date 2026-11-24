@@ -80,7 +80,7 @@ export default async function MeuCurso({ params, searchParams }: Props) {
           })}
         </div>
 
-        <CartaoCertificado s={cert} slug={slug} faltam={c.total - c.feitas} nomeSugerido={nomeSugerido} erroNome={erroNome === "1"} creditos={creditos} emailSuporte={loja.emailContato} email={aluno.email} cursoNome={c.curso.nome} />
+        <CartaoCertificado s={cert} slug={slug} faltam={c.total - c.feitas} nomeSugerido={nomeSugerido} erroNome={erroNome === "1"} creditos={creditos} whatsappSuporte={loja.whatsapp} emailSuporte={loja.emailContato} email={aluno.email} cursoNome={c.curso.nome} />
       </div>
     </>
   );

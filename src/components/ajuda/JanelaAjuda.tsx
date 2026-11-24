@@ -3,7 +3,6 @@
 import { useActionState, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { enviarMensagemAjuda, quemEstaLogado } from "@/app/ajuda/acoes";
-import { EVENTO_ABRIR_AJUDA } from "./BotaoAbrirAjuda";
 
 /**
  * Bolinha de ajuda no canto inferior direito (site e área do aluno; não aparece no painel).
@@ -105,20 +104,6 @@ export function JanelaAjuda() {
     setDispensado(true);
     try { sessionStorage.setItem("tecpro_balao_ajuda", "1"); } catch { /* sem armazenamento */ }
   }
-
-  // Outros botões do site (ex.: "Nome errado?" no certificado) abrem a janela já com assunto e texto.
-  useEffect(() => {
-    const abrir = (e: Event) => {
-      const d = (e as CustomEvent<{ tipo?: string; mensagem?: string }>).detail ?? {};
-      setEnviada(false);
-      if (d.tipo) setTipo(d.tipo);
-      if (d.mensagem) setCampos((c) => ({ ...c, mensagem: d.mensagem! }));
-      dispensar();
-      setAberto(true);
-    };
-    window.addEventListener(EVENTO_ABRIR_AJUDA, abrir);
-    return () => window.removeEventListener(EVENTO_ABRIR_AJUDA, abrir);
-  }, []);
 
   // Fecha ao trocar de página.
   useEffect(() => setAberto(false), [pathname]);
