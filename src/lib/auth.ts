@@ -56,3 +56,12 @@ export async function entrarDemonstracao(email: string) {
 export async function sairDemonstracao() {
   (await cookies()).delete(COOKIE_DEMO);
 }
+
+/** Cookie curto que diz para onde ir depois que a pessoa clica no link do e-mail (ex.: tela de criar senha). */
+export const COOKIE_DEPOIS_DO_LINK = "tecpro_depois_link";
+const DESTINOS_PERMITIDOS = ["/minha-conta/senha"];
+/** Só aceita destinos conhecidos, para o cookie nunca levar a outro site. */
+export function destinoDepoisDoLink(valor: string | undefined): string {
+  return valor && DESTINOS_PERMITIDOS.includes(valor) ? valor : "/minha-conta";
+}
+

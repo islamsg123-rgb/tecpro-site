@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { acessoPainel, exigirAdmin } from "@/lib/admin";
 import { bancoEmDemonstracao } from "@/lib/dados";
 import { pagamentoEmSimulacao } from "@/lib/pagamentos";
@@ -25,9 +26,12 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
         secoes={secoes}
         email={acesso.nome ? `${acesso.nome} · ${acesso.email}` : acesso.email}
         sair={
-          <form action={sair}>
-            <button className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold text-white hover:border-laranja-500">Sair</button>
-          </form>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/minha-conta/senha" className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold text-white hover:border-laranja-500">Minha senha</Link>
+            <form action={sair}>
+              <button className="rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold text-white hover:border-laranja-500">Sair</button>
+            </form>
+          </div>
         }
       />
       <div className="min-w-0 flex-1">

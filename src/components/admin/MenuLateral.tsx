@@ -66,6 +66,7 @@ export const MENU: Item[] = [
     ],
   },
   { secao: "funcionarios", rotulo: "Funcionários", href: "/admin/funcionarios", icone: svg(<><rect x="4" y="3" width="16" height="18" rx="2" /><circle cx="12" cy="10" r="2.8" /><path d="M7.5 17.5c.7-2 2.5-3.2 4.5-3.2s3.8 1.2 4.5 3.2" /></>) },
+  { secao: "sistema", rotulo: "Integrações", href: "/admin/integracoes", icone: svg(<><path d="M9 15 15 9" /><path d="M11 6.5 12.5 5a3.5 3.5 0 0 1 5 5L16 11.5M13 17.5 11.5 19a3.5 3.5 0 0 1-5-5L8 12.5" /></>) },
   { secao: "sistema", rotulo: "Conexão (API)", href: "/admin/diagnostico", icone: svg(<><path d="M9 7 4 12l5 5M15 7l5 5-5 5" /></>) },
 ];
 
