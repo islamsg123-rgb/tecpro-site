@@ -29,6 +29,8 @@ export function origemDoLink(host: string | null, proto: string | null): string 
   if (/^http:\/\/localhost(:\d+)?$/.test(origem)) return origem;
   // Prévias da Vercel deste projeto (para testar antes de publicar).
   if (/^https:\/\/tecpro-site-[a-z0-9-]+-tecpro-site\.vercel\.app$/.test(origem)) return origem;
+  // Prévias da Vercel deste projeto (para testar antes de publicar).
+  if (/^https:\/\/tecpro-site-[a-z0-9-]+-tecpro-site\.vercel\.app$/.test(origem)) return origem;
   return process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || SITE_OFICIAL;
 }
 
