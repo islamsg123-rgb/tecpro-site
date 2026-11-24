@@ -1,5 +1,6 @@
 "use server";
 
+import { estadoValido } from "@/lib/estados";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eDono, exigirAdmin } from "@/lib/admin";
@@ -281,6 +282,8 @@ export async function salvarDadosAlunoAcao(f: FormData) {
       cpf: cpf || null,
       telefone: telefone || null,
       observacoes: String(f.get("observacoes") ?? "").trim().slice(0, 2000) || null,
+      cidade: String(f.get("cidade") ?? "").replace(/\s+/g, " ").trim().slice(0, 80) || null,
+      estado: estadoValido(String(f.get("estado") ?? "")) ? String(f.get("estado")) : null,
     });
   } catch (e) {
     redirect(ficha(email, `erro=${e instanceof Error && e.message === "colunas" ? "colunas" : "banco"}#dados`));

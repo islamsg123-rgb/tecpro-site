@@ -13,6 +13,8 @@ import { liberarAcesso } from "@/lib/pagamentos/liberacao";
 import { randomUUID } from "node:crypto";
 import { aplicarCupom } from "@/lib/cupons";
 import { pacotePorId } from "@/lib/pacotes-certificado";
+import { estadoValido } from "@/lib/estados";
+import { salvarLocalidadeAluno } from "@/lib/dados/painel";
 import { opcoesParcelas as parcelasPara } from "@/lib/config-loja";
 import { contarUsoCupom, registrarCarrinho } from "@/lib/dados/carrinhos";
 import type { Curso } from "@/lib/types";
@@ -196,6 +198,10 @@ export async function matricularGratis(_anterior: EstadoGratis, f: FormData): Pr
   if (!curso || !curso.visivel || !curso.gratuito) return { erro: "Este curso não está disponível para matrícula gratuita." };
 
   const { comprador, campos } = lerComprador(f);
+  const estado = texto(f, "estado").toUpperCase();
+  const cidade = texto(f, "cidade").replace(/\s+/g, " ").slice(0, 80);
+  if (!estadoValido(estado)) campos.estado = "Escolha o seu estado.";
+  if (cidade.length < 2) campos.cidade = "Informe a sua cidade.";
   if (f.get("termos") !== "on") campos.termos = "Para continuar, aceite os termos de uso.";
   if (Object.keys(campos).length) return { erro: "Confira os campos destacados.", campos };
 
@@ -204,6 +210,8 @@ export async function matricularGratis(_anterior: EstadoGratis, f: FormData): Pr
   });
   try {
     await liberarAcesso(`gratis-${randomUUID().slice(0, 8)}`, comprador, curso.id);
+    // Sem o SQL da cidade/estado, a matrícula segue normalmente.
+    await salvarLocalidadeAluno(comprador.email, cidade, estado).catch((e) => console.warn("[matricula-gratis] cidade/estado", e));
     await registrarCarrinho({ email: comprador.email, cursoId: curso.id, tipo: "curso", etapa: "matriculado", valorCentavos: 0 });
   } catch (e) {
     console.error("[matricula-gratis]", e);

@@ -223,20 +223,30 @@ export interface DadosExtrasAluno {
   telefone: string | null;
   cpf: string | null;
   observacoes: string | null;
+  cidade?: string | null;
+  estado?: string | null;
 }
 
 export async function dadosExtrasAluno(email: string): Promise<DadosExtrasAluno & { colunasFaltando: boolean }> {
   const e = norm(email);
   if (bancoEmDemonstracao) return { telefone: null, cpf: null, observacoes: null, ...mem().extras.get(e), colunasFaltando: false };
-  const { data, error } = await db().from("alunos").select("telefone, cpf, observacoes").eq("email", e).maybeSingle();
-  if (error) return { telefone: null, cpf: null, observacoes: null, colunasFaltando: true };
-  return { telefone: data?.telefone ?? null, cpf: data?.cpf ?? null, observacoes: data?.observacoes ?? null, colunasFaltando: false };
+  const [{ data, error }, local] = await Promise.all([
+    db().from("alunos").select("telefone, cpf, observacoes").eq("email", e).maybeSingle(),
+    db().from("alunos").select("cidade, estado").eq("email", e).maybeSingle(),
+  ]);
+  const cidade = local.error ? null : (local.data?.cidade ?? null);
+  const estado = local.error ? null : (local.data?.estado ?? null);
+  if (error) return { telefone: null, cpf: null, observacoes: null, cidade, estado, colunasFaltando: true };
+  return {
+    telefone: data?.telefone ?? null, cpf: data?.cpf ?? null, observacoes: data?.observacoes ?? null, cidade, estado,
+    colunasFaltando: Boolean(local.error),
+  };
 }
 
 export async function salvarDadosAluno(email: string, d: DadosExtrasAluno & { nome: string | null }): Promise<void> {
   const e = norm(email);
   if (bancoEmDemonstracao) {
-    mem().extras.set(e, { telefone: d.telefone, cpf: d.cpf, observacoes: d.observacoes });
+    mem().extras.set(e, { ...mem().extras.get(e), telefone: d.telefone, cpf: d.cpf, observacoes: d.observacoes, ...(d.cidade !== undefined ? { cidade: d.cidade, estado: d.estado } : {}) });
     const g2 = globalThis as unknown as { __bancoDemo?: { alunos: Map<string, { eaUsuarioId: string; nome: string | null }> } };
     const a = g2.__bancoDemo?.alunos.get(e);
     if (a) a.nome = d.nome;
@@ -249,6 +259,34 @@ export async function salvarDadosAluno(email: string, d: DadosExtrasAluno & { no
     if (e2) throw e2;
     throw new Error("colunas");
   }
+  if (d.cidade !== undefined) await salvarLocalidadeAluno(e, d.cidade ?? null, d.estado ?? null);
+}
+
+/** Guarda cidade e estado do aluno. Sem o SQL 0008, dá erro "colunas". */
+export async function salvarLocalidadeAluno(email: string, cidade: string | null, estado: string | null): Promise<void> {
+  const e = norm(email);
+  if (bancoEmDemonstracao) {
+    mem().extras.set(e, { telefone: null, cpf: null, observacoes: null, ...mem().extras.get(e), cidade, estado });
+    return;
+  }
+  const { error } = await db().from("alunos").update({ cidade, estado }).eq("email", e);
+  if (error) throw new Error("colunas");
+}
+
+/** Cidade e estado de todos os alunos (para a planilha). Vazio se o SQL 0008 não foi rodado. */
+export async function localidadesDosAlunos(): Promise<Map<string, { cidade: string | null; estado: string | null }>> {
+  const m = new Map<string, { cidade: string | null; estado: string | null }>();
+  if (bancoEmDemonstracao) {
+    for (const [e, x] of mem().extras) m.set(e, { cidade: x.cidade ?? null, estado: x.estado ?? null });
+    return m;
+  }
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await db().from("alunos").select("email, cidade, estado").range(de, de + 999);
+    if (error || !data?.length) break;
+    for (const r of data) m.set(r.email as string, { cidade: (r.cidade as string) ?? null, estado: (r.estado as string) ?? null });
+    if (data.length < 1000) break;
+  }
+  return m;
 }
 
 /* ---------- Cursos removidos de um aluno ---------- */

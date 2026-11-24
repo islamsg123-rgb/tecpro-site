@@ -6,9 +6,12 @@ import { matricularGratis, type EstadoGratis } from "@/app/checkout/acoes";
 import { mascaraCpf, mascaraTelefone } from "@/lib/validacao";
 import { IconeCheck } from "../Icones";
 import { Campo } from "./FormularioCheckout";
+import { ESTADOS } from "@/lib/estados";
 
 /** Matrícula em curso gratuito: só os dados do aluno, sem pagamento. */
-export function FormularioGratis({ cursoId, nomeInicial, emailInicial }: { cursoId: string; nomeInicial?: string; emailInicial?: string }) {
+export function FormularioGratis({ cursoId, nomeInicial, emailInicial, cidadeInicial, estadoInicial }: {
+  cursoId: string; nomeInicial?: string; emailInicial?: string; cidadeInicial?: string; estadoInicial?: string;
+}) {
   const [estado, acao, enviando] = useActionState<EstadoGratis, FormData>(matricularGratis, {});
   const e = estado.campos ?? {};
 
@@ -49,6 +52,20 @@ export function FormularioGratis({ cursoId, nomeInicial, emailInicial }: { curso
           <Campo nome="email" rotulo="E-mail" type="email" autoComplete="email" defaultValue={emailInicial} erro={e.email} className="sm:col-span-2" required />
           <Campo nome="cpf" rotulo="CPF" inputMode="numeric" placeholder="000.000.000-00" mascara={mascaraCpf} erro={e.cpf} required />
           <Campo nome="telefone" rotulo="Celular (WhatsApp)" inputMode="tel" autoComplete="tel" placeholder="(00) 00000-0000" mascara={mascaraTelefone} erro={e.telefone} required />
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">Estado</span>
+            <select
+              name="estado"
+              defaultValue={estadoInicial ?? ""}
+              aria-invalid={Boolean(e.estado)}
+              className={`w-full rounded-xl border bg-white px-4 py-3 text-[15px] outline-none transition focus:border-marca-500 focus:ring-4 focus:ring-marca-100 ${e.estado ? "border-red-400" : "border-slate-300"}`}
+            >
+              <option value="" disabled>Selecione</option>
+              {ESTADOS.map(([uf, nome]) => <option key={uf} value={uf}>{nome}</option>)}
+            </select>
+            {e.estado && <span className="mt-1 block text-xs font-medium text-red-600">{e.estado}</span>}
+          </label>
+          <Campo nome="cidade" rotulo="Cidade" autoComplete="address-level2" defaultValue={cidadeInicial} erro={e.cidade} required />
         </div>
         <label className="mt-6 flex items-start gap-2 text-sm text-slate-600">
           <input type="checkbox" name="termos" className="mt-0.5 h-4 w-4 accent-[#011749]" />

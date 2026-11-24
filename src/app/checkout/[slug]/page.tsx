@@ -9,6 +9,7 @@ import { FormularioCheckout } from "@/components/checkout/FormularioCheckout";
 import { FormularioGratis } from "@/components/checkout/FormularioGratis";
 import { alunoLogado } from "@/lib/auth";
 import { obterAluno } from "@/lib/dados";
+import { dadosExtrasAluno } from "@/lib/dados/painel";
 import { IconeCadeado, IconeCertificado, IconeCheck, IconeChevron, IconeRelogio } from "@/components/Icones";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -21,6 +22,7 @@ export default async function Checkout({ params }: Props) {
   const gratis = curso.gratuito;
   const logado = gratis ? await alunoLogado() : null;
   const registro = logado ? await obterAluno(logado.email).catch(() => null) : null;
+  const extras = registro ? await dadosExtrasAluno(registro.email ?? logado!.email).catch(() => null) : null;
 
   return (
     <div className="bg-[#f3f6fb]">
@@ -42,7 +44,7 @@ export default async function Checkout({ params }: Props) {
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px] lg:items-start">
           {gratis ? (
-            <FormularioGratis cursoId={curso.id} emailInicial={logado?.email} nomeInicial={registro?.nome ?? undefined} />
+            <FormularioGratis cursoId={curso.id} emailInicial={logado?.email} nomeInicial={registro?.nome ?? undefined} cidadeInicial={extras?.cidade ?? undefined} estadoInicial={extras?.estado ?? undefined} />
           ) : (
             <FormularioCheckout cursoId={curso.id} precoCentavos={curso.precoCentavos} parcelas={opcoesParcelas(curso.precoCentavos)} />
           )}

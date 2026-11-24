@@ -12,6 +12,7 @@ import { formatarPreco } from "@/lib/formatar";
 import { cobrancasDoEmail, clientePorEmail } from "@/lib/pagamentos";
 import { listarCarrinhos } from "@/lib/dados/carrinhos";
 import { cursosRemovidos, dadosExtrasAluno, listarPesquisas } from "@/lib/dados/painel";
+import { ESTADOS } from "@/lib/estados";
 import { DIAS_PARA_INATIVO } from "@/lib/painel-resumo";
 import { TabelaVendas } from "@/components/admin/TabelaVendas";
 import { EtiquetaAluno } from "@/components/admin/Blocos";
@@ -138,6 +139,13 @@ export default async function Ficha({ searchParams }: Props) {
         <label className="font-semibold text-marca-900">E-mail (login)<input value={email} readOnly className={`${campo} bg-slate-50`} /></label>
         <label className="font-semibold text-marca-900">CPF<input name="cpf" defaultValue={cpf} disabled={!registro} className={campo} /></label>
         <label className="font-semibold text-marca-900">Telefone / WhatsApp<input name="telefone" defaultValue={telefone} disabled={!registro} className={campo} /></label>
+        <label className="font-semibold text-marca-900">Cidade<input name="cidade" defaultValue={extras.cidade ?? ""} disabled={!registro} className={campo} /></label>
+        <label className="font-semibold text-marca-900">Estado
+          <select name="estado" defaultValue={extras.estado ?? ""} disabled={!registro} className={`${campo} bg-white`}>
+            <option value="">—</option>
+            {ESTADOS.map(([uf, n]) => <option key={uf} value={uf}>{n}</option>)}
+          </select>
+        </label>
         <label className="font-semibold text-marca-900 sm:col-span-2">Observações internas <span className="font-normal text-slate-400">(só a equipe vê)</span>
           <textarea name="observacoes" rows={2} defaultValue={extras.observacoes ?? ""} disabled={!registro} className={campo} />
         </label>
@@ -147,7 +155,7 @@ export default async function Ficha({ searchParams }: Props) {
           ) : (
             <p className="text-slate-500">Esta pessoa só preencheu o contato no checkout. Libere um curso abaixo para virar aluno.</p>
           )}
-          {extras.colunasFaltando && <p className="text-amber-700">Para salvar CPF, telefone e observações, rode o SQL novo no Supabase.</p>}
+          {extras.colunasFaltando && <p className="text-amber-700">Para salvar todos os dados (incluindo cidade e estado), rode o SQL novo no Supabase.</p>}
           {asaas && <p className="text-xs text-slate-400">CPF e telefone vêm do cadastro de pagamento quando não foram editados aqui.</p>}
         </div>
       </form>
