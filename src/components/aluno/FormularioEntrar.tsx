@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { entrar, pedirLinkSenha, type EstadoEntrar } from "@/app/entrar/acoes";
 import { IconeCadeado, IconeEmail, IconeSeta } from "../Icones";
+import { AvisoVisivel } from "../AvisoVisivel";
 
 type Modo = "link" | "senha" | "criar";
 
@@ -26,7 +27,7 @@ export function FormularioEntrar({ demonstracao, erroLink, supabase }: Props) {
 
   if (enviado.enviadoPara) {
     return (
-      <div className="text-center">
+      <AvisoVisivel className="text-center">
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-laranja-500/15 text-laranja-600">
           <IconeEmail className="h-8 w-8" />
         </span>
@@ -46,7 +47,7 @@ export function FormularioEntrar({ demonstracao, erroLink, supabase }: Props) {
           <EntrarComCodigo supabase={supabase} email={enviado.enviadoPara} destino={enviado.paraSenha ? "/minha-conta/senha" : "/minha-conta"} />
         )}
         <p className="mt-4 text-sm text-slate-500">Não chegou? Olhe a caixa de spam ou promoções. Se pedir de novo, use sempre o e-mail mais recente.</p>
-      </div>
+      </AvisoVisivel>
     );
   }
 

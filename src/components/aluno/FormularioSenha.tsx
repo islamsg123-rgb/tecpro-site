@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { definirSenha, type EstadoSenha } from "@/app/minha-conta/senha/acoes";
 import { problemaNaSenha } from "@/lib/senha";
 import { IconeCadeado, IconeCheck } from "../Icones";
+import { AvisoVisivel } from "../AvisoVisivel";
 
 export function FormularioSenha({ email }: { email: string }) {
   const [estado, acao, salvando] = useActionState<EstadoSenha, FormData>(definirSenha, {});
@@ -13,7 +14,7 @@ export function FormularioSenha({ email }: { email: string }) {
 
   if (estado.ok) {
     return (
-      <div className="text-center">
+      <AvisoVisivel className="text-center">
         <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600">
           <IconeCheck className="h-8 w-8" />
         </span>
@@ -22,7 +23,7 @@ export function FormularioSenha({ email }: { email: string }) {
           Na próxima vez, entre com <strong className="text-marca-900">{email}</strong> e a sua senha. O link por e-mail continua funcionando se preferir.
         </p>
         <Link href="/minha-conta" className="mt-6 inline-block rounded-full bg-laranja-500 px-7 py-3 font-bold text-marca-900">Ir para meus cursos</Link>
-      </div>
+      </AvisoVisivel>
     );
   }
 

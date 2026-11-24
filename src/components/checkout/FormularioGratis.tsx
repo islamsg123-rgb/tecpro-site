@@ -7,6 +7,7 @@ import { mascaraCpf, mascaraTelefone } from "@/lib/validacao";
 import { IconeCheck } from "../Icones";
 import { Campo } from "./FormularioCheckout";
 import { ESTADOS } from "@/lib/estados";
+import { AvisoVisivel } from "../AvisoVisivel";
 
 /** Matrícula em curso gratuito: só os dados do aluno, sem pagamento. */
 export function FormularioGratis({ cursoId, nomeInicial, emailInicial, cidadeInicial, estadoInicial, cpfInicial, telefoneInicial }: {
@@ -17,7 +18,7 @@ export function FormularioGratis({ cursoId, nomeInicial, emailInicial, cidadeIni
 
   if (estado.matriculadoEm) {
     return (
-      <div className="rounded-3xl border border-green-200 bg-white p-8 text-center">
+      <AvisoVisivel className="rounded-3xl border border-green-200 bg-white p-8 text-center">
         <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-700">
           <IconeCheck className="h-7 w-7" />
         </span>
@@ -28,7 +29,7 @@ export function FormularioGratis({ cursoId, nomeInicial, emailInicial, cidadeIni
         <Link href="/entrar" className="mt-6 inline-block rounded-full bg-laranja-500 px-8 py-3.5 font-bold text-marca-900 hover:bg-laranja-400">
           Entrar e começar a estudar
         </Link>
-      </div>
+      </AvisoVisivel>
     );
   }
 
