@@ -57,3 +57,42 @@ export function emailBoasVindas(nome: string, curso: string, siteUrl: string, pa
 </td></tr></table></td></tr></table></body></html>`;
   return { assunto, html, texto };
 }
+
+/**
+ * Link de acesso à conta (substitui o e-mail do Supabase). Funciona em qualquer navegador e traz
+ * também um código para digitar no site, caso o link não abra.
+ */
+export function emailLinkAcesso(link: string, codigo: string, paraSenha: boolean) {
+  const assunto = paraSenha ? "Crie sua senha na Tecpro Multi Ensino" : "Seu link de acesso à Tecpro Multi Ensino";
+  const acao = paraSenha ? "Criar minha senha" : "Entrar na minha conta";
+  const intro = paraSenha
+    ? "Recebemos um pedido para criar ou trocar a senha da sua conta."
+    : "Use o botão abaixo para entrar na Área do aluno.";
+  const texto = [
+    `Olá!`,
+    ``,
+    intro,
+    ``,
+    `${acao}: ${link}`,
+    ...(codigo ? [``, `Ou digite este código na tela de entrada do site: ${codigo}`] : []),
+    ``,
+    `O link e o código valem por 1 hora e só podem ser usados uma vez. Pode abrir em qualquer aparelho ou navegador.`,
+    `Se você não pediu este acesso, ignore este e-mail.`,
+    ``,
+    `Tecpro Multi Ensino`,
+  ].join("\n");
+  const html = `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#f4f7fe;font-family:Arial,Helvetica,sans-serif;color:#011749">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px"><tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;overflow:hidden">
+<tr><td style="background:#011749;padding:20px 28px;color:#ffffff;font-size:20px;font-weight:bold">TECPRO <span style="color:#FFA500">Multi Ensino</span></td></tr>
+<tr><td style="padding:28px">
+<p style="font-size:18px;font-weight:bold;margin:0 0 12px">Olá!</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 24px">${escapar(intro)}</p>
+<p style="margin:0 0 24px"><a href="${escapar(link)}" style="display:inline-block;background:#FFA500;color:#011749;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:999px">${acao}</a></p>
+${codigo ? `<p style="font-size:14px;line-height:1.6;margin:0 0 8px;color:#475569">Se o botão não abrir, digite este código na tela de entrada do site:</p>
+<p style="font-size:30px;font-weight:bold;letter-spacing:6px;margin:0 0 24px;color:#011749">${escapar(codigo)}</p>` : ""}
+<p style="font-size:13px;line-height:1.6;color:#64748b;margin:0 0 8px">O link e o código valem por 1 hora e só podem ser usados uma vez. Pode abrir em qualquer aparelho ou navegador.</p>
+<p style="font-size:13px;line-height:1.6;color:#64748b;margin:0">Se você não pediu este acesso, ignore este e-mail.</p>
+</td></tr></table></td></tr></table></body></html>`;
+  return { assunto, html, texto };
+}

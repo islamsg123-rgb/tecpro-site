@@ -4,13 +4,15 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { COOKIE_DEPOIS_DO_LINK, entrarDemonstracao, loginEmDemonstracao, sairDemonstracao, supabaseDoServidor } from "@/lib/auth";
 import { emailValido } from "@/lib/validacao";
-import { SITE_OFICIAL } from "@/lib/site";
+import { enviarLinkDeAcesso, origemDoLink } from "@/lib/link-acesso";
 
 export interface EstadoEntrar {
   erro?: string;
   enviadoPara?: string;
   /** true quando o link enviado é para criar ou trocar a senha. */
   paraSenha?: boolean;
+  /** true quando o e-mail traz também um código para digitar no site. */
+  comCodigo?: boolean;
 }
 
 /** Link de acesso por e-mail (sem senha). */
@@ -44,11 +46,14 @@ async function enviarLink(f: FormData, paraSenha: boolean): Promise<EstadoEntrar
   }
 
   const h = await headers();
-  // O link volta para o MESMO endereço em que o aluno pediu: o login guarda um código no navegador
-  // (cookie) daquele endereço. Se o link levasse para outro endereço, o login falhava ("link expirou").
-  const host = h.get("x-forwarded-host") ?? h.get("host");
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const origem = host ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_SITE_URL ?? SITE_OFICIAL);
+  const origem = origemDoLink(h.get("x-forwarded-host") ?? h.get("host"), h.get("x-forwarded-proto"));
+
+  // Caminho principal: link próprio do site, que funciona em qualquer navegador (ver lib/link-acesso.ts).
+  const r = await enviarLinkDeAcesso(email, origem, paraSenha ? "senha" : "conta");
+  if (r === "aguarde") return { erro: "Acabamos de enviar um link para esse e-mail. Aguarde 1 minuto para pedir outro." };
+  if (r === "enviado") return { enviadoPara: email, paraSenha, comCodigo: true };
+
+  // Plano B (sem Resend ou se algo falhar): o e-mail padrão do Supabase.
   const { error } = await (await supabaseDoServidor()).auth.signInWithOtp({
     email,
     options: { emailRedirectTo: `${origem}/auth/callback`, shouldCreateUser: true },
