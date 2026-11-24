@@ -18,7 +18,7 @@ async function lerTudo(
 import { getCursos, getModulos } from "./cursos";
 import { listarCarrinhos } from "./dados/carrinhos";
 import { telefonesDemonstracao } from "./dados/painel";
-import { emailConfigurado, emailInscricao, emailLembrete, emailNuncaComecou, enviarEmail } from "./email";
+import { emailConfigurado, emailLembrete, emailNuncaComecou, enviarEmail } from "./email";
 import { SITE_OFICIAL } from "./site";
 
 /**
@@ -29,8 +29,7 @@ import { SITE_OFICIAL } from "./site";
  *  - Se o aluno voltar a estudar, a contagem recomeça do zero.
  *  - Curso concluído, curso removido pelo painel, aluno excluído ou descadastrado: não recebe.
  *  - No máximo 1 e-mail por pessoa a cada 2 dias, mesmo com vários cursos parados.
- *  - Também (cada um liga separado no painel): matriculados que nunca abriram uma aula e
- *    quem começou a inscrição num curso e não terminou (padrão: 1, 3 e 7 dias).
+ *  - Também (liga separado no painel): matriculados que nunca abriram uma aula (padrão: 1, 3 e 7 dias).
  * Roda todo dia sozinho (Cron da Vercel, vercel.json) e também pelo botão do painel.
  * Tabelas: supabase/migrations/0010_lembretes_estudo.sql.
  */
@@ -52,8 +51,6 @@ export interface ConfigLembretes {
   mensagemWhatsapp: string;
   /** Matriculados que nunca abriram uma aula (dias contados da matrícula) */
   nuncaComecou: GrupoExtra;
-  /** Começaram a inscrição (deixaram nome e e-mail) e não terminaram (dias contados da inscrição) */
-  interessados: GrupoExtra;
 }
 
 export interface GrupoExtra {
@@ -62,9 +59,9 @@ export interface GrupoExtra {
   mensagemWhatsapp: string;
 }
 
-/** Tipo de lembrete: aluno parado no meio do curso, matriculado que nunca começou, inscrição não terminada. */
-export type TipoLembrete = "parado" | "nunca" | "interessado";
-export const NOME_TIPO: Record<TipoLembrete, string> = { parado: "Parou de estudar", nunca: "Nunca começou", interessado: "Não terminou a inscrição" };
+/** Tipo de lembrete: aluno parado no meio do curso ou matriculado que nunca começou. */
+export type TipoLembrete = "parado" | "nunca";
+export const NOME_TIPO: Record<TipoLembrete, string> = { parado: "Parou de estudar", nunca: "Nunca começou" };
 
 export const MENSAGEM_WHATSAPP_PADRAO =
   "Oi, {nome}! Tudo bem? Aqui é da Tecpro Multi Ensino 😊\n\n" +
@@ -78,15 +75,9 @@ export const MENSAGEM_WHATSAPP_NUNCA =
   "É só entrar aqui com o seu e-mail: {link}\n\n" +
   "Se tiver qualquer dificuldade, me chama aqui que eu te ajudo.";
 
-export const MENSAGEM_WHATSAPP_INTERESSADO =
-  "Oi, {nome}! Tudo bem? Aqui é da Tecpro Multi Ensino 😊\n\n" +
-  "Vi que você começou a se inscrever no curso *{curso}* e não terminou. Ficou alguma dúvida? Posso te ajudar?\n\n" +
-  "Para terminar a inscrição é só clicar aqui: {link}";
-
 export const CONFIG_LEMBRETES_PADRAO: ConfigLembretes = {
   ligado: false, dias: [3, 7, 14], limiteDias: 45, maximoPorDia: 90, mensagemWhatsapp: MENSAGEM_WHATSAPP_PADRAO,
   nuncaComecou: { ligado: false, dias: [1, 3, 7], mensagemWhatsapp: MENSAGEM_WHATSAPP_NUNCA },
-  interessados: { ligado: false, dias: [1, 3, 7], mensagemWhatsapp: MENSAGEM_WHATSAPP_INTERESSADO },
 };
 
 /** Junta o que está salvo com o padrão (configurações antigas não têm os grupos novos). */
@@ -95,7 +86,6 @@ function completar(c: Partial<ConfigLembretes> | undefined): ConfigLembretes {
   return {
     ...p, ...c,
     nuncaComecou: { ...p.nuncaComecou, ...c?.nuncaComecou },
-    interessados: { ...p.interessados, ...c?.interessados },
   };
 }
 
@@ -134,7 +124,7 @@ export interface RegistroLembrete {
   etapa: number;
   diasParado: number;
   progressoPct: number | null;
-  /** Data de referência: última aula (parado), matrícula (nunca começou) ou inscrição (interessado) */
+  /** Data de referência: última aula (parado), matrícula (nunca começou)  */
   ultimaAtividade: string;
   status: "enviado" | "erro";
   detalhe: string | null;
@@ -184,7 +174,7 @@ async function registrar(r: Omit<RegistroLembrete, "id" | "enviadoEm">): Promise
   if (error) throw new Error(`Não deu para gravar o registro do lembrete: ${error.message}`);
 }
 
-/** true quando falta rodar o SQL que cria a coluna "tipo" (lembretes para quem nunca começou e inscrições). */
+/** true quando falta rodar o SQL que cria a coluna "tipo" (lembretes para quem nunca começou). */
 export async function faltaSqlTipos(): Promise<boolean> {
   if (bancoEmDemonstracao) return false;
   const { error } = await db().from("lembretes_estudo").select("tipo").limit(1);
@@ -229,7 +219,6 @@ export const linkDescadastro = (email: string, base = SITE_OFICIAL) =>
   `${base}/lembretes/sair?e=${encodeURIComponent(norm(email))}&t=${assinatura(email)}`;
 
 export const linkContinuar = (slug: string, base = SITE_OFICIAL) => `${base}/continuar/${encodeURIComponent(slug)}`;
-export const linkInscricao = (slug: string, base = SITE_OFICIAL) => `${base}/checkout/${encodeURIComponent(slug)}`;
 
 /* ---------- Quem está parado ---------- */
 
@@ -357,7 +346,7 @@ export async function telefonesDosAlunos(): Promise<Map<string, string>> {
   return out;
 }
 
-/* ---------- Quem nunca começou e quem não terminou a inscrição ---------- */
+/* ---------- Quem se matriculou e nunca começou ---------- */
 
 export interface PessoaSemAula {
   email: string;
@@ -367,7 +356,7 @@ export interface PessoaSemAula {
   cursoNome: string;
   cursoSlug: string;
   gratuito: boolean;
-  /** Data da matrícula (nunca começou) ou da inscrição (interessado) */
+  /** Data da matrícula */
   desde: string;
   dias: number;
 }
@@ -389,49 +378,40 @@ async function carrinhosDeCurso(): Promise<LinhaCarrinho[]> {
 }
 
 /**
- * - nunca: matriculados pelo site (inscrição concluída) que não abriram nenhuma aula daquele curso.
- * - interessados: deixaram nome e e-mail na inscrição de um curso e não terminaram (e não são alunos).
+ * Matriculados pelo site (inscrição concluída) que não abriram nenhuma aula daquele curso.
  * O curso de cada pessoa vem da inscrição feita no site (alunos cadastrados só pelo painel ficam de fora).
  */
-export async function semAula(minimoDias = 1, progresso?: Progresso): Promise<{ nunca: PessoaSemAula[]; interessados: PessoaSemAula[] }> {
+export async function semAula(minimoDias = 1, progresso?: Progresso): Promise<{ nunca: PessoaSemAula[] }> {
   const [porPar, carrinhos, alunos, cursos, removidos, telefones] = await Promise.all([
     progresso ?? lerProgresso(), carrinhosDeCurso(), todosAlunos(), getCursos(), todosCursosRemovidos(), telefonesDosAlunos(),
   ]);
   const aluno = new Map(alunos.map((a) => [norm(a.email), a]));
-  const estudou = new Set(Array.from(porPar.keys()).map((k) => k.split("|")[0]));
   const agora = Date.now();
   const nunca: PessoaSemAula[] = [];
-  const interessados: PessoaSemAula[] = [];
   for (const c of carrinhos) {
     const curso = cursos.find((x) => x.id === c.cursoId);
     if (!curso) continue;
-    const matriculado = c.etapa === "pago" || c.etapa === "matriculado";
-    const desde = matriculado ? c.atualizadoEm : c.criadoEm;
+    if (c.etapa !== "pago" && c.etapa !== "matriculado") continue;
+    const desde = c.atualizadoEm;
     const dias = Math.floor((agora - new Date(desde).getTime()) / DIA);
     if (dias < minimoDias) continue;
     const base = {
       email: c.email, telefone: telefones.get(c.email) ?? c.telefone, cursoId: c.cursoId, cursoNome: curso.nome, cursoSlug: curso.slug,
       gratuito: curso.gratuito, desde, dias,
     };
-    if (matriculado) {
-      const a = aluno.get(c.email);
-      if (!a || porPar.has(`${c.email}|${c.cursoId}`) || removidos.has(`${c.email}|${c.cursoId}`)) continue;
-      nunca.push({ ...base, nome: a.nome ?? c.nome });
-    } else {
-      // Quem já é aluno (estuda outro curso) não recebe e-mail de inscrição não terminada.
-      if (aluno.has(c.email) || estudou.has(c.email) || !curso.visivel) continue;
-      interessados.push({ ...base, nome: c.nome });
-    }
+    const a = aluno.get(c.email);
+    if (!a || porPar.has(`${c.email}|${c.cursoId}`) || removidos.has(`${c.email}|${c.cursoId}`)) continue;
+    nunca.push({ ...base, nome: a.nome ?? c.nome });
   }
   const ordem = (x: PessoaSemAula, y: PessoaSemAula) => x.dias - y.dias;
-  return { nunca: nunca.sort(ordem), interessados: interessados.sort(ordem) };
+  return { nunca: nunca.sort(ordem) };
 }
 
 /* ---------- Envio ---------- */
 
 /** Qual lembrete (1, 2 ou 3) cabe para quem está há `dias` sem estudar. 0 = nenhum. */
 export function etapaPara(dias: number, cfg: ConfigLembretes, tipo: TipoLembrete = "parado"): number {
-  const lista = tipo === "parado" ? cfg.dias : tipo === "nunca" ? cfg.nuncaComecou.dias : cfg.interessados.dias;
+  const lista = tipo === "parado" ? cfg.dias : cfg.nuncaComecou.dias;
   let etapa = 0;
   lista.forEach((d, i) => { if (dias >= d) etapa = i + 1; });
   return dias > cfg.limiteDias ? 0 : etapa;
@@ -491,7 +471,7 @@ interface Envio {
 async function rodada(base: string): Promise<ResultadoRodada> {
   const cfg = await obterConfigLembretes();
   const r: ResultadoRodada = { enviados: 0, erros: 0, pulados: [], detalhes: [] };
-  const extras = cfg.nuncaComecou.ligado || cfg.interessados.ligado;
+  const extras = cfg.nuncaComecou.ligado;
   if (!cfg.ligado && !extras) {
     r.pulados.push("Lembretes desligados no painel.");
     return r;
@@ -503,13 +483,13 @@ async function rodada(base: string): Promise<ResultadoRodada> {
   const progresso = await lerProgresso();
   const [parados, sem, sairam, { lista: historico, tabelaFaltando }, faltaTipo] = await Promise.all([
     cfg.ligado ? cursosParados(Math.min(...cfg.dias), progresso) : Promise.resolve([]),
-    extras ? semAula(1, progresso) : Promise.resolve({ nunca: [], interessados: [] }),
+    extras ? semAula(1, progresso) : Promise.resolve({ nunca: [] }),
     descadastrados(), listarLembretes(Math.max(cfg.limiteDias, 30) + 30), extras ? faltaSqlTipos() : Promise.resolve(false),
   ]);
   if (tabelaFaltando) throw new Error("Tabela de lembretes não encontrada: rode o SQL lembretes-estudo.sql no Supabase.");
 
   const sair = (email: string) => linkDescadastro(email, base);
-  // Ordem de prioridade: quem parou no meio do curso, depois quem nunca começou, depois inscrições não terminadas.
+  // Ordem de prioridade: quem parou no meio do curso, depois quem nunca começou.
   const fila: Envio[] = [
     ...parados.map((p): Envio => ({
       tipo: "parado", email: p.email, nome: p.nome, cursoId: p.cursoId, cursoNome: p.cursoNome, referencia: p.ultimaAtividade, dias: p.diasParado, pct: p.pct,
@@ -520,18 +500,12 @@ async function rodada(base: string): Promise<ResultadoRodada> {
     })),
   ];
   if (extras && faltaTipo) {
-    r.pulados.push("Lembretes para quem nunca começou e inscrições não terminadas: falta rodar o SQL lembretes-novos-alunos.sql no Supabase.");
+    r.pulados.push("Lembretes para quem nunca começou: falta rodar o SQL lembretes-novos-alunos.sql no Supabase.");
   } else {
     if (cfg.nuncaComecou.ligado) {
       fila.push(...sem.nunca.map((p): Envio => ({
         tipo: "nunca", email: p.email, nome: p.nome, cursoId: p.cursoId, cursoNome: p.cursoNome, referencia: p.desde, dias: p.dias, pct: 0,
         montar: (etapa) => emailNuncaComecou({ nome: p.nome ?? "", curso: p.cursoNome, dias: p.dias, etapa, link: linkContinuar(p.cursoSlug, base), linkSair: sair(p.email) }),
-      })));
-    }
-    if (cfg.interessados.ligado) {
-      fila.push(...sem.interessados.map((p): Envio => ({
-        tipo: "interessado", email: p.email, nome: p.nome, cursoId: p.cursoId, cursoNome: p.cursoNome, referencia: p.desde, dias: p.dias, pct: null,
-        montar: (etapa) => emailInscricao({ nome: p.nome ?? "", curso: p.cursoNome, gratuito: p.gratuito, etapa, link: linkInscricao(p.cursoSlug, base), linkSair: sair(p.email) }),
       })));
     }
   }
@@ -583,9 +557,6 @@ export function emailDeExemplo(tipo: TipoLembrete, etapa: number, cfg: ConfigLem
   const linkSair = linkDescadastro(emailSair);
   if (tipo === "nunca") {
     return emailNuncaComecou({ nome, curso: "Excel Avançado", dias: cfg.nuncaComecou.dias[etapa - 1], etapa, link: linkContinuar("excel-avancado"), linkSair });
-  }
-  if (tipo === "interessado") {
-    return emailInscricao({ nome, curso: "Excel Avançado", gratuito: true, etapa, link: linkInscricao("excel-avancado"), linkSair });
   }
   return emailLembrete({
     nome, curso: "Excel Avançado", pct: 40 + etapa * 5, feitas: 8 + etapa, total: 20, dias: cfg.dias[etapa - 1], etapa,

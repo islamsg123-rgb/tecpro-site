@@ -4,12 +4,12 @@ import { exigirAdmin } from "@/lib/admin";
 import { ultimaAtividadePorAluno } from "@/lib/dados";
 import { emailConfigurado } from "@/lib/email";
 import {
-  descadastrados, etapaPara, faltaSqlTipos, linkContinuar, linkInscricao, listarLembretes, listasDoPainel, NOME_TIPO, obterConfigLembretes, ultimaRodada,
+  descadastrados, etapaPara, faltaSqlTipos, linkContinuar, listarLembretes, listasDoPainel, NOME_TIPO, obterConfigLembretes, ultimaRodada,
   type AlunoParado, type ConfigLembretes, type PessoaSemAula, type RegistroLembrete, type TipoLembrete,
 } from "@/lib/lembretes";
 import { AvisoSql, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { Dica } from "@/components/admin/Dica";
-import { rodarAgora, salvarLembretes, testeInteressado, testeNunca, testeParado } from "./acoes";
+import { rodarAgora, salvarLembretes, testeNunca, testeParado } from "./acoes";
 
 export const metadata: Metadata = { title: "Lembretes de estudo" };
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export default async function Lembretes({ searchParams }: Props) {
   await exigirAdmin("alunos");
   const q = await searchParams;
   const cfg = await obterConfigLembretes();
-  const vazio = { parados: [] as AlunoParado[], nunca: [] as PessoaSemAula[], interessados: [] as PessoaSemAula[] };
+  const vazio = { parados: [] as AlunoParado[], nunca: [] as PessoaSemAula[] };
   const [listas, historico, sairam, atividade, rodada, faltaTipo] = await Promise.all([
     listasDoPainel(cfg).catch(() => vazio),
     listarLembretes(120),
@@ -37,9 +37,9 @@ export default async function Lembretes({ searchParams }: Props) {
     ultimaRodada().catch(() => null),
     faltaSqlTipos(),
   ]);
-  const { parados, nunca, interessados } = listas;
+  const { parados, nunca } = listas;
   const cronOk = Boolean(process.env.CRON_SECRET);
-  const algumLigado = cfg.ligado || cfg.nuncaComecou.ligado || cfg.interessados.ligado;
+  const algumLigado = cfg.ligado || cfg.nuncaComecou.ligado;
   const enviados = historico.lista.filter((h) => h.status === "enviado");
   const voltou = (h: RegistroLembrete) => {
     const a = atividade.get(h.email);
@@ -59,7 +59,7 @@ export default async function Lembretes({ searchParams }: Props) {
   return (
     <>
       <Titulo
-        descricao={<>O site manda sozinho, todo dia às 10h, e-mails chamando de volta três tipos de pessoa: quem <strong>parou de estudar</strong> no meio do curso, quem se <strong>matriculou e nunca abriu uma aula</strong> e quem <strong>começou a inscrição e não terminou</strong>. Cada tipo liga separado, tem no máximo 3 lembretes e cada pessoa recebe no máximo um e-mail a cada 2 dias.</>}
+        descricao={<>O site manda sozinho, todo dia às 10h, e-mails chamando de volta dois tipos de aluno: quem <strong>parou de estudar</strong> no meio do curso e quem se <strong>matriculou e nunca abriu uma aula</strong>. Cada tipo liga separado, tem no máximo 3 lembretes e cada pessoa recebe no máximo um e-mail a cada 2 dias.</>}
       >
         Lembretes de estudo
       </Titulo>
@@ -99,10 +99,9 @@ export default async function Lembretes({ searchParams }: Props) {
         )}
       </section>
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mb-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Numero rotulo="Pararam de estudar" valor={String(new Set(parados.map((p) => p.email)).size)} cor="laranja" href="#parados" dica={`Alunos com curso começado e não concluído, há ${cfg.dias[0]} dias ou mais sem estudar.`} />
         <Numero rotulo="Nunca começaram" valor={String(new Set(nunca.map((p) => p.email)).size)} cor="laranja" href="#nunca" dica="Se matricularam pelo site, mas ainda não abriram nenhuma aula do curso." />
-        <Numero rotulo="Inscrição pela metade" valor={String(new Set(interessados.map((p) => p.email)).size)} cor="laranja" href="#interessados" dica="Deixaram nome e e-mail na inscrição de um curso e não terminaram. Não são alunos ainda." />
         <Numero rotulo="Lembrados (30 dias)" valor={String(alunos30.size)} detalhe={`${ultimos30.length} e-mails`} href="#enviados" dica="Pessoas que receberam pelo menos um lembrete nos últimos 30 dias." />
         <Numero rotulo="Voltaram a estudar" valor={String(voltaram30.size)} cor="verde" detalhe={alunos30.size ? `${Math.round((voltaram30.size / alunos30.size) * 100)}% dos lembrados` : undefined} dica="Das pessoas lembradas nos últimos 30 dias, quantas estudaram alguma aula depois do e-mail." />
         <Numero rotulo="Não querem lembretes" valor={String(sairam.size)} cor="cinza" dica="Clicaram no link do fim do e-mail para não receber mais lembretes. O site respeita (LGPD)." />
@@ -134,18 +133,6 @@ export default async function Lembretes({ searchParams }: Props) {
         ))}
       </Secao>
 
-      <Secao id="interessados" titulo="Inscrições não terminadas" texto={<>Deixaram nome e e-mail na inscrição de um curso e não terminaram. Quem já é aluno não aparece aqui. Também estão em <Link href="/admin/carrinhos" className="font-semibold text-marca-700">Carrinhos abandonados</Link>.</>} total={interessados.length} todos={todos}>
-        {interessados.slice(0, todos ? undefined : 100).map((p) => (
-          <Linha
-            key={`${p.email}|${p.cursoId}`} email={p.email} nome={p.nome} curso={p.cursoNome} semFicha
-            detalhe={<span className="text-xs text-slate-500">{p.gratuito ? "curso gratuito" : "curso pago"} · inscrição em {dataCurta(p.desde)}</span>}
-            dias={p.dias} rotuloDias="desde a inscrição"
-            situacao={<SituacaoEmail tipo="interessado" dias={p.dias} cfg={cfg} enviado={enviadoDesta("interessado", p.email, p.cursoId, p.desde)} saiu={sairam.has(p.email)} />}
-            whatsapp={p.telefone ? linkWhatsapp(p.telefone, cfg.interessados.mensagemWhatsapp, { nome: p.nome, curso: p.cursoNome, progresso: "0%", dias: p.dias, link: linkInscricao(p.cursoSlug) }) : null}
-          />
-        ))}
-      </Secao>
-
       <h2 id="enviados" className="mt-12 scroll-mt-24 text-xl font-bold text-marca-900">Lembretes enviados</h2>
       <p className="mt-1 text-sm text-slate-500">Os últimos 200 e-mails de lembrete, mais recentes primeiro.</p>
       {!historico.lista.length ? (
@@ -167,7 +154,7 @@ export default async function Lembretes({ searchParams }: Props) {
                 <tr key={h.id}>
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">{dataHora(h.enviadoEm)}</td>
                   <td className="px-5 py-3">
-                    {h.tipo === "interessado" ? <span className="text-marca-900">{h.nome ?? h.email}</span> : <Link href={ficha(h.email)} className="text-marca-900 underline decoration-laranja-500 underline-offset-4">{h.nome ?? h.email}</Link>}
+                    <Link href={ficha(h.email)} className="text-marca-900 underline decoration-laranja-500 underline-offset-4">{h.nome ?? h.email}</Link>
                   </td>
                   <td className="px-5 py-3 text-slate-600">{h.cursoNome}{h.tipo === "parado" && h.progressoPct !== null && <span className="text-slate-400"> · {h.progressoPct}%</span>}</td>
                   <td className="px-5 py-3 text-slate-600">
@@ -249,16 +236,14 @@ function Secao({ id, titulo, texto, total, todos, children }: { id: string; titu
   );
 }
 
-function Linha({ email, nome, curso, detalhe, dias, rotuloDias, situacao, whatsapp, semFicha }: {
+function Linha({ email, nome, curso, detalhe, dias, rotuloDias, situacao, whatsapp }: {
   email: string; nome: string | null; curso: string; detalhe: React.ReactNode; dias: number; rotuloDias: string;
-  situacao: React.ReactNode; whatsapp: string | null; semFicha?: boolean;
+  situacao: React.ReactNode; whatsapp: string | null;
 }) {
   return (
     <tr className="hover:bg-marca-50/50">
       <td className="px-5 py-3">
-        {semFicha ? <span className="font-medium text-marca-900">{nome ?? email}</span> : (
-          <Link href={ficha(email)} className="font-medium text-marca-900 underline decoration-laranja-500 underline-offset-4">{nome ?? email}</Link>
-        )}
+        <Link href={ficha(email)} className="font-medium text-marca-900 underline decoration-laranja-500 underline-offset-4">{nome ?? email}</Link>
         <span className="block text-xs text-slate-500">{email}</span>
       </td>
       <td className="px-5 py-3">
@@ -286,7 +271,7 @@ function Linha({ email, nome, curso, detalhe, dias, rotuloDias, situacao, whatsa
 
 function SituacaoEmail({ tipo, dias, cfg, enviado, saiu }: { tipo: TipoLembrete; dias: number; cfg: ConfigLembretes; enviado: RegistroLembrete | null; saiu: boolean }) {
   if (saiu) return <>pediu para não receber</>;
-  const grupo = tipo === "parado" ? { ligado: cfg.ligado, dias: cfg.dias } : tipo === "nunca" ? cfg.nuncaComecou : cfg.interessados;
+  const grupo = tipo === "parado" ? { ligado: cfg.ligado, dias: cfg.dias } : cfg.nuncaComecou;
   if (dias > cfg.limiteDias) {
     return <Dica texto={`Há mais de ${cfg.limiteDias} dias: o e-mail automático não vai para essa pessoa. Chame no WhatsApp.`}><span>faz muito tempo</span></Dica>;
   }
@@ -338,7 +323,7 @@ function Grupo({ tipo, titulo, explica, ligado, nomeLigado, prefixo, dias, rotul
             Ver {n}º e-mail
           </a>
         ))}
-        <button formAction={{ parado: testeParado, nunca: testeNunca, interessado: testeInteressado }[tipo]} formNoValidate className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-marca-900 hover:border-marca-900">
+        <button formAction={tipo === "nunca" ? testeNunca : testeParado} formNoValidate className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-marca-900 hover:border-marca-900">
           Mandar os 3 para o meu e-mail
         </button>
       </div>
@@ -365,11 +350,6 @@ function Config({ cfg, erro }: { cfg: ConfigLembretes; erro?: string }) {
         tipo="nunca" titulo="Quem se matriculou e nunca começou" explica="Fez a matrícula (paga ou gratuita), mas não abriu nenhuma aula. O botão do e-mail leva direto para o curso."
         ligado={cfg.nuncaComecou.ligado} nomeLigado="nLigado" prefixo="n" dias={cfg.nuncaComecou.dias} rotuloDias="depois da matrícula"
         nomeMensagem="nMensagem" mensagem={cfg.nuncaComecou.mensagemWhatsapp} variaveis="{nome}, {curso}, {dias} e {link}"
-      />
-      <Grupo
-        tipo="interessado" titulo="Quem começou a inscrição e não terminou" explica="Deixou nome e e-mail ao se inscrever num curso, mas não concluiu. O botão do e-mail leva de volta para a inscrição."
-        ligado={cfg.interessados.ligado} nomeLigado="iLigado" prefixo="i" dias={cfg.interessados.dias} rotuloDias="depois da inscrição"
-        nomeMensagem="iMensagem" mensagem={cfg.interessados.mensagemWhatsapp} variaveis="{nome}, {curso}, {dias} e {link}"
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm text-slate-600">

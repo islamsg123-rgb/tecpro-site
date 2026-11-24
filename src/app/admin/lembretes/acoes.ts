@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { exigirAdmin } from "@/lib/admin";
 import { enviarEmail } from "@/lib/email";
 import {
-  CONFIG_LEMBRETES_PADRAO, emailDeExemplo, MENSAGEM_WHATSAPP_INTERESSADO, MENSAGEM_WHATSAPP_NUNCA, MENSAGEM_WHATSAPP_PADRAO, NOME_TIPO,
+  CONFIG_LEMBRETES_PADRAO, emailDeExemplo, MENSAGEM_WHATSAPP_NUNCA, MENSAGEM_WHATSAPP_PADRAO, NOME_TIPO,
   obterConfigLembretes, rodarLembretes, salvarConfigLembretes, type TipoLembrete,
 } from "@/lib/lembretes";
 import { SITE_OFICIAL } from "@/lib/site";
@@ -26,10 +26,10 @@ const texto = (f: FormData, nome: string, padrao: string) => String(f.get(nome) 
 
 export async function salvarLembretes(f: FormData) {
   await exigirAdmin("alunos");
-  const dias = lerDias(f, "d"), diasN = lerDias(f, "n"), diasI = lerDias(f, "i");
+  const dias = lerDias(f, "d"), diasN = lerDias(f, "n");
   const limite = inteiro(f.get("limite"), 1, 365), maximo = inteiro(f.get("maximo"), 1, 1000);
-  if (!dias || !diasN || !diasI) redirect("/admin/lembretes?erro=dias#config");
-  if (!limite || limite < Math.max(dias[2], diasN[2], diasI[2])) redirect("/admin/lembretes?erro=limite#config");
+  if (!dias || !diasN) redirect("/admin/lembretes?erro=dias#config");
+  if (!limite || limite < Math.max(dias[2], diasN[2])) redirect("/admin/lembretes?erro=limite#config");
   if (!maximo) redirect("/admin/lembretes?erro=maximo#config");
   await salvarConfigLembretes({
     ...CONFIG_LEMBRETES_PADRAO,
@@ -39,7 +39,6 @@ export async function salvarLembretes(f: FormData) {
     maximoPorDia: maximo,
     mensagemWhatsapp: texto(f, "mensagemWhatsapp", MENSAGEM_WHATSAPP_PADRAO),
     nuncaComecou: { ligado: f.get("nLigado") === "on", dias: diasN, mensagemWhatsapp: texto(f, "nMensagem", MENSAGEM_WHATSAPP_NUNCA) },
-    interessados: { ligado: f.get("iLigado") === "on", dias: diasI, mensagemWhatsapp: texto(f, "iMensagem", MENSAGEM_WHATSAPP_INTERESSADO) },
   });
   redirect("/admin/lembretes?salvo=1");
 }
@@ -71,7 +70,4 @@ export async function testeParado() {
 }
 export async function testeNunca() {
   await enviarTeste("nunca");
-}
-export async function testeInteressado() {
-  await enviarTeste("interessado");
 }
