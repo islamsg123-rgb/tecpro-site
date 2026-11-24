@@ -1,3 +1,4 @@
+import type { Curso } from "@/lib/types";
 import Image from "next/image";
 import Link from "next/link";
 import { getCursosPublicos } from "@/lib/cursos";
@@ -33,6 +34,8 @@ export default async function Inicio() {
     listarDepoimentos(true).catch(() => ({ lista: [] })),
   ]);
   const destaques = cursos.slice(0, 6);
+  const gratuitos = cursos.filter((c) => c.gratuito);
+  const pagos = cursos.filter((c) => !c.gratuito);
   const categorias = Array.from(new Set(cursos.map((c) => c.categoria)));
   const vitrine = cursos[0];
 
@@ -146,23 +149,23 @@ export default async function Inicio() {
         </div>
       </section>
 
-      {/* ===== DESTAQUES ===== */}
-      <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-widest text-laranja-600">Cursos</p>
-            <h2 className="mt-2 text-3xl font-extrabold text-marca-900 sm:text-4xl">Mais procurados</h2>
-          </div>
-          <Link href="/cursos" className="flex items-center gap-2 text-sm font-bold text-marca-700 hover:text-laranja-600">
-            Ver todos os cursos <IconeSeta className="h-4 w-4" />
-          </Link>
-        </div>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {destaques.map((c) => (
-            <CartaoCurso key={c.id} curso={c} />
-          ))}
-        </div>
-      </section>
+      {/* ===== DESTAQUES, GRATUITOS E PAGOS ===== */}
+      <VitrineCursos titulo="Mais procurados" cursos={destaques} link="/cursos" textoLink="Ver todos os cursos" />
+      <VitrineCursos
+        titulo="Cursos gratuitos"
+        subtitulo="Comece agora mesmo: é só fazer seu cadastro."
+        cursos={gratuitos.slice(0, 6)}
+        link="/cursos?tipo=gratuitos"
+        textoLink="Ver todos os gratuitos"
+        fundoBranco
+      />
+      <VitrineCursos
+        titulo="Cursos pagos"
+        subtitulo="Formações completas, com certificado incluso."
+        cursos={pagos.slice(0, 6)}
+        link="/cursos?tipo=pagos"
+        textoLink="Ver todos os pagos"
+      />
 
       {/* ===== COMO FUNCIONA ===== */}
       <section id="como-funciona" className="scroll-mt-20 bg-white py-24">
@@ -310,5 +313,35 @@ export default async function Inicio() {
         )}
       </section>
     </>
+  );
+}
+
+/** Uma faixa de cursos da página inicial (título, botão "ver todos" e até 6 cartões). */
+function VitrineCursos({
+  titulo, subtitulo, cursos, link, textoLink, fundoBranco = false,
+}: {
+  titulo: string; subtitulo?: string; cursos: Curso[]; link: string; textoLink: string; fundoBranco?: boolean;
+}) {
+  if (!cursos.length) return null;
+  return (
+    <section className={fundoBranco ? "bg-white" : ""}>
+      <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-widest text-laranja-600">Cursos</p>
+            <h2 className="mt-2 text-3xl font-extrabold text-marca-900 sm:text-4xl">{titulo}</h2>
+            {subtitulo && <p className="mt-2 text-slate-500">{subtitulo}</p>}
+          </div>
+          <Link href={link} className="flex items-center gap-2 text-sm font-bold text-marca-700 hover:text-laranja-600">
+            {textoLink} <IconeSeta className="h-4 w-4" />
+          </Link>
+        </div>
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {cursos.map((c) => (
+            <CartaoCurso key={c.id} curso={c} />
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

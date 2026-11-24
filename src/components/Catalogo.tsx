@@ -13,11 +13,14 @@ export function Catalogo({
   cursos,
   buscaInicial = "",
   categoriaInicial = "Todas",
+  tipoInicial = "todos",
 }: {
   cursos: Curso[];
   buscaInicial?: string;
   categoriaInicial?: string;
+  tipoInicial?: string;
 }) {
+  const [tipo, setTipo] = useState(["gratuitos", "pagos"].includes(tipoInicial) ? tipoInicial : "todos");
   const [busca, setBusca] = useState(buscaInicial);
   const [categoria, setCategoria] = useState(categoriaInicial);
   const [ordem, setOrdem] = useState("relevancia");
@@ -29,6 +32,7 @@ export function Catalogo({
 
   const termo = normalizar(busca.trim());
   const filtrados = cursos
+    .filter((c) => tipo === "todos" || (tipo === "gratuitos" ? c.gratuito : !c.gratuito))
     .filter((c) => (categoria === "Todas" || c.categoria === categoria) && (!termo || normalizar(`${c.nome} ${c.resumo}`).includes(termo)))
     .sort((a, b) =>
       ordem === "menor" ? a.precoCentavos - b.precoCentavos : ordem === "maior" ? b.precoCentavos - a.precoCentavos : ordem === "nome" ? a.nome.localeCompare(b.nome) : 0,
@@ -61,7 +65,27 @@ export function Catalogo({
         </select>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-5 inline-flex rounded-full bg-white p-1 ring-1 ring-slate-200" role="group" aria-label="Tipo de curso">
+        {[
+          ["todos", "Todos"],
+          ["gratuitos", "Gratuitos"],
+          ["pagos", "Pagos"],
+        ].map(([v, rotulo]) => (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={tipo === v}
+            onClick={() => setTipo(v)}
+            className={`rounded-full px-5 py-2 text-sm font-bold transition ${
+              tipo === v ? "bg-laranja-500 text-marca-900" : "text-slate-600 hover:text-marca-900"
+            }`}
+          >
+            {rotulo}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
         {categorias.map((cat) => (
           <button
             key={cat}
