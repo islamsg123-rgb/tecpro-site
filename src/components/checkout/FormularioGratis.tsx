@@ -9,8 +9,8 @@ import { Campo } from "./FormularioCheckout";
 import { ESTADOS } from "@/lib/estados";
 
 /** Matrícula em curso gratuito: só os dados do aluno, sem pagamento. */
-export function FormularioGratis({ cursoId, nomeInicial, emailInicial, cidadeInicial, estadoInicial }: {
-  cursoId: string; nomeInicial?: string; emailInicial?: string; cidadeInicial?: string; estadoInicial?: string;
+export function FormularioGratis({ cursoId, nomeInicial, emailInicial, cidadeInicial, estadoInicial, cpfInicial, telefoneInicial }: {
+  cursoId: string; nomeInicial?: string; emailInicial?: string; cidadeInicial?: string; estadoInicial?: string; cpfInicial?: string; telefoneInicial?: string;
 }) {
   const [estado, acao, enviando] = useActionState<EstadoGratis, FormData>(matricularGratis, {});
   const e = estado.campos ?? {};
@@ -50,8 +50,8 @@ export function FormularioGratis({ cursoId, nomeInicial, emailInicial, cidadeIni
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <Campo nome="nome" rotulo="Nome completo" autoComplete="name" defaultValue={nomeInicial} erro={e.nome} className="sm:col-span-2" required />
           <Campo nome="email" rotulo="E-mail" type="email" autoComplete="email" defaultValue={emailInicial} erro={e.email} className="sm:col-span-2" required />
-          <Campo nome="cpf" rotulo="CPF" inputMode="numeric" placeholder="000.000.000-00" mascara={mascaraCpf} erro={e.cpf} required />
-          <Campo nome="telefone" rotulo="Celular (WhatsApp)" inputMode="tel" autoComplete="tel" placeholder="(00) 00000-0000" mascara={mascaraTelefone} erro={e.telefone} required />
+          <Campo nome="cpf" rotulo="CPF" inputMode="numeric" placeholder="000.000.000-00" mascara={mascaraCpf} defaultValue={cpfInicial ? mascaraCpf(cpfInicial) : undefined} erro={e.cpf} required />
+          <Campo nome="telefone" rotulo="Celular (WhatsApp)" inputMode="tel" autoComplete="tel" placeholder="(00) 00000-0000" mascara={mascaraTelefone} defaultValue={telefoneInicial ? mascaraTelefone(telefoneInicial) : undefined} erro={e.telefone} required />
           <label className="block">
             <span className="mb-1.5 block text-sm font-medium text-slate-700">Estado</span>
             <select

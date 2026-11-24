@@ -39,7 +39,7 @@ export default async function Carrinhos({ searchParams }: Props) {
     listarCarrinhos(), getCursos(), mensagensProntas(), listarCupons(), searchParams,
   ]);
   const ver = sp.ver ?? "abandonados";
-  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://tecpro-site.vercel.app";
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://www.tecpromultiensino.com.br";
   const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
   const cuponsAtivos = cupons.filter((c) => c.ativo && (!c.validade || c.validade >= hoje)).map((c) => c.codigo);
 

@@ -24,7 +24,7 @@ export default async function Financeiro({ searchParams }: Props) {
     <>
       <Titulo
         acao={<BotaoExportar tipo="vendas" />}
-        descricao="Tudo o que entrou e o que está para entrar, direto do Asaas. Os valores contam a data em que o aluno pagou."
+        descricao="Tudo o que entrou e o que está para entrar, direto do sistema de pagamento (Mercado Pago e/ou Asaas). Os valores contam a data em que o aluno pagou."
       >
         Financeiro
       </Titulo>
@@ -39,7 +39,7 @@ export default async function Financeiro({ searchParams }: Props) {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Numero rotulo={`Recebido em ${nomeMes(mes)}`} valor={formatarPreco(r.recebidoMesCentavos)} detalhe={`mês anterior: ${formatarPreco(r.recebidoMesAnteriorCentavos)}`} cor="verde" />
-        <Numero rotulo="Líquido (após taxas do Asaas)" valor={formatarPreco(r.liquidoMesCentavos)} detalhe={`taxas: ${formatarPreco(r.recebidoMesCentavos - r.liquidoMesCentavos)}`} />
+        <Numero rotulo="Líquido (após taxas)" valor={formatarPreco(r.liquidoMesCentavos)} detalhe={`taxas: ${formatarPreco(r.recebidoMesCentavos - r.liquidoMesCentavos)}`} />
         <Numero rotulo="A receber" valor={formatarPreco(r.aReceberCentavos)} detalhe="Pix e boletos ainda no prazo" href="/admin/financeiro/recebimentos?situacao=aguardando" cor="laranja" />
         <Numero rotulo="Em atraso" valor={formatarPreco(r.emAtrasoCentavos)} detalhe="ver devedores" href="/admin/financeiro/devedores" cor="vermelho" />
       </div>
@@ -47,7 +47,7 @@ export default async function Financeiro({ searchParams }: Props) {
         <Numero rotulo="Matrículas pagas" valor={String(r.matriculasMes)} detalhe="cursos pagos no mês" href={`/admin/financeiro/recebimentos?mes=${mes}&tipo=curso&situacao=pago`} />
         <Numero rotulo="Certificados pagos" valor={String(r.certificadosMes)} detalhe="emissões pagas no mês" href={`/admin/financeiro/recebimentos?mes=${mes}&tipo=certificado&situacao=pago`} />
         <Numero rotulo="Ticket médio" valor={formatarPreco(r.ticketMedioCentavos)} detalhe="valor médio por pagamento" />
-        <Numero rotulo="Saldo no Asaas" valor={saldo === null ? "—" : formatarPreco(saldo)} detalhe={saldo === null ? "disponível com o Asaas ligado" : "disponível para saque"} cor="cinza" />
+        <Numero rotulo="Saldo para saque" valor={saldo === null ? "—" : formatarPreco(saldo)} detalhe={saldo === null ? "veja no app do Mercado Pago" : "disponível no Asaas"} cor="cinza" />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -78,7 +78,7 @@ export default async function Financeiro({ searchParams }: Props) {
           </table>
         </div>
       </Caixa>
-      <p className="mt-4 text-xs text-slate-400">Considera as {cobrancas.length} cobranças mais recentes do Asaas. Para extratos completos e saques, use o painel do Asaas.</p>
+      <p className="mt-4 text-xs text-slate-400">Considera as {cobrancas.length} cobranças mais recentes. Para extratos completos e saques, use o painel do Mercado Pago (ou do Asaas).</p>
     </>
   );
 }

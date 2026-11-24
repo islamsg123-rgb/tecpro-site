@@ -3,9 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { precoDoCurso, getCursoPublicoPorSlug } from "@/lib/cursos";
 import { opcoesParcelas } from "@/lib/config-loja";
-import { pagamentoEmSimulacao } from "@/lib/pagamentos";
+import { infoCheckout } from "@/lib/pagamentos";
 import { CapaCurso } from "@/components/CapaCurso";
 import { FormularioCheckout } from "@/components/checkout/FormularioCheckout";
+import { TotalResumo } from "@/components/checkout/TotalResumo";
 import { FormularioGratis } from "@/components/checkout/FormularioGratis";
 import { alunoLogado } from "@/lib/auth";
 import { obterAluno } from "@/lib/dados";
@@ -22,6 +23,7 @@ export default async function Checkout({ params }: Props) {
   const gratis = curso.gratuito;
   const logado = gratis ? await alunoLogado() : null;
   const registro = logado ? await obterAluno(logado.email).catch(() => null) : null;
+  const pagamento = gratis ? null : await infoCheckout();
   const extras = registro ? await dadosExtrasAluno(registro.email ?? logado!.email).catch(() => null) : null;
 
   return (
@@ -35,7 +37,14 @@ export default async function Checkout({ params }: Props) {
           <IconeCadeado className="h-4 w-4 text-green-600" /> Ambiente seguro. Seus dados são protegidos.
         </p>
 
-        {!gratis && pagamentoEmSimulacao && (
+        {pagamento?.emTeste && (
+          <div className="mt-6 rounded-2xl border border-laranja-500/40 bg-laranja-300/20 p-4 text-sm text-marca-900">
+            <strong>Modo de teste do Mercado Pago:</strong> nada é cobrado de verdade. Use um cartão de teste do Mercado Pago
+            (ex.: Visa 4235 6477 2802 5682, CVV 123, validade 11/30) com o nome <strong>APRO</strong> para aprovar
+            ou <strong>OTHE</strong> para recusar, e o CPF 123.456.789-09.
+          </div>
+        )}
+        {pagamento?.gateway === "simulador" && (
           <div className="mt-6 rounded-2xl border border-laranja-500/40 bg-laranja-300/20 p-4 text-sm text-marca-900">
             <strong>Modo de teste:</strong> nenhum valor será cobrado. Use qualquer CPF válido.
             No cartão, qualquer número válido é aprovado; o 4000 0000 0000 0002 simula recusa. O Pix é “pago” sozinho em 20 segundos.
@@ -44,9 +53,9 @@ export default async function Checkout({ params }: Props) {
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px] lg:items-start">
           {gratis ? (
-            <FormularioGratis cursoId={curso.id} emailInicial={logado?.email} nomeInicial={registro?.nome ?? undefined} cidadeInicial={extras?.cidade ?? undefined} estadoInicial={extras?.estado ?? undefined} />
+            <FormularioGratis cursoId={curso.id} emailInicial={logado?.email} nomeInicial={registro?.nome ?? undefined} cidadeInicial={extras?.cidade ?? undefined} estadoInicial={extras?.estado ?? undefined} cpfInicial={extras?.cpf ?? undefined} telefoneInicial={extras?.telefone ?? undefined} />
           ) : (
-            <FormularioCheckout cursoId={curso.id} precoCentavos={curso.precoCentavos} parcelas={opcoesParcelas(curso.precoCentavos)} />
+            <FormularioCheckout pagamento={pagamento!} cursoId={curso.id} precoCentavos={curso.precoCentavos} parcelas={opcoesParcelas(curso.precoCentavos)} />
           )}
 
           <aside className="order-first overflow-hidden rounded-3xl border border-slate-200 bg-white lg:sticky lg:top-24 lg:order-none">
@@ -72,7 +81,7 @@ export default async function Checkout({ params }: Props) {
             </div>
             <div className="mx-5 mb-5 mt-1 flex items-center justify-between border-t border-slate-100 pt-4 lg:mx-6 lg:mb-6 lg:mt-6 lg:pt-5">
               <span className="font-semibold text-slate-600">Total</span>
-              <span className="font-display text-2xl font-extrabold text-marca-900">{precoDoCurso(curso)}</span>
+              {gratis ? <span className="font-display text-2xl font-extrabold text-marca-900">{precoDoCurso(curso)}</span> : <TotalResumo valorCentavos={curso.precoCentavos} />}
             </div>
           </aside>
         </div>

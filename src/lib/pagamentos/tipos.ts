@@ -57,8 +57,32 @@ export interface NovaCobranca {
   comprador: Comprador;
   parcelas?: number;
   cartao?: DadosCartao;
+  /** Mercado Pago: o navegador troca o cartão por um token; o número nunca chega ao servidor. */
+  cartaoMp?: CartaoMercadoPago;
+  /** Mercado Pago: o boleto exige endereço completo (montado pelo CEP). */
+  endereco?: Endereco;
   ipComprador?: string;
 }
+
+export interface CartaoMercadoPago {
+  token: string;
+  /** payment_method_id do Mercado Pago (ex.: "visa", "master") */
+  bandeira: string;
+  /** issuer_id (banco emissor), quando o Mercado Pago informa */
+  emissor?: string;
+}
+
+export interface Endereco {
+  cep: string;
+  rua: string;
+  numero: string;
+  bairro: string;
+  cidade: string;
+  uf: string;
+}
+
+/** Onde os pagamentos são processados. */
+export type Gateway = "mercadopago" | "asaas";
 
 export interface Cobranca {
   id: string;
@@ -84,6 +108,10 @@ export interface Cobranca {
   valorLiquidoCentavos?: number;
   /** Parcela (ex.: 2 de 12) quando o cartão é parcelado */
   parcela?: number;
+  /** Dados do comprador quando vêm junto com o pagamento (Mercado Pago) */
+  comprador?: Comprador;
+  /** Detalhe técnico da situação (ex.: cartão "em análise") */
+  detalheSituacao?: string;
 }
 
 export interface DadosPix {

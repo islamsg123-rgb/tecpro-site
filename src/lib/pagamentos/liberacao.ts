@@ -6,6 +6,7 @@ import { getCursos } from "../cursos";
 import { emailBoasVindas, enviarEmail } from "../email";
 import type { Comprador, Produto } from "./tipos";
 import { registrarCarrinho } from "../dados/carrinhos";
+import { SITE_OFICIAL } from "../site";
 
 /**
  * Depois do pagamento confirmado: cria o aluno na Escola Avançada (se ainda não existir),
@@ -44,7 +45,9 @@ export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cu
       cursoNome,
     );
     if (novoVinculo) console.info(`[liberacao] cobrança ${cobrancaId}: curso ${cursoId} liberado para ${comprador.email}`);
-    if (novoVinculo) await enviarBoasVindas(comprador, cursoNome ?? `curso ${cursoId}`);
+    // Matrícula grátis ("gratis-...") ou feita pelo painel ("painel-...") não teve pagamento.
+    const pago = !/^(gratis|painel)-/.test(cobrancaId);
+    if (novoVinculo) await enviarBoasVindas(comprador, cursoNome ?? `curso ${cursoId}`, pago);
     await registrarEventoMatricula(
       "matrícula",
       true,
@@ -66,10 +69,10 @@ export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cu
 }
 
 /** E-mail de boas-vindas do próprio site. Se falhar, o curso continua liberado; só registramos. */
-async function enviarBoasVindas(comprador: Comprador, cursoNome: string): Promise<void> {
-  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://tecpro-site.vercel.app";
+async function enviarBoasVindas(comprador: Comprador, cursoNome: string, pago: boolean): Promise<void> {
+  // Sempre o endereço oficial: o aluno pede o link de login no mesmo endereço em que vai abri-lo.
   try {
-    await enviarEmail({ para: comprador.email, ...emailBoasVindas(comprador.nome, cursoNome, site) });
+    await enviarEmail({ para: comprador.email, ...emailBoasVindas(comprador.nome, cursoNome, SITE_OFICIAL, pago) });
     await registrarEventoMatricula("e-mail de boas-vindas", true, `Enviado para ${comprador.email}`);
   } catch (e) {
     await registrarEventoMatricula("e-mail de boas-vindas", false, e instanceof Error ? e.message : String(e));

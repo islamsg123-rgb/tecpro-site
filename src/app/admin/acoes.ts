@@ -8,13 +8,13 @@ import {
   apagarDepoimento, apagarFuncionario, apagarPesquisa, LISTA_SECOES, listarFuncionarios, obterDepoimento,
   salvarDepoimento, salvarFuncionario, type Secao, dadosExtrasAluno, definirCursoRemovido, salvarDadosAluno,
 } from "@/lib/dados/painel";
-import { obterAluno } from "@/lib/dados";
-import { clientePorEmail } from "@/lib/pagamentos";
+import { concluirCursoTeste, desfazerConclusaoTeste, obterAluno } from "@/lib/dados";
+import { cursosDoAluno } from "@/lib/area-aluno";
+import { clientePorEmail, cobrancaParaLiberacao, pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { liberarAcesso } from "@/lib/pagamentos/liberacao";
 import { cpfValido, emailValido, soDigitos, telefoneValido } from "@/lib/validacao";
 import { getCursos } from "@/lib/cursos";
 import { configuracoesDosCursos, definirCursoGratuito, definirCursosGratuitos, registrarEventoMatricula, salvarConfigLoja, salvarConfiguracaoCurso, salvarConfiguracoesCursos } from "@/lib/dados";
-import { asaasConfigurado, cobrancaParaLiberacao } from "@/lib/pagamentos/asaas";
 import { processarPagamento } from "@/lib/pagamentos/liberacao";
 import {
   apagarCupom, marcarContatado, MENSAGENS_PADRAO, normCupom, obterCupom, salvarCupom, salvarMensagensProntas,
@@ -89,6 +89,7 @@ export async function salvarConfiguracoes(f: FormData) {
     precoCertIndividual: precos[0] as number,
     precoCertEssencial: precos[1] as number,
     precoCertProfissional: precos[2] as number,
+    gateway: String(f.get("gateway")) === "asaas" ? "asaas" : "mercadopago",
   });
   revalidatePath("/", "layout");
   redirect("/admin/configuracoes?salvo=1");
@@ -98,7 +99,7 @@ export async function salvarConfiguracoes(f: FormData) {
 export async function matricularDeNovo(f: FormData) {
   await exigirAdmin("financeiro");
   const id = String(f.get("cobrancaId") ?? "");
-  if (!asaasConfigurado || !id) redirect("/admin/vendas");
+  if (pagamentoEmSimulacao || !id) redirect("/admin/vendas");
   try {
     const { pago, comprador, produto } = await cobrancaParaLiberacao(id);
     if (!pago || !produto) {
@@ -354,4 +355,36 @@ export async function cadastrarAlunoAcao(f: FormData) {
   }
   revalidatePath("/admin/alunos");
   redirect(ficha(email, "salvo=novo"));
+}
+
+/**
+ * Modo teste (só o dono): marca todas as aulas de todos os cursos liberados para este aluno
+ * como concluídas, para testar a emissão do certificado sem assistir às aulas.
+ */
+export async function concluirCursosTesteAcao(f: FormData) {
+  const quem = await exigirAdmin("alunos");
+  const email = String(f.get("email") ?? "").trim().toLowerCase();
+  if (!quem.dono) redirect(ficha(email, "erro=dono#teste"));
+  try {
+    const cursos = await cursosDoAluno(email);
+    for (const c of cursos) await concluirCursoTeste(email, c.curso.id, c.aulas.map((a) => a.id));
+  } catch {
+    redirect(ficha(email, "erro=teste#teste"));
+  }
+  revalidatePath("/", "layout");
+  redirect(ficha(email, "salvo=teste#teste"));
+}
+
+/** Desfaz o modo teste: o progresso volta ao que era antes. */
+export async function desfazerCursosTesteAcao(f: FormData) {
+  const quem = await exigirAdmin("alunos");
+  const email = String(f.get("email") ?? "").trim().toLowerCase();
+  if (!quem.dono) redirect(ficha(email, "erro=dono#teste"));
+  try {
+    await desfazerConclusaoTeste(email);
+  } catch {
+    redirect(ficha(email, "erro=teste#teste"));
+  }
+  revalidatePath("/", "layout");
+  redirect(ficha(email, "salvo=teste-desfeito#teste"));
 }

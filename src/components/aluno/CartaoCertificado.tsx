@@ -38,7 +38,11 @@ export function CartaoCertificado({
             ? "Grátis ao concluir o curso"
             : s.estado === "aguardando_pagamento" && s.regra.modo === "pago"
               ? creditos > 0 ? "Use um certificado do seu pacote" : `A partir de ${formatarPreco(s.regra.precoCentavos)}`
-              : "Disponível ao concluir o curso"}
+              : s.estado === "disponivel"
+                ? "Pagamento confirmado, pronto para emitir"
+                : s.estado === "emitido"
+                  ? "Certificado emitido"
+                  : "Disponível ao concluir o curso"}
         </p>
       </div>
       <div className="p-6">
