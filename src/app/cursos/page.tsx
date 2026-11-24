@@ -4,7 +4,7 @@ import { Catalogo } from "@/components/Catalogo";
 
 export const metadata: Metadata = { title: "Cursos" };
 
-type Props = { searchParams: Promise<{ busca?: string; categoria?: string }> };
+type Props = { searchParams: Promise<{ busca?: string; categoria?: string; tipo?: string }> };
 
 export default async function PaginaCursos({ searchParams }: Props) {
   const [cursos, sp] = await Promise.all([getCursosPublicos(), searchParams]);
@@ -20,7 +20,7 @@ export default async function PaginaCursos({ searchParams }: Props) {
         </div>
       </section>
       <section className="relative mx-auto -mt-14 max-w-7xl px-4 pb-24 sm:px-6">
-        <Catalogo cursos={cursos} buscaInicial={sp.busca ?? ""} categoriaInicial={sp.categoria ?? "Todas"} />
+        <Catalogo cursos={cursos} buscaInicial={sp.busca ?? ""} categoriaInicial={sp.categoria ?? "Todas"} tipoInicial={sp.tipo ?? "todos"} />
       </section>
     </>
   );
