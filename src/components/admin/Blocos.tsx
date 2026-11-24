@@ -51,10 +51,10 @@ export function Vazio({ children }: { children: React.ReactNode }) {
 }
 
 /** Aviso quando a tabela nova ainda não foi criada no Supabase. */
-export function AvisoSql() {
+export function AvisoSql({ arquivo = "painel-completo.sql" }: { arquivo?: string }) {
   return (
     <p className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-      <strong>Falta um passo no banco:</strong> rode o arquivo <code>painel-completo.sql</code> no Supabase (SQL Editor &gt; New query &gt; colar &gt; Run).
+      <strong>Falta um passo no banco:</strong> rode o arquivo <code>{arquivo}</code> no Supabase (SQL Editor &gt; New query &gt; colar &gt; Run).
       Até lá, esta parte não consegue salvar.
     </p>
   );

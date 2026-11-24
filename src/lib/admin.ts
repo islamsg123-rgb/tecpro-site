@@ -15,7 +15,7 @@ import { LISTA_SECOES, obterFuncionario, type Secao } from "./dados/painel";
 export const EMAIL_ADMIN_DEMO = "admin@demo.tecpro";
 export type { Secao } from "./dados/painel";
 
-function emailsDono(): string[] {
+export function emailsDono(): string[] {
   const lista = (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
   if (!lista.length && loginEmDemonstracao) return [EMAIL_ADMIN_DEMO];
   return lista;
