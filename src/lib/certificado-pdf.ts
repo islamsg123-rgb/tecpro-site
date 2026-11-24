@@ -132,7 +132,12 @@ export async function gerarPdfCertificado(c: Certificado & { cpf?: string | null
 
   // Rodapé com os dados da escola
   const site = SITE_OFICIAL.replace(/^https?:\/\//, "");
-  centralizado(page, `Tecpro Multi Ensino  ·  CNPJ ${CNPJ_TECPRO}  ·  ${site}`, 40, regular, 8, CINZA);
+  centralizado(
+    page,
+    "Os cursos têm como base legal o Decreto Presidencial nº 5.154 de 23 de julho de 2004, Art. 1º e 3º, e a Resolução CNE nº 04/99, Art. 11, Inciso II - Conselho Nacional de Educação.",
+    50, semi, 7.5, rgb(0.08, 0.08, 0.1),
+  );
+  centralizado(page, `Tecpro Multi Ensino  ·  CNPJ ${CNPJ_TECPRO}  ·  ${site}`, 36, regular, 8, CINZA);
 
   return pdf.save();
 }
