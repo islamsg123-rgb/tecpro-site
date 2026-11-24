@@ -4,7 +4,7 @@ import { cursoDoAluno, exigirAluno } from "@/lib/area-aluno";
 import { AnelProgresso } from "@/components/aluno/Progresso";
 import { CartaoCertificado } from "@/components/aluno/CartaoCertificado";
 import { situacaoCertificado } from "@/lib/certificados";
-import { obterAluno, saldoCreditos } from "@/lib/dados";
+import { obterAluno, obterConfigLoja, saldoCreditos } from "@/lib/dados";
 import { IconeCadeado, IconeCheck, IconeChevron, IconePlay } from "@/components/Icones";
 
 export const metadata: Metadata = { title: "Meu curso", robots: { index: false } };
@@ -15,8 +15,8 @@ export default async function MeuCurso({ params, searchParams }: Props) {
   const aluno = await exigirAluno();
   const { slug } = await params;
   const c = await cursoDoAluno(aluno.email, slug);
-  const [cert, registro, { erroNome }, creditos] = await Promise.all([
-    situacaoCertificado(aluno.email, c), obterAluno(aluno.email), searchParams, saldoCreditos(aluno.email).catch(() => 0),
+  const [cert, registro, { erroNome }, creditos, loja] = await Promise.all([
+    situacaoCertificado(aluno.email, c), obterAluno(aluno.email), searchParams, saldoCreditos(aluno.email).catch(() => 0), obterConfigLoja(),
   ]);
   const nomeSugerido = registro?.nome ?? "";
   const link = (id: string) => `/minha-conta/cursos/${slug}/aulas/${encodeURIComponent(id)}`;
@@ -80,7 +80,7 @@ export default async function MeuCurso({ params, searchParams }: Props) {
           })}
         </div>
 
-        <CartaoCertificado s={cert} slug={slug} faltam={c.total - c.feitas} nomeSugerido={nomeSugerido} erroNome={erroNome === "1"} creditos={creditos} />
+        <CartaoCertificado s={cert} slug={slug} faltam={c.total - c.feitas} nomeSugerido={nomeSugerido} erroNome={erroNome === "1"} creditos={creditos} whatsappSuporte={loja.whatsapp} emailSuporte={loja.emailContato} email={aluno.email} cursoNome={c.curso.nome} />
       </div>
     </>
   );

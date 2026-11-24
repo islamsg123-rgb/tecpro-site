@@ -5,7 +5,7 @@ import type { SituacaoCertificado } from "@/lib/certificados";
 import { IconeCadeado, IconeCertificado, IconeCheck } from "../Icones";
 
 export function CartaoCertificado({
-  s, slug, faltam, nomeSugerido, erroNome, creditos = 0,
+  s, slug, faltam, nomeSugerido, erroNome, creditos = 0, whatsappSuporte = "", emailSuporte = "", email = "", cursoNome = "",
 }: {
   s: SituacaoCertificado;
   slug: string;
@@ -14,7 +14,18 @@ export function CartaoCertificado({
   erroNome?: boolean;
   /** Certificados que sobraram de pacotes comprados */
   creditos?: number;
+  /** WhatsApp da escola (Configurações da loja), para pedir correção do nome */
+  whatsappSuporte?: string;
+  emailSuporte?: string;
+  email?: string;
+  cursoNome?: string;
 }) {
+  const zap = whatsappSuporte.replace(/\D/g, "");
+  const linkSuporte = zap
+    ? `https://wa.me/${zap.length <= 11 ? `55${zap}` : zap}?text=${encodeURIComponent(
+        `Olá! Concluí o curso ${cursoNome} e o meu nome está errado no certificado. Meu cadastro: ${nomeSugerido || "(sem nome)"}, ${email}. Nome correto: `,
+      )}`
+    : "";
   const pago = s.regra.modo === "pago";
   return (
     <aside id="certificado" className="h-fit scroll-mt-24 overflow-hidden rounded-3xl border border-slate-200 bg-white">
@@ -58,16 +69,25 @@ export function CartaoCertificado({
         )}
 
         {s.estado === "disponivel" && (
-          <form action={emitir} className="space-y-3">
-            <p className="text-sm text-slate-600">Tudo pronto! Confira como o seu nome deve aparecer. Depois de emitido, ele não pode ser alterado.</p>
-            <input type="hidden" name="slug" value={slug} />
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">Nome completo no certificado</span>
-              <input name="nome" defaultValue={nomeSugerido} required className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-marca-500 focus:ring-4 focus:ring-marca-100" />
-            </label>
-            {erroNome && <p className="text-xs font-medium text-red-600">Informe nome e sobrenome.</p>}
-            <button className="w-full rounded-full bg-laranja-500 py-3.5 font-bold text-marca-900 hover:bg-laranja-400">Emitir certificado</button>
-          </form>
+<div className="space-y-3">
+            <p className="text-sm text-slate-600">Tudo pronto! O certificado sai com o nome do seu cadastro:</p>
+            <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold text-marca-900">{nomeSugerido || "Nome não cadastrado"}</p>
+            {nomeSugerido.trim().split(/\s+/).length >= 2 && (
+              <form action={emitir}>
+                <input type="hidden" name="slug" value={slug} />
+                <button className="w-full rounded-full bg-laranja-500 py-3.5 font-bold text-marca-900 hover:bg-laranja-400">Está certo, emitir certificado</button>
+              </form>
+            )}
+            {erroNome && <p className="text-xs font-medium text-red-600">Seu cadastro está sem nome completo. Fale com o suporte para corrigir.</p>}
+            <p className="text-xs text-slate-500">Depois de emitido, o certificado não pode ser alterado. Se o nome estiver errado, fale com o suporte: confirmamos a sua identidade e corrigimos para você.</p>
+            {linkSuporte ? (
+              <a href={linkSuporte} target="_blank" rel="noreferrer" className="block rounded-full border border-emerald-600 py-3 text-center font-semibold text-emerald-700 hover:bg-emerald-50">
+                Nome errado? Falar no WhatsApp
+              </a>
+            ) : (
+              emailSuporte && <a href={`mailto:${emailSuporte}`} className="block text-center text-sm font-semibold text-marca-700 underline">Nome errado? Escreva para {emailSuporte}</a>
+            )}
+          </div>
         )}
 
         {s.estado === "emitido" && s.certificado && (

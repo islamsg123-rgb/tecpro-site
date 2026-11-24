@@ -65,11 +65,14 @@ export async function registrarVideo(slug: string, aulaId: string, assistidoSeg:
   return true;
 }
 
-/** Emite o certificado com o nome confirmado pelo aluno. */
+/**
+ * Emite o certificado com o nome do cadastro. O aluno não pode trocar o nome:
+ * se estiver errado, fala com o suporte, que corrige na ficha do aluno no painel.
+ */
 export async function emitir(f: FormData) {
   const aluno = await exigirAluno();
   const slug = String(f.get("slug"));
-  const nome = limparNome(String(f.get("nome") ?? ""));
+  const nome = limparNome((await obterAluno(aluno.email))?.nome ?? "");
   if (nome.split(" ").length < 2) redirect(`/minha-conta/cursos/${slug}?erroNome=1#certificado`);
   const c = await cursoDoAluno(aluno.email, slug);
   await emitirCertificado(aluno.email, c, nome);
