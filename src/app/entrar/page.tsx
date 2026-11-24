@@ -7,11 +7,11 @@ import { IconeCertificado, IconeGrafico, IconePlay } from "@/components/Icones";
 
 export const metadata: Metadata = { title: "Entrar", robots: { index: false } };
 
-type Props = { searchParams: Promise<{ erro?: string }> };
+type Props = { searchParams: Promise<{ erro?: string; continuar?: string }> };
 
 export default async function Entrar({ searchParams }: Props) {
   if (await alunoLogado()) redirect("/minha-conta");
-  const { erro } = await searchParams;
+  const { erro, continuar } = await searchParams;
   return (
     <section className="grid min-h-[calc(100vh-72px)] lg:grid-cols-2">
       <div className="relative hidden overflow-hidden bg-marca-900 p-14 text-white lg:flex lg:flex-col lg:justify-center">
@@ -35,6 +35,11 @@ export default async function Entrar({ searchParams }: Props) {
       </div>
       <div className="flex items-center justify-center px-4 py-16">
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-marca-900/5 sm:p-10">
+          {continuar && (
+            <p className="mb-6 rounded-2xl bg-laranja-500/15 p-4 text-sm font-semibold text-marca-900">
+              Entre com o seu e-mail para continuar o curso de onde parou. Seu progresso está salvo.
+            </p>
+          )}
           <FormularioEntrar
             demonstracao={loginEmDemonstracao}
             erroLink={erro === "link"}

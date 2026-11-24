@@ -53,6 +53,7 @@ export const MENU: Item[] = [
     icone: svg(<><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5" /><circle cx="17" cy="9" r="2.5" /><path d="M17 14.5c2.3 0 4 1.5 4.5 4" /></>),
     sub: [
       { rotulo: "Todos os alunos", href: "/admin/alunos" },
+      { rotulo: "Lembretes de estudo", href: "/admin/lembretes" },
       { rotulo: "Formados", href: "/admin/alunos/formados" },
       { rotulo: "Certificados", href: "/admin/certificados" },
       { rotulo: "Cadastrar aluno", href: "/admin/alunos/novo" },
