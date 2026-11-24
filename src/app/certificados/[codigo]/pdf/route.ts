@@ -1,4 +1,5 @@
 import { certificadoPorCodigo } from "@/lib/dados";
+import { dadosExtrasAluno } from "@/lib/dados/painel";
 import { gerarPdfCertificado } from "@/lib/certificado-pdf";
 import { SITE_OFICIAL } from "@/lib/site";
 import { slugify } from "@/lib/escola-avancada/adapter";
@@ -10,7 +11,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ codigo:
   if (!cert) return new Response("Certificado não encontrado", { status: 404 });
   // O link impresso no certificado é sempre o endereço oficial (nunca localhost ou endereço de teste).
   const base = SITE_OFICIAL;
-  const pdf = await gerarPdfCertificado(cert, `${base}/validar/${cert.codigo}`);
+  // CPF vem do cadastro do aluno; se não tiver (ou a coluna ainda não existir), o certificado sai sem ele.
+  const cpf = await dadosExtrasAluno(cert.email).then((d) => d.cpf).catch(() => null);
+  const pdf = await gerarPdfCertificado({ ...cert, cpf }, `${base}/validar/${cert.codigo}`);
   return new Response(Buffer.from(pdf), {
     headers: {
       "Content-Type": "application/pdf",
