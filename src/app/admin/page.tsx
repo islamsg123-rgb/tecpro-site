@@ -43,7 +43,7 @@ export default async function PainelRapido({ searchParams }: Props) {
     pessoasDoPainel(),
     listarFormados().catch(() => []),
     getCursos(),
-    verMensagens ? contarNovas().catch(() => ({ aluno: 0, loja: 0 })) : { aluno: 0, loja: 0 },
+    verMensagens ? contarNovas().catch(() => 0) : 0,
   ]);
   const acontecimentos = await ultimosAcontecimentos(verFinanceiro ? cobrancas : []);
   const fin = resumoFinanceiro(cobrancas);
@@ -71,14 +71,13 @@ export default async function PainelRapido({ searchParams }: Props) {
         </p>
       )}
 
-      {novas.aluno + novas.loja > 0 && (
+      {novas > 0 && (
         <Link
-          href={novas.aluno ? "/admin/mensagens/aluno" : "/admin/mensagens/loja"}
+          href="/admin/mensagens"
           className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-laranja-500/50 bg-laranja-300/20 p-4 text-sm text-marca-900 hover:border-laranja-500"
         >
           <span>
-            <strong>{novas.aluno + novas.loja === 1 ? "1 mensagem nova" : `${novas.aluno + novas.loja} mensagens novas`}</strong> no botão de ajuda
-            {" "}({novas.aluno} da Área do aluno, {novas.loja} da Loja virtual).
+            <strong>{novas === 1 ? "1 mensagem nova" : `${novas} mensagens novas`}</strong> no botão de ajuda do site.
           </span>
           <span className="font-semibold underline">Ver mensagens</span>
         </Link>

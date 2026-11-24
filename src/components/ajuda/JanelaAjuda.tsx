@@ -48,7 +48,7 @@ const Icone = ({ aberto }: { aberto: boolean }) =>
     </svg>
   );
 
-export function JanelaAjuda({ whatsapp }: { whatsapp: string }) {
+export function JanelaAjuda() {
   const pathname = usePathname() ?? "/";
   const [aberto, setAberto] = useState(false);
   const [tipo, setTipo] = useState("");
@@ -78,6 +78,33 @@ export function JanelaAjuda({ whatsapp }: { whatsapp: string }) {
     return () => document.removeEventListener("keydown", tecla);
   }, [aberto, quem]);
 
+  // Balãozinho "Precisa de ajuda?" que sai da bolinha de tempos em tempos (some quando a pessoa usa ou fecha).
+  const [balao, setBalao] = useState(false);
+  const [dispensado, setDispensado] = useState(false);
+  useEffect(() => {
+    try { if (sessionStorage.getItem("tecpro_balao_ajuda")) setDispensado(true); } catch { /* sem armazenamento */ }
+  }, []);
+  useEffect(() => {
+    if (dispensado || aberto) { setBalao(false); return; }
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let vezes = 0;
+    const ciclo = (espera: number) => {
+      timers.push(setTimeout(() => {
+        setBalao(true);
+        timers.push(setTimeout(() => {
+          setBalao(false);
+          if (++vezes < 4) ciclo(25000); // aparece no máximo 4 vezes por página
+        }, 6000));
+      }, espera));
+    };
+    ciclo(3000);
+    return () => timers.forEach(clearTimeout);
+  }, [dispensado, aberto, pathname]);
+  function dispensar() {
+    setDispensado(true);
+    try { sessionStorage.setItem("tecpro_balao_ajuda", "1"); } catch { /* sem armazenamento */ }
+  }
+
   // Fecha ao trocar de página.
   useEffect(() => setAberto(false), [pathname]);
 
@@ -87,7 +114,6 @@ export function JanelaAjuda({ whatsapp }: { whatsapp: string }) {
   const temBarraEmbaixo = /^\/cursos\/[^/]+$/.test(pathname);
   const naAreaDoAluno = pathname.startsWith("/minha-conta");
   const dica = TIPOS.find((t) => t.id === tipo)?.dica ?? "Escolha o assunto acima e conte o que aconteceu.";
-  const zap = whatsapp.replace(/\D/g, "");
 
   function novaMensagem() {
     setEnviada(false);
@@ -218,11 +244,7 @@ export function JanelaAjuda({ whatsapp }: { whatsapp: string }) {
                 <div className="border-t border-slate-100 px-5 py-3">
                   {estado.erro && <p className="mb-2 text-sm text-red-700" role="alert">{estado.erro}</p>}
                   <div className="flex items-center justify-between gap-3">
-                    {zap ? (
-                      <a href={`https://wa.me/${zap.length <= 11 ? `55${zap}` : zap}`} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-green-700 hover:underline">
-                        Prefere WhatsApp?
-                      </a>
-                    ) : <span />}
+                    <span />
                     <button disabled={!tipo || enviando} className="rounded-full bg-laranja-500 px-6 py-2.5 font-bold text-marca-900 hover:bg-laranja-400 disabled:opacity-50">
                       {enviando ? "Enviando…" : "Enviar"}
                     </button>
@@ -234,8 +256,24 @@ export function JanelaAjuda({ whatsapp }: { whatsapp: string }) {
         </>
       )}
 
+      {/* Balãozinho que sai da bolinha */}
+      <div
+        aria-hidden={!balao}
+        className={`absolute bottom-2 right-[68px] flex origin-right items-center gap-1 whitespace-nowrap rounded-2xl rounded-br-md bg-white py-2 pl-4 pr-2 text-sm font-semibold text-marca-900 shadow-lg ring-1 ring-slate-200 transition-all duration-500 ease-out ${balao && !aberto ? "translate-x-0 scale-100 opacity-100" : "pointer-events-none translate-x-3 scale-75 opacity-0"}`}
+      >
+        <button type="button" tabIndex={balao ? 0 : -1} onClick={() => { dispensar(); setAberto(true); }} className="hover:underline">
+          Precisa de ajuda? <span aria-hidden>👋</span>
+        </button>
+        <button type="button" tabIndex={balao ? 0 : -1} onClick={dispensar} aria-label="Fechar aviso" className="grid h-6 w-6 place-items-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-marca-900">
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6 6 18" /></svg>
+        </button>
+      </div>
+
+      {/* Onda suave em volta da bolinha enquanto o balão aparece */}
+      {balao && !aberto && <span className="pointer-events-none absolute inset-0 animate-ping rounded-full bg-laranja-500/50" aria-hidden />}
+
       <button
-        onClick={() => setAberto((v) => !v)}
+        onClick={() => { dispensar(); setAberto((v) => !v); }}
         aria-expanded={aberto}
         aria-label={aberto ? "Fechar ajuda" : "Precisa de ajuda? Fale com a gente"}
         title="Precisa de ajuda?"
