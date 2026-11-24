@@ -29,7 +29,7 @@ export default async function Cupons({ searchParams }: Props) {
     <>
       <h1 className="text-3xl font-extrabold text-marca-900">Cupons de desconto</h1>
       <p className="mt-2 max-w-3xl text-sm text-slate-500">
-        O aluno digita o cupom no checkout, na etapa do pagamento. O valor final nunca fica abaixo de R$ 5,00 (mínimo do Asaas).
+        O aluno digita o cupom no checkout, na etapa do pagamento. O valor final nunca fica abaixo de R$ 5,00 (mínimo para cobrança).
         O uso é contado quando o Pix, boleto ou cartão é gerado.
       </p>
       {tabelaFaltando && (

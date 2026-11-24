@@ -5,8 +5,9 @@ import { EVENTO_TOTAL } from "./TotalResumo";
 import { conferirCupom, pagar, salvarContato, type EstadoCheckout } from "@/app/checkout/acoes";
 import { formatarPreco } from "@/lib/formatar";
 import {
-  mascaraCartao, mascaraCep, mascaraCpf, mascaraTelefone,
+  cartaoValido, mascaraCartao, mascaraCep, mascaraCpf, mascaraTelefone, soDigitos, validadeValida,
 } from "@/lib/validacao";
+import { preCarregarSdk, tokenizarCartao } from "./mercadopago-navegador";
 import { IconeCadeado, IconeCartao, IconeCodigoBarras, IconePix } from "../Icones";
 
 type Forma = "PIX" | "CREDIT_CARD" | "BOLETO";
@@ -42,9 +43,17 @@ export function Campo({
   );
 }
 
+/** Onde o pagamento é processado (vem do servidor). */
+export interface InfoPagamento {
+  gateway: "mercadopago" | "asaas" | "simulador";
+  /** Public Key do Mercado Pago (não é secreta) */
+  chavePublica: string;
+}
+
 export function FormularioCheckout({
-  cursoId, precoCentavos, parcelas, tipo = "curso", nomeInicial, emailInicial, pacote = "",
+  cursoId, precoCentavos, parcelas, tipo = "curso", nomeInicial, emailInicial, pacote = "", pagamento,
 }: {
+  pagamento: InfoPagamento;
   cursoId: string;
   precoCentavos: number;
   parcelas: number[];
@@ -69,8 +78,14 @@ export function FormularioCheckout({
   // Avisa o resumo ao lado (TotalResumo) quando o cupom muda o total.
   useEffect(() => { window.dispatchEvent(new CustomEvent(EVENTO_TOTAL, { detail: valor })); }, [valor]);
   const [opcoes, setOpcoes] = useState(parcelas);
+  // Mercado Pago: o cartão vira um token no navegador antes de enviar.
+  const mp = pagamento.gateway === "mercadopago";
+  const [errosCartao, setErrosCartao] = useState<Record<string, string>>({});
+  const [erroCartao, setErroCartao] = useState("");
+  const [protegendo, setProtegendo] = useState(false);
+  useEffect(() => { if (mp && forma === "CREDIT_CARD") preCarregarSdk(); }, [mp, forma]);
 
-  const e = { ...(contato.campos ?? {}), ...(estado.campos ?? {}) };
+  const e = { ...(contato.campos ?? {}), ...(estado.campos ?? {}), ...errosCartao };
   const maxParcelas = opcoes[opcoes.length - 1] ?? 1;
   const formas = formasBase.map((f) =>
     f.id === "CREDIT_CARD" && maxParcelas > 1 ? { ...f, detalhe: `Em até ${maxParcelas}x` } : f,
@@ -101,6 +116,40 @@ export function FormularioCheckout({
     setOpcoes(r.parcelas);
   }
 
+  /** Confere o cartão, troca por um token do Mercado Pago e tira o número do cartão do envio. */
+  async function protegerCartao(dados: FormData): Promise<boolean> {
+    const v = (k: string) => String(dados.get(k) ?? "").trim();
+    const cartao = {
+      numero: soDigitos(v("numeroCartao")), nome: v("nomeNoCartao"), mes: soDigitos(v("mesValidade")),
+      ano: soDigitos(v("anoValidade")), cvv: soDigitos(v("cvv")), cpf: soDigitos(v("cpf")),
+    };
+    const erros: Record<string, string> = {};
+    if (!cartaoValido(cartao.numero)) erros.numeroCartao = "Número do cartão inválido.";
+    if (cartao.nome.length < 3) erros.nomeNoCartao = "Nome como está no cartão.";
+    if (!validadeValida(cartao.mes, cartao.ano)) erros.validade = "Validade inválida.";
+    if (cartao.cvv.length < 3 || cartao.cvv.length > 4) erros.cvv = "CVV inválido.";
+    setErrosCartao(erros);
+    setErroCartao("");
+    if (Object.keys(erros).length) {
+      setErroCartao("Confira os campos destacados.");
+      return false;
+    }
+    setProtegendo(true);
+    try {
+      const t = await tokenizarCartao(pagamento.chavePublica, cartao);
+      for (const k of ["numeroCartao", "nomeNoCartao", "mesValidade", "anoValidade", "cvv"]) dados.delete(k);
+      dados.set("mpToken", t.token);
+      dados.set("mpBandeira", t.bandeira);
+      if (t.emissor) dados.set("mpEmissor", t.emissor);
+      return true;
+    } catch (err) {
+      setErroCartao(err instanceof Error ? err.message : "Confira os dados do cartão.");
+      return false;
+    } finally {
+      setProtegendo(false);
+    }
+  }
+
   function tirarCupom() {
     setCupom(null);
     setCupomDigitado("");
@@ -112,10 +161,14 @@ export function FormularioCheckout({
     <form
       className="space-y-8"
       noValidate
-      onSubmit={(ev) => {
+      onSubmit={async (ev) => {
         // Envio manual para o formulário NÃO ser apagado se der algum erro.
         ev.preventDefault();
         const dados = new FormData(ev.currentTarget);
+        if (mp && forma === "CREDIT_CARD") {
+          const pronto = await protegerCartao(dados);
+          if (!pronto) return;
+        }
         startTransition(() => acao(dados));
       }}
     >
@@ -224,9 +277,18 @@ export function FormularioCheckout({
           </p>
         )}
         {forma === "BOLETO" && (
-          <p className="mt-6 rounded-2xl bg-marca-50 p-4 text-sm text-slate-600">
-            O boleto vence em 3 dias. A compensação leva até 3 dias úteis após o pagamento, e então liberamos o acesso.
-          </p>
+          <>
+            <p className="mt-6 rounded-2xl bg-marca-50 p-4 text-sm text-slate-600">
+              O boleto vence em 3 dias. A compensação leva até 3 dias úteis após o pagamento, e então liberamos o acesso.
+            </p>
+            {mp && (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <Campo nome="cepBoleto" rotulo="CEP" inputMode="numeric" autoComplete="postal-code" placeholder="00000-000" mascara={mascaraCep} erro={e.cepBoleto} />
+                <Campo nome="numeroBoleto" rotulo="Nº do endereço" placeholder="123 ou S/N" erro={e.numeroBoleto} />
+                <p className="text-xs text-slate-500 sm:col-span-2">O banco exige o endereço no boleto. Completamos rua e cidade pelo CEP.</p>
+              </div>
+            )}
+          </>
         )}
         {forma === "CREDIT_CARD" && (
           <div className="mt-6 grid gap-4 sm:grid-cols-6">
@@ -235,8 +297,12 @@ export function FormularioCheckout({
             <Campo nome="mesValidade" rotulo="Mês" inputMode="numeric" autoComplete="cc-exp-month" placeholder="MM" maxLength={2} erro={e.validade} className="sm:col-span-2" />
             <Campo nome="anoValidade" rotulo="Ano" inputMode="numeric" autoComplete="cc-exp-year" placeholder="AA" maxLength={4} className="sm:col-span-2" />
             <Campo nome="cvv" rotulo="CVV" inputMode="numeric" autoComplete="cc-csc" placeholder="123" maxLength={4} erro={e.cvv} className="sm:col-span-2" />
-            <Campo nome="cep" rotulo="CEP do titular" inputMode="numeric" autoComplete="postal-code" placeholder="00000-000" mascara={mascaraCep} erro={e.cep} className="sm:col-span-3" />
-            <Campo nome="numeroEndereco" rotulo="Nº do endereço" erro={e.numeroEndereco} className="sm:col-span-3" />
+            {!mp && (
+              <>
+                <Campo nome="cep" rotulo="CEP do titular" inputMode="numeric" autoComplete="postal-code" placeholder="00000-000" mascara={mascaraCep} erro={e.cep} className="sm:col-span-3" />
+                <Campo nome="numeroEndereco" rotulo="Nº do endereço" erro={e.numeroEndereco} className="sm:col-span-3" />
+              </>
+            )}
             <label className="block sm:col-span-6">
               <span className="mb-1.5 block text-sm font-medium text-slate-700">Parcelas</span>
               <select name="parcelas" className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-[15px]">
@@ -251,21 +317,21 @@ export function FormularioCheckout({
         )}
       </fieldset>
 
-      {estado.erro && (
+      {(erroCartao || estado.erro) && (
         <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
-          {estado.erro}
+          {erroCartao || estado.erro}
         </p>
       )}
 
       <button
         type="submit"
-        disabled={enviando}
+        disabled={enviando || protegendo}
         className="w-full rounded-full bg-laranja-500 py-4 text-lg font-bold text-marca-900 shadow-lg shadow-laranja-500/30 transition hover:bg-laranja-400 disabled:cursor-wait disabled:opacity-70"
       >
-        {enviando ? "Processando…" : textoBotao}
+        {enviando || protegendo ? "Processando…" : textoBotao}
       </button>
       <p className="flex items-center justify-center gap-2 text-xs text-slate-500">
-        <IconeCadeado className="h-4 w-4" /> Pagamento processado com segurança pelo Asaas
+        <IconeCadeado className="h-4 w-4" /> Pagamento processado com segurança {pagamento.gateway === "asaas" ? "pelo Asaas" : pagamento.gateway === "mercadopago" ? "pelo Mercado Pago" : "(modo de teste)"}
       </p>
       </>
       )}

@@ -108,12 +108,12 @@ export default async function Alunos({ searchParams }: Props) {
 
       <h2 id="eventos" className="mt-12 text-xl font-bold text-marca-900">Últimas tentativas de matrícula</h2>
       <p className="mt-1 text-sm text-slate-500">
-        O que aconteceu depois de cada pagamento: o aviso do Asaas e cada resposta da Escola Avançada. Mais recentes primeiro.
+        O que aconteceu depois de cada pagamento: o aviso do Mercado Pago (ou do Asaas) e cada resposta da Escola Avançada. Mais recentes primeiro.
       </p>
       {!eventos.length ? (
         <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-          Nada registrado ainda. Se você fez uma compra e nada aparece aqui, o aviso do Asaas não chegou ao site
-          (confira o webhook em Asaas &gt; Integrações &gt; Webhooks).
+          Nada registrado ainda. Se você fez uma compra e nada aparece aqui, o aviso de pagamento não chegou ao site
+          (abra a tela do pedido: ela também libera o acesso quando vê o pagamento aprovado).
         </p>
       ) : (
         <ul className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">

@@ -15,7 +15,7 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
   const secoes = ["painel", ...acesso.permissoes, ...(acesso.dono ? ["sistema"] : [])] as Parameters<typeof MenuLateral>[0]["secoes"];
   const avisos = [
     usandoDadosDeExemplo && "cursos de exemplo (falta a chave da Escola Avançada)",
-    pagamentoEmSimulacao && "pagamentos simulados (falta a chave do Asaas)",
+    pagamentoEmSimulacao && "pagamentos simulados (falta a chave do Mercado Pago ou do Asaas)",
     bancoEmDemonstracao && "banco de demonstração (falta o Supabase): as alterações somem quando o servidor reinicia",
   ].filter(Boolean);
 

@@ -39,7 +39,7 @@ export async function tabelaParaExportar(tipo: string): Promise<string[][] | nul
   if (tipo === "vendas") {
     const vendas = await listarCobrancas();
     return [
-      ["Data", "Descrição", "Cliente", "Forma", "Valor (R$)", "Situação", "Código Asaas"],
+      ["Data", "Descrição", "Cliente", "Forma", "Valor (R$)", "Situação", "Código do pagamento"],
       ...vendas.map((v) => [
         dataBR(v.criadoEm), v.descricao ?? "", v.cliente ?? "", nomeForma[v.forma] ?? v.forma,
         (v.valorCentavos / 100).toFixed(2).replace(".", ","), v.situacao, v.id,

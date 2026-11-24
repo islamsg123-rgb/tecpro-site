@@ -1,0 +1,75 @@
+"use client";
+
+/**
+ * Proteção do cartão no navegador com o SDK oficial do Mercado Pago (MercadoPago.js v2).
+ * Os dados do cartão vão direto do navegador para o Mercado Pago, que devolve um "token" de uso único.
+ * O nosso servidor só recebe esse token, nunca o número do cartão.
+ */
+
+interface SdkMercadoPago {
+  getPaymentMethods(p: { bin: string }): Promise<{ results?: { id: string; issuer?: { id?: number | string } }[] }>;
+  createCardToken(p: {
+    cardNumber: string; cardholderName: string; cardExpirationMonth: string; cardExpirationYear: string;
+    securityCode: string; identificationType: string; identificationNumber: string;
+  }): Promise<{ id: string }>;
+}
+
+declare global {
+  interface Window {
+    MercadoPago?: new (chave: string, opcoes?: { locale?: string }) => SdkMercadoPago;
+  }
+}
+
+let carregando: Promise<void> | null = null;
+
+function carregarSdk(): Promise<void> {
+  if (window.MercadoPago) return Promise.resolve();
+  carregando ??= new Promise<void>((ok, falha) => {
+    const s = document.createElement("script");
+    s.src = "https://sdk.mercadopago.com/js/v2";
+    s.async = true;
+    s.onload = () => ok();
+    s.onerror = () => {
+      carregando = null;
+      falha(new Error("sdk"));
+    };
+    document.head.appendChild(s);
+  });
+  return carregando;
+}
+
+/** Já começa a carregar quando o aluno escolhe "Cartão", para o clique em "Pagar" ser rápido. */
+export function preCarregarSdk() {
+  carregarSdk().catch(() => {});
+}
+
+export interface CartaoDigitado {
+  numero: string; nome: string; mes: string; ano: string; cvv: string; cpf: string;
+}
+
+export async function tokenizarCartao(chavePublica: string, c: CartaoDigitado): Promise<{ token: string; bandeira: string; emissor?: string }> {
+  try {
+    await carregarSdk();
+  } catch {
+    throw new Error("Não conseguimos carregar o pagamento seguro. Confira sua internet e tente de novo.");
+  }
+  const mp = new window.MercadoPago!(chavePublica, { locale: "pt-BR" });
+  const metodos = await mp.getPaymentMethods({ bin: c.numero.slice(0, 8) }).catch(() => null);
+  const metodo = metodos?.results?.[0];
+  if (!metodo) throw new Error("Não reconhecemos este cartão. Confira o número.");
+  const ano = c.ano.length === 2 ? `20${c.ano}` : c.ano;
+  try {
+    const { id } = await mp.createCardToken({
+      cardNumber: c.numero,
+      cardholderName: c.nome,
+      cardExpirationMonth: c.mes.padStart(2, "0"),
+      cardExpirationYear: ano,
+      securityCode: c.cvv,
+      identificationType: "CPF",
+      identificationNumber: c.cpf,
+    });
+    return { token: id, bandeira: metodo.id, emissor: metodo.issuer?.id != null ? String(metodo.issuer.id) : undefined };
+  } catch {
+    throw new Error("Confira os dados do cartão (número, validade e código de segurança).");
+  }
+}
