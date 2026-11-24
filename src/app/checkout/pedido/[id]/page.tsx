@@ -63,7 +63,7 @@ export default async function Pedido({ params }: Props) {
           <div>
             <p className="font-bold text-marca-900">Confira seu e-mail</p>
             <p className="mt-1 text-sm text-slate-600">
-              Enviamos um e-mail de boas-vindas. Para estudar, entre na Área do aluno com este mesmo e-mail: você recebe um link de acesso, sem senha. Se não encontrar, olhe a caixa de spam ou promoções.
+              Enviamos um e-mail de boas-vindas. Para estudar, entre na Área do aluno com este mesmo e-mail: você recebe um link de acesso (e pode criar uma senha, se preferir). Se não encontrar, olhe a caixa de spam ou promoções.
             </p>
           </div>
         </div>

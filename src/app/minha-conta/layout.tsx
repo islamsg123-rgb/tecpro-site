@@ -13,9 +13,10 @@ export default async function LayoutAluno({ children }: { children: React.ReactN
     <div className="min-h-[calc(100vh-72px)] bg-[#f3f6fb]">
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
-          <nav className="flex items-center gap-1 text-sm font-semibold">
+          <nav className="-mx-1 flex max-w-full items-center gap-1 overflow-x-auto whitespace-nowrap text-sm font-semibold">
             <Link href="/minha-conta" className="rounded-full px-4 py-2 text-marca-900 hover:bg-marca-50">Meus cursos</Link>
             <Link href="/cursos" className="rounded-full px-4 py-2 text-slate-500 hover:bg-marca-50 hover:text-marca-900">Novos cursos</Link>
+            <Link href="/minha-conta/senha" className="rounded-full px-4 py-2 text-slate-500 hover:bg-marca-50 hover:text-marca-900">Minha senha</Link>
             {temPainel && <Link href="/admin" className="rounded-full bg-marca-900 px-4 py-2 text-white hover:bg-marca-800">Painel</Link>}
           </nav>
           <div className="flex items-center gap-3 text-sm">

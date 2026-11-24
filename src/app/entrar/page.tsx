@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { alunoLogado, loginEmDemonstracao } from "@/lib/auth";
+import { urlSupabase } from "@/lib/supabase-url";
 import { FormularioEntrar } from "@/components/aluno/FormularioEntrar";
 import { IconeCertificado, IconeGrafico, IconePlay } from "@/components/Icones";
 
@@ -34,7 +35,11 @@ export default async function Entrar({ searchParams }: Props) {
       </div>
       <div className="flex items-center justify-center px-4 py-16">
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl shadow-marca-900/5 sm:p-10">
-          <FormularioEntrar demonstracao={loginEmDemonstracao} erroLink={erro === "link"} />
+          <FormularioEntrar
+            demonstracao={loginEmDemonstracao}
+            erroLink={erro === "link"}
+            supabase={loginEmDemonstracao ? undefined : { url: urlSupabase()!, chave: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! }}
+          />
         </div>
       </div>
     </section>
