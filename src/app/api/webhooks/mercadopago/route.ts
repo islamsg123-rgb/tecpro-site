@@ -6,10 +6,9 @@ import { registrarEventoMatricula } from "@/lib/dados";
 
 /**
  * Avisos automáticos do Mercado Pago (webhook).
- * Cada pagamento já é criado com este endereço (notification_url), então não precisa cadastrar nada.
- * Opcional, mais seguro: em Mercado Pago > Suas integrações > (aplicação) > Webhooks, cadastrar
- *   URL: https://SEU-DOMINIO/api/webhooks/mercadopago   Evento: Pagamentos
- * e colar a "Assinatura secreta" em MERCADOPAGO_WEBHOOK_SECRET na Vercel.
+ * Cadastrar em Mercado Pago > Suas integrações > (aplicação) > Webhooks:
+ *   URL: https://SEU-DOMINIO/api/webhooks/mercadopago   Evento: "Order (Mercado Pago)"
+ * Opcional, mais seguro: colar a "Assinatura secreta" em MERCADOPAGO_WEBHOOK_SECRET na Vercel.
  *
  * Mesmo sem a assinatura, um aviso falso não libera nada: o site sempre consulta o pagamento
  * direto no Mercado Pago (com o nosso Access Token) antes de liberar.
@@ -35,8 +34,8 @@ export async function POST(req: Request) {
   const tipo = url.searchParams.get("type") ?? url.searchParams.get("topic") ?? corpo?.type ?? corpo?.topic ?? "";
   const id = String(url.searchParams.get("data.id") ?? url.searchParams.get("id") ?? corpo?.data?.id ?? "");
 
-  // Só interessam avisos de pagamento (os outros, como "merchant_order", são ignorados).
-  if (tipo !== "payment" || !/^\d+$/.test(id)) return NextResponse.json({ ok: true, ignorado: tipo || "sem tipo" });
+  // Só interessam avisos de pedidos ("order"); os outros são ignorados.
+  if (tipo !== "order" || !/^ORD[A-Z0-9]+$/i.test(id)) return NextResponse.json({ ok: true, ignorado: tipo || "sem tipo" });
   if (!mpConfigurado) return NextResponse.json({ ok: true, ignorado: "Mercado Pago não configurado" });
 
   if (!assinaturaConfere(req, id)) {
@@ -49,14 +48,14 @@ export async function POST(req: Request) {
   }
 
   const cobranca = await consultarCobrancaMp(id);
-  if (!cobranca) return NextResponse.json({ erro: "pagamento não encontrado" }, { status: 500 });
-  console.info(`[webhook-mp] pagamento ${id} situação=${cobranca.situacao} produto=${cobranca.produto ? "sim" : "não"}`);
+  if (!cobranca) return NextResponse.json({ erro: "pedido não encontrado" }, { status: 500 });
+  console.info(`[webhook-mp] pedido ${id} situação=${cobranca.situacao} produto=${cobranca.produto ? "sim" : "não"}`);
   if (cobranca.situacao !== "pago") return NextResponse.json({ ok: true, situacao: cobranca.situacao });
 
   await registrarEventoMatricula(
     "aviso do Mercado Pago",
     Boolean(cobranca.produto),
-    `Pagamento ${id} aprovado` + (cobranca.produto ? "" : " ignorado: não indica um curso ou certificado do site"),
+    `Pedido ${id} pago` + (cobranca.produto ? "" : " ignorado: não indica um curso ou certificado do site"),
   );
   if (!cobranca.produto) return NextResponse.json({ ok: true, ignorado: "sem produto" });
 
