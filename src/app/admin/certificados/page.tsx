@@ -5,6 +5,7 @@ import { getCursos } from "@/lib/cursos";
 import { listarCertificados, listarCertificadosPagos } from "@/lib/dados";
 import { dataBR } from "@/lib/admin-relatorios";
 import { BotaoExportar } from "@/components/admin/BotaoExportar";
+import { Dica } from "@/components/admin/Dica";
 
 export const metadata: Metadata = { title: "Certificados" };
 export const dynamic = "force-dynamic";
@@ -75,7 +76,11 @@ export default async function Certificados({ searchParams }: Props) {
                   </td>
                   <td className="px-5 py-3 text-slate-600">{c.cursoNome} · {c.cargaHoraria}h</td>
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">{dataBR(c.emitidoEm)}</td>
-                  <td className="px-5 py-3 text-slate-600">{pago.has(`${c.email}|${c.cursoId}`) ? "Pago" : "Grátis"}</td>
+                  <td className="px-5 py-3 text-slate-600">
+                    <Dica texto={pago.has(`${c.email}|${c.cursoId}`) ? "O aluno pagou por este certificado." : "Saiu sem cobrança, porque o curso era pago ou o certificado estava configurado como grátis."}>
+                      {pago.has(`${c.email}|${c.cursoId}`) ? "Pago" : "Grátis"}
+                    </Dica>
+                  </td>
                   <td className="whitespace-nowrap px-5 py-3 text-right">
                     <a href={`/certificados/${c.codigo}/pdf`} target="_blank" rel="noopener" className="font-semibold text-marca-700 hover:underline">PDF</a>
                     <Link href={`/validar/${c.codigo}`} className="ml-4 font-semibold text-marca-700 hover:underline">Validar</Link>

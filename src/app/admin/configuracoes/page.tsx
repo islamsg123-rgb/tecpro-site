@@ -4,6 +4,7 @@ import { obterConfigLoja } from "@/lib/dados";
 import { situacaoChaves } from "@/lib/pagamentos";
 import { Titulo } from "@/components/admin/Blocos";
 import { salvarConfiguracoes } from "../acoes";
+import { Dica } from "@/components/admin/Dica";
 
 export const metadata: Metadata = { title: "Configurações da loja" };
 export const dynamic = "force-dynamic";
@@ -70,9 +71,11 @@ export default async function Configuracoes({ searchParams }: Props) {
               <label key={valor} className="flex cursor-pointer flex-wrap items-center gap-3 rounded-2xl border border-slate-200 p-4 has-[:checked]:border-marca-900 has-[:checked]:bg-marca-50">
                 <input type="radio" name="gateway" value={valor} defaultChecked={(loja.gateway ?? "mercadopago") === valor} className="h-4 w-4 accent-marca-900" />
                 <span className="font-semibold text-marca-900">{rotulo}</span>
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ligado ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
-                  {ligado ? `ligado${modo ? ` (${modo})` : ""}` : "sem chave na Vercel"}
-                </span>
+                <Dica texto={!ligado ? "A chave deste sistema não está cadastrada na Vercel. Sem ela, ele não consegue receber pagamentos." : modo === "chave de TESTE" ? "Está ligado, mas com chave de teste: os pagamentos são de mentira. Troque pela chave de produção para vender de verdade." : "A chave está cadastrada na Vercel e o sistema pode receber pagamentos."}>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ligado ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
+                    {ligado ? `ligado${modo ? ` (${modo})` : ""}` : "sem chave na Vercel"}
+                  </span>
+                </Dica>
               </label>
             ))}
           </div>

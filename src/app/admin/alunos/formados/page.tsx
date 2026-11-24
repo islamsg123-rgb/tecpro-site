@@ -6,6 +6,7 @@ import { formatarPreco } from "@/lib/formatar";
 import { listarFormados } from "@/lib/painel-resumo";
 import { dataCurta, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { BotaoExportar } from "@/components/admin/BotaoExportar";
+import { Dica } from "@/components/admin/Dica";
 
 export const metadata: Metadata = { title: "Formados" };
 export const dynamic = "force-dynamic";
@@ -23,9 +24,9 @@ export default async function Formados() {
         Formados
       </Titulo>
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <Numero rotulo="Cursos concluídos" valor={String(formados.length)} detalhe={`${new Set(formados.map((f) => f.email)).size} pessoas`} />
-        <Numero rotulo="Certificados emitidos" valor={String(emitidos)} cor="verde" />
-        <Numero rotulo="Falta pagar o certificado" valor={String(faltaPagar)} cor="laranja" href="/admin/financeiro/devedores" />
+        <Numero rotulo="Cursos concluídos" valor={String(formados.length)} detalhe={`${new Set(formados.map((f) => f.email)).size} pessoas`} dica="Quantos cursos foram terminados (todas as aulas feitas). Embaixo, quantas pessoas diferentes concluíram." />
+        <Numero rotulo="Certificados emitidos" valor={String(emitidos)} cor="verde" dica="Certificados que já foram gerados e têm código de validação." />
+        <Numero rotulo="Falta pagar o certificado" valor={String(faltaPagar)} cor="laranja" href="/admin/financeiro/devedores" dica="Alunos que concluíram um curso grátis e ainda não pagaram o certificado." />
       </div>
       {!formados.length ? (
         <Vazio>Ninguém concluiu um curso ainda.</Vazio>
@@ -50,11 +51,17 @@ export default async function Formados() {
                   <td className="px-5 py-3 text-slate-700">{f.cursoNome}</td>
                   <td className="px-5 py-3">
                     {f.certificado ? (
-                      <Link href={`/validar/${f.certificado.codigo}`} className="rounded-full bg-green-100 px-2.5 py-1 font-mono text-xs font-semibold text-green-800">{f.certificado.codigo}</Link>
+                      <Dica temLink texto="Certificado já emitido. Este é o código de validação. Clique para abrir a página que confirma que ele é verdadeiro.">
+                        <Link href={`/validar/${f.certificado.codigo}`} className="rounded-full bg-green-100 px-2.5 py-1 font-mono text-xs font-semibold text-green-800">{f.certificado.codigo}</Link>
+                      </Dica>
                     ) : f.faltaPagarCertificado ? (
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">falta pagar {f.precoCertificadoCentavos ? formatarPreco(f.precoCertificadoCentavos) : ""}</span>
+                      <Dica texto="Concluiu um curso grátis. O certificado é pago e o aluno ainda não pagou. Aparece aqui mesmo que ele não tenha clicado em emitir.">
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">falta pagar {f.precoCertificadoCentavos ? formatarPreco(f.precoCertificadoCentavos) : ""}</span>
+                      </Dica>
                     ) : (
-                      <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">pode emitir</span>
+                      <Dica texto="Certificado liberado (curso pago ou certificado já pago), mas o aluno ainda não clicou para gerar.">
+                        <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">pode emitir</span>
+                      </Dica>
                     )}
                   </td>
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">{dataCurta(f.certificado?.emitidoEm)}</td>

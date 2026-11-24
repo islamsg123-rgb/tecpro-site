@@ -3,6 +3,7 @@ import { exigirAdmin } from "@/lib/admin";
 import { listarFuncionarios, SECOES, type Secao } from "@/lib/dados/painel";
 import { AvisoSql, Caixa, Titulo, Vazio } from "@/components/admin/Blocos";
 import { alternarFuncionario, excluirFuncionario, salvarFuncionarioAcao } from "../acoes";
+import { Dica } from "@/components/admin/Dica";
 
 export const metadata: Metadata = { title: "Funcionários" };
 export const dynamic = "force-dynamic";
@@ -39,11 +40,11 @@ export default async function Funcionarios({ searchParams }: Props) {
                 <li key={f.email} className={`rounded-2xl border bg-white p-5 ${f.ativo ? "border-slate-200" : "border-dashed border-slate-300 opacity-70"}`}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-bold text-marca-900">{f.nome} {!f.ativo && <span className="ml-1 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-600">bloqueado</span>}</p>
+                      <p className="font-bold text-marca-900">{f.nome} {!f.ativo && <Dica texto="Este funcionário não consegue entrar no painel até ser desbloqueado." className="ml-1"><span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-600">bloqueado</span></Dica>}</p>
                       <p className="text-sm text-slate-500">{f.email}</p>
                       <p className="mt-2 flex flex-wrap gap-1.5">
-                        <span className="rounded-full bg-marca-50 px-2.5 py-1 text-xs font-semibold text-marca-700">Painel rápido</span>
-                        {f.permissoes.map((p) => <span key={p} className="rounded-full bg-marca-50 px-2.5 py-1 text-xs font-semibold text-marca-700">{SECOES[p]}</span>)}
+                        <Dica texto="Todo funcionário vê o Painel rápido (só com os números das partes que ele pode acessar)."><span className="rounded-full bg-marca-50 px-2.5 py-1 text-xs font-semibold text-marca-700">Painel rápido</span></Dica>
+                        {f.permissoes.map((p) => <Dica key={p} texto={`Este funcionário pode abrir e mexer na parte ${SECOES[p]} do painel.`}><span className="rounded-full bg-marca-50 px-2.5 py-1 text-xs font-semibold text-marca-700">{SECOES[p]}</span></Dica>)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2 text-xs font-semibold">
