@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { entrarDemonstracao, loginEmDemonstracao, sairDemonstracao, supabaseDoServidor } from "@/lib/auth";
 import { emailValido } from "@/lib/validacao";
+import { SITE_OFICIAL } from "@/lib/site";
 
 export interface EstadoEntrar {
   erro?: string;
@@ -20,7 +21,11 @@ export async function entrar(_: EstadoEntrar, f: FormData): Promise<EstadoEntrar
   }
 
   const h = await headers();
-  const origem = process.env.NEXT_PUBLIC_SITE_URL ?? h.get("origin") ?? `https://${h.get("host")}`;
+  // O link volta para o MESMO endereço em que o aluno pediu: o login guarda um código no navegador
+  // (cookie) daquele endereço. Se o link levasse para outro endereço, o login falhava ("link expirou").
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  const origem = host ? `${proto}://${host}` : (process.env.NEXT_PUBLIC_SITE_URL ?? SITE_OFICIAL);
   const { error } = await (await supabaseDoServidor()).auth.signInWithOtp({
     email,
     options: { emailRedirectTo: `${origem}/auth/callback`, shouldCreateUser: true },

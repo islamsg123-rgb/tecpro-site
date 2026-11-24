@@ -44,7 +44,7 @@ export default async function Checkout({ params }: Props) {
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_380px] lg:items-start">
           {gratis ? (
-            <FormularioGratis cursoId={curso.id} emailInicial={logado?.email} nomeInicial={registro?.nome ?? undefined} cidadeInicial={extras?.cidade ?? undefined} estadoInicial={extras?.estado ?? undefined} />
+            <FormularioGratis cursoId={curso.id} emailInicial={logado?.email} nomeInicial={registro?.nome ?? undefined} cidadeInicial={extras?.cidade ?? undefined} estadoInicial={extras?.estado ?? undefined} cpfInicial={extras?.cpf ?? undefined} telefoneInicial={extras?.telefone ?? undefined} />
           ) : (
             <FormularioCheckout cursoId={curso.id} precoCentavos={curso.precoCentavos} parcelas={opcoesParcelas(curso.precoCentavos)} />
           )}

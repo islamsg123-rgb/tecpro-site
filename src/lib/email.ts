@@ -29,14 +29,15 @@ const escapar = (t: string) =>
  * Boas-vindas depois da compra. Não leva senha: o aluno entra no site com o próprio e-mail
  * (link mágico), então nada sensível viaja no e-mail.
  */
-export function emailBoasVindas(nome: string, curso: string, siteUrl: string) {
+export function emailBoasVindas(nome: string, curso: string, siteUrl: string, pago = true) {
   const primeiro = nome.trim().split(/\s+/)[0] || "aluno";
   const link = `${siteUrl.replace(/\/+$/, "")}/entrar`;
   const assunto = `Seu acesso ao curso ${curso} está liberado`;
+  const abertura = pago ? "Seu pagamento foi confirmado e o curso" : "Sua matrícula foi feita e o curso";
   const texto = [
     `Olá, ${primeiro}!`,
     ``,
-    `Seu pagamento foi confirmado e o curso ${curso} já está liberado.`,
+    `${abertura} ${curso} já está liberado.`,
     ``,
     `Para assistir às aulas, entre em ${link} com este mesmo e-mail. Você vai receber um link de acesso, sem precisar de senha.`,
     ``,
@@ -49,7 +50,7 @@ export function emailBoasVindas(nome: string, curso: string, siteUrl: string) {
 <tr><td style="background:#011749;padding:20px 28px;color:#ffffff;font-size:20px;font-weight:bold">TECPRO <span style="color:#FFA500">Multi Ensino</span></td></tr>
 <tr><td style="padding:28px">
 <p style="font-size:18px;font-weight:bold;margin:0 0 12px">Olá, ${escapar(primeiro)}!</p>
-<p style="font-size:15px;line-height:1.6;margin:0 0 12px">Seu pagamento foi confirmado e o curso <strong>${escapar(curso)}</strong> já está liberado.</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 12px">${abertura} <strong>${escapar(curso)}</strong> já está liberado.</p>
 <p style="font-size:15px;line-height:1.6;margin:0 0 24px">Para assistir às aulas, entre na Área do aluno com este mesmo e-mail. Você recebe um link de acesso, sem precisar de senha.</p>
 <p style="margin:0 0 24px"><a href="${escapar(link)}" style="display:inline-block;background:#FFA500;color:#011749;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:999px">Acessar meu curso</a></p>
 <p style="font-size:13px;color:#64748b;margin:0">Bons estudos!<br>Tecpro Multi Ensino</p>
