@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { exigirAdmin } from "@/lib/admin";
 import { obterConfigLoja } from "@/lib/dados";
-import { chavesConfiguradas } from "@/lib/pagamentos";
+import { situacaoChaves } from "@/lib/pagamentos";
 import { Titulo } from "@/components/admin/Blocos";
 import { salvarConfiguracoes } from "../acoes";
 
@@ -26,7 +26,7 @@ function Chave({ nome, ligado, titulo, texto }: { nome: string; ligado: boolean;
 
 export default async function Configuracoes({ searchParams }: Props) {
   await exigirAdmin("loja");
-  const [{ salvo, erro }, loja] = await Promise.all([searchParams, obterConfigLoja()]);
+  const [{ salvo, erro }, loja, chavesConfiguradas] = await Promise.all([searchParams, obterConfigLoja(), situacaoChaves()]);
   const vitalicio = loja.mesesDeAcesso === null;
 
   return (

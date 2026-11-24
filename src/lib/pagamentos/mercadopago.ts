@@ -9,7 +9,7 @@ import { SITE_OFICIAL } from "../site";
  * Integração com o Mercado Pago (Checkout Transparente, API /v1/payments). Docs: https://www.mercadopago.com.br/developers
  *
  * Variáveis na Vercel:
- *  - MERCADOPAGO_ACCESS_TOKEN: "Access Token" (TEST-... nas credenciais de teste, APP_USR-... nas de produção). Secreto.
+ *  - MERCADOPAGO_ACCESS_TOKEN: "Access Token" (TEST-... ou APP_USR-...; o modo de teste é detectado sozinho). Secreto.
  *  - MERCADOPAGO_PUBLIC_KEY:   "Public Key" (usada no navegador para proteger os dados do cartão). Não é secreta.
  *  - MERCADOPAGO_WEBHOOK_SECRET (opcional): "Assinatura secreta" dos webhooks, para conferir que o aviso veio do Mercado Pago.
  *
@@ -26,8 +26,25 @@ const URL_BASE = process.env.MERCADOPAGO_API_URL || "https://api.mercadopago.com
 
 export const mpConfigurado = Boolean(TOKEN);
 export const chavePublicaMp = process.env.MERCADOPAGO_PUBLIC_KEY ?? "";
-/** Credenciais de teste (sandbox) começam com "TEST-". */
-export const mpEmTeste = Boolean(TOKEN?.startsWith("TEST-"));
+/**
+ * Credenciais de teste: as antigas começam com "TEST-"; as novas (APP_USR-...) são de um "usuário de teste",
+ * que o Mercado Pago marca com a etiqueta "test_user". MERCADOPAGO_MODO=teste/producao força o modo.
+ */
+const gTeste = globalThis as unknown as { __mpEmTeste?: Promise<boolean> };
+export function mpEmTeste(): Promise<boolean> {
+  if (!TOKEN) return Promise.resolve(false);
+  const modo = process.env.MERCADOPAGO_MODO?.toLowerCase();
+  if (modo === "teste") return Promise.resolve(true);
+  if (modo === "producao" || modo === "produção") return Promise.resolve(false);
+  if (TOKEN.startsWith("TEST-")) return Promise.resolve(true);
+  gTeste.__mpEmTeste ??= chamar<{ tags?: string[]; nickname?: string; email?: string }>("/users/me")
+    .then((u) => Boolean(u.tags?.includes("test_user") || /^TESTUSER|^TEST_USER/i.test(u.nickname ?? "") || /@testuser\.com$/i.test(u.email ?? "")))
+    .catch(() => {
+      gTeste.__mpEmTeste = undefined; // tenta de novo na próxima vez
+      return false;
+    });
+  return gTeste.__mpEmTeste;
+}
 
 type Json = Record<string, unknown>;
 

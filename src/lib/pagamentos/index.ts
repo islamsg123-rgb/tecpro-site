@@ -38,11 +38,13 @@ export async function gatewayAtivo(): Promise<GatewayAtivo> {
 /** O que o formulário do checkout precisa saber para mostrar os campos certos. */
 export async function infoCheckout(): Promise<{ gateway: GatewayAtivo; chavePublica: string; emTeste: boolean }> {
   const gateway = await gatewayAtivo();
-  return { gateway, chavePublica: gateway === "mercadopago" ? chavePublicaMp : "", emTeste: gateway === "mercadopago" && mpEmTeste };
+  return { gateway, chavePublica: gateway === "mercadopago" ? chavePublicaMp : "", emTeste: gateway === "mercadopago" && (await mpEmTeste()) };
 }
 
 /** Situação das chaves, para o painel. */
-export const chavesConfiguradas = { mercadopago: mpConfigurado, asaas: asaasConfigurado, mercadopagoEmTeste: mpEmTeste, mercadopagoChavePublica: Boolean(chavePublicaMp) };
+export async function situacaoChaves() {
+  return { mercadopago: mpConfigurado, asaas: asaasConfigurado, mercadopagoEmTeste: await mpEmTeste(), mercadopagoChavePublica: Boolean(chavePublicaMp) };
+}
 
 function gatewayDoId(id: string): GatewayAtivo {
   if (id.startsWith("sim_")) return "simulador";
