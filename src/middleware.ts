@@ -23,7 +23,7 @@ export async function middleware(req: NextRequest) {
 
   // Veio do e-mail de lembrete sem login: depois de entrar, volta para o curso.
   const voltar = req.cookies.get("tecpro_voltar")?.value;
-  if (data.user && voltar && req.nextUrl.pathname === "/minha-conta" && /^\/minha-conta\/cursos\/[a-z0-9-]+$/i.test(voltar)) {
+  if (data.user && voltar && req.nextUrl.pathname === "/minha-conta" && /^\/minha-conta\/cursos\/[a-z0-9-]+(\/certificado)?$/i.test(voltar)) {
     const ir = NextResponse.redirect(new URL(voltar, req.url));
     resp.cookies.getAll().forEach((c) => ir.cookies.set(c));
     ir.cookies.delete("tecpro_voltar");

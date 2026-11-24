@@ -17,6 +17,7 @@ async function lerTudo(
 }
 import { getCursos, getModulos } from "./cursos";
 import { listarCarrinhos } from "./dados/carrinhos";
+import { telefonesDemonstracao } from "./dados/painel";
 import { emailConfigurado, emailInscricao, emailLembrete, emailNuncaComecou, enviarEmail } from "./email";
 import { SITE_OFICIAL } from "./site";
 
@@ -344,9 +345,9 @@ async function todosCursosRemovidos(): Promise<Set<string>> {
 }
 
 /** Telefone do aluno: o da ficha; se não tiver, o que ele digitou no checkout. */
-async function telefonesDosAlunos(): Promise<Map<string, string>> {
+export async function telefonesDosAlunos(): Promise<Map<string, string>> {
   const out = new Map<string, string>();
-  if (bancoEmDemonstracao) return out;
+  if (bancoEmDemonstracao) return telefonesDemonstracao();
   const [carr, fichas] = await Promise.all([
     lerTudo((de, ate) => db().from("carrinhos").select("email, telefone, criado_em").not("telefone", "is", null).order("criado_em", { ascending: false }).order("email").range(de, ate)).catch(() => []),
     lerTudo((de, ate) => db().from("alunos").select("email, telefone").not("telefone", "is", null).order("email").range(de, ate)).catch(() => []),

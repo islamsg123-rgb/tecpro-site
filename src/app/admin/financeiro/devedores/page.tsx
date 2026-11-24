@@ -4,6 +4,10 @@ import { exigirAdmin } from "@/lib/admin";
 import { formatarPreco } from "@/lib/formatar";
 import { agruparDevedores, cobrancasEmAtraso, cobrancasParaRelatorio, listarFormados } from "@/lib/painel-resumo";
 import { listarCarrinhos } from "@/lib/dados/carrinhos";
+import { listarAlunos, obterConfigLoja } from "@/lib/dados";
+import { telefonesDosAlunos } from "@/lib/lembretes";
+import { linkEmitirCertificado, mensagemCertificado } from "@/lib/whatsapp-certificado";
+import { BotaoWhatsCertificado } from "@/components/admin/BotaoWhatsCertificado";
 import { nomeForma } from "@/components/admin/EtiquetaSituacao";
 import { Caixa, dataCurta, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 
@@ -17,14 +21,16 @@ function linkWhats(telefone: string, texto: string) {
 
 export default async function Devedores() {
   await exigirAdmin("financeiro");
-  const [cobrancas, formados, { lista: carrinhos }] = await Promise.all([
+  const [cobrancas, formados, { lista: carrinhos }, telefones, loja, alunos] = await Promise.all([
     cobrancasParaRelatorio(), listarFormados().catch(() => []), listarCarrinhos(2000),
+    telefonesDosAlunos().catch(() => new Map<string, string>()), obterConfigLoja(), listarAlunos(5000),
   ]);
+  const precos = { individual: loja.precoCertIndividual, essencial: loja.precoCertEssencial, profissional: loja.precoCertProfissional };
+  const nomeAluno = (email: string) => alunos.find((a) => a.email === email)?.nome ?? email;
   const devedores = agruparDevedores(cobrancasEmAtraso(cobrancas));
   const total = devedores.reduce((s, d) => s + d.totalCentavos, 0);
   const pendentesCert = formados.filter((f) => f.faltaPagarCertificado);
   const telefone = (email: string) => carrinhos.find((c) => c.email === email && c.telefone)?.telefone ?? null;
-  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://www.tecpromultiensino.com.br";
 
   return (
     <>
@@ -98,22 +104,14 @@ export default async function Devedores() {
         ) : (
           <ul className="divide-y divide-slate-100 text-sm">
             {pendentesCert.map((f) => {
-              const fone = telefone(f.email);
+              const fone = telefones.get(f.email.trim().toLowerCase()) ?? telefone(f.email);
               return (
                 <li key={`${f.email}|${f.cursoId}`} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <span>
-                    <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(f.email)}`} className="font-semibold text-marca-900 underline decoration-laranja-500 underline-offset-4">{f.email}</Link>
-                    <span className="block text-xs text-slate-500">{f.cursoNome} · certificado {f.precoCertificadoCentavos ? formatarPreco(f.precoCertificadoCentavos) : ""}</span>
+                    <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(f.email)}`} className="font-semibold text-marca-900 underline decoration-laranja-500 underline-offset-4">{nomeAluno(f.email)}</Link>
+                    <span className="block text-xs text-slate-500">{f.email} · {f.cursoNome} · certificado {f.precoCertificadoCentavos ? formatarPreco(f.precoCertificadoCentavos) : ""}</span>
                   </span>
-                  {fone && (
-                    <a
-                      href={linkWhats(fone, `Oi! Aqui é da Tecpro. Parabéns por concluir o curso ${f.cursoNome}! Seu certificado já pode ser liberado na área do aluno: ${site}/minha-conta`)}
-                      target="_blank" rel="noreferrer"
-                      className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                    >
-                      WhatsApp
-                    </a>
-                  )}
+                  <BotaoWhatsCertificado url={fone ? linkWhats(fone, mensagemCertificado({ nome: nomeAluno(f.email), curso: f.cursoNome, link: linkEmitirCertificado(f.cursoSlug), precos })) : null} />
                 </li>
               );
             })}
