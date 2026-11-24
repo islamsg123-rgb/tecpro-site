@@ -33,9 +33,19 @@ export function FormularioEntrar({ demonstracao, erroLink, supabase }: Props) {
         <h2 className="mt-5 text-2xl font-bold text-marca-900">Confira seu e-mail</h2>
         <p className="mt-3 text-slate-600">
           Enviamos um link para <strong className="text-marca-900">{enviado.enviadoPara}</strong>.{" "}
-          {enviado.paraSenha ? "Clique nele neste mesmo aparelho e você vai direto para a tela de criar a sua senha." : "Clique nele para entrar."} O link vale por 1 hora.
+          {enviado.comCodigo
+            ? enviado.paraSenha
+              ? "Clique nele (pode ser no celular ou em outro navegador) para criar a sua senha."
+              : "Clique nele (pode ser no celular ou em outro navegador) para entrar."
+            : enviado.paraSenha
+              ? "Clique nele neste mesmo aparelho e você vai direto para a tela de criar a sua senha."
+              : "Clique nele para entrar."}{" "}
+          O link vale por 1 hora.
         </p>
-        <p className="mt-4 text-sm text-slate-500">Não chegou? Olhe a caixa de spam ou promoções.</p>
+        {enviado.comCodigo && supabase && (
+          <EntrarComCodigo supabase={supabase} email={enviado.enviadoPara} destino={enviado.paraSenha ? "/minha-conta/senha" : "/minha-conta"} />
+        )}
+        <p className="mt-4 text-sm text-slate-500">Não chegou? Olhe a caixa de spam ou promoções. Se pedir de novo, use sempre o e-mail mais recente.</p>
       </div>
     );
   }
@@ -70,7 +80,7 @@ export function FormularioEntrar({ demonstracao, erroLink, supabase }: Props) {
         <h1 className="text-3xl font-extrabold text-marca-900">Entrar</h1>
         <p className="mt-2 text-slate-600">Área do aluno e painel da Tecpro. Use o e-mail da sua matrícula.</p>
       </div>
-      {erroLink && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">Esse link expirou ou já foi usado. Peça um novo abaixo.</p>}
+      {erroLink && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">Esse link expirou ou já foi usado. Peça um novo abaixo e use sempre o e-mail mais recente.</p>}
       {!demonstracao && abas}
 
       {modo === "link" && (
@@ -160,6 +170,57 @@ function EntrarComSenha({ supabase, email, campoEmail, irCriar }: { supabase: { 
       {erro && <p role="alert" className="text-sm font-medium text-red-600">{erro}</p>}
       <button disabled={entrando} className={botao}>
         {entrando ? "Entrando…" : "Entrar"} <IconeSeta className="h-5 w-5" />
+      </button>
+    </form>
+  );
+}
+
+/**
+ * Plano B do link: o e-mail traz um código. A pessoa digita aqui e entra, sem depender de abrir o link.
+ * A conferência é feita no navegador, direto com o Supabase, para o limite de tentativas valer por pessoa.
+ */
+function EntrarComCodigo({ supabase, email, destino }: { supabase: { url: string; chave: string }; email: string; destino: string }) {
+  const [erro, setErro] = useState<string | null>(null);
+  const [entrando, setEntrando] = useState(false);
+
+  async function enviar(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErro(null);
+    const codigo = String(new FormData(e.currentTarget).get("codigo") ?? "").replace(/\D/g, "");
+    if (codigo.length < 6) return setErro("Digite o código que veio no e-mail.");
+    setEntrando(true);
+    try {
+      const cliente = createBrowserClient(supabase.url, supabase.chave);
+      const { error } = await cliente.auth.verifyOtp({ email, token: codigo, type: "email" });
+      if (error) {
+        setEntrando(false);
+        if (error.status === 429) return setErro("Muitas tentativas. Aguarde alguns minutos e tente de novo.");
+        return setErro("Código incorreto ou vencido. Confira o e-mail mais recente.");
+      }
+      window.location.assign(destino);
+    } catch {
+      setEntrando(false);
+      setErro("Não foi possível entrar agora. Tente novamente.");
+    }
+  }
+
+  return (
+    <form onSubmit={enviar} className="mt-6 space-y-3 rounded-2xl bg-slate-50 p-4 text-left">
+      <label className="block">
+        <span className="mb-1.5 block text-sm font-medium text-slate-700">Ou digite o código do e-mail</span>
+        <input
+          name="codigo"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          pattern="[0-9 ]*"
+          maxLength={12}
+          placeholder="000000"
+          className={`${campo} text-center text-2xl font-bold tracking-[0.4em]`}
+        />
+      </label>
+      {erro && <p role="alert" className="text-sm font-medium text-red-600">{erro}</p>}
+      <button disabled={entrando} className={botao}>
+        {entrando ? "Entrando…" : "Entrar com o código"} <IconeSeta className="h-5 w-5" />
       </button>
     </form>
   );
