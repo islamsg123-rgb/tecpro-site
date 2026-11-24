@@ -24,7 +24,7 @@ export default async function Devedores() {
   const total = devedores.reduce((s, d) => s + d.totalCentavos, 0);
   const pendentesCert = formados.filter((f) => f.faltaPagarCertificado);
   const telefone = (email: string) => carrinhos.find((c) => c.email === email && c.telefone)?.telefone ?? null;
-  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://tecpro-site.vercel.app";
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://www.tecpromultiensino.com.br";
 
   return (
     <>
