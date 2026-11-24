@@ -123,9 +123,9 @@ export async function gerarPdfCertificado(c: Certificado & { cpf?: string | null
 
   // Assinatura institucional: rubrica (PNG transparente) encostada na linha
   const ax = 110;
-  const assLargura = 125;
+  const assLargura = 95;
   const assAltura = (assinaturaPng.height / assinaturaPng.width) * assLargura;
-  page.drawImage(assinaturaPng, { x: ax + (230 - assLargura) / 2, y: 106, width: assLargura, height: assAltura });
+  page.drawImage(assinaturaPng, { x: ax + (230 - assLargura) / 2, y: 101, width: assLargura, height: assAltura });
   page.drawLine({ start: { x: ax, y: 108 }, end: { x: ax + 230, y: 108 }, thickness: 0.8, color: AZUL });
   page.drawText("Tecpro Multi Ensino", { x: ax, y: 92, size: 11, font: semi, color: AZUL });
   page.drawText("Coordenação pedagógica", { x: ax, y: 78, size: 9, font: regular, color: CINZA });
