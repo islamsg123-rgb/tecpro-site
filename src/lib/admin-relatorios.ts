@@ -17,6 +17,16 @@ export function dataBR(iso: string | null | undefined): string {
   return d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
+/** Data e hora no horário de Brasília, ex.: "24/11/2026 às 14:35". Se só houver a data, mostra só a data. */
+export function dataHoraBR(iso: string | null | undefined): string {
+  if (!iso) return "";
+  if (iso.length === 10) return dataBR(iso);
+  const d = new Date(iso);
+  const data = d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const hora = d.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  return `${data} às ${hora}`;
+}
+
 /** Alunos com a data da última atividade nas aulas. */
 export async function alunosComAtividade() {
   const [alunos, atividade] = await Promise.all([listarAlunos(1000), ultimaAtividadePorAluno()]);

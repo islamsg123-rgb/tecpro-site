@@ -4,7 +4,7 @@ import { cursosDoAluno } from "@/lib/area-aluno";
 import { situacaoCertificado, type EstadoCertificado } from "@/lib/certificados";
 import { atividadesDoAluno, obterAluno, saldoCreditos } from "@/lib/dados";
 import { provaDaAula } from "@/lib/provas";
-import { dataBR, diasDesde } from "@/lib/admin-relatorios";
+import { dataBR, dataHoraBR, diasDesde } from "@/lib/admin-relatorios";
 import { BarraProgresso } from "@/components/aluno/Progresso";
 import { eDono, exigirAdmin } from "@/lib/admin";
 import { getCursos } from "@/lib/cursos";
@@ -135,7 +135,7 @@ export default async function Ficha({ searchParams }: Props) {
             Total pago: <strong className="text-marca-900">{formatarPreco(pagos.reduce((s, p) => s + p.valorCentavos, 0))}</strong>
           </p>
           <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">
-            Última atividade: <strong className="text-marca-900">{ultima ? `${dataBR(ultima)} (${dias === 0 ? "hoje" : `há ${dias} dias`})` : "nunca estudou"}</strong>
+            Última atividade: <strong className="text-marca-900">{ultima ? `${dataHoraBR(ultima)} (${dias === 0 ? "hoje" : `há ${dias} dias`})` : "nunca estudou"}</strong>
           </p>
           {telefone && (
             <a href={`https://wa.me/${telefone.replace(/\D/g, "").length <= 11 ? "55" : ""}${telefone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700">
@@ -207,7 +207,7 @@ export default async function Ficha({ searchParams }: Props) {
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
                   <div><dt className="text-xs text-slate-500">Aulas concluídas</dt><dd className="font-semibold text-marca-900">{c.feitas} de {c.total}</dd></div>
                   <div><dt className="text-xs text-slate-500">Provas aprovadas (100%)</dt><dd className="font-semibold text-marca-900">{comProva ? `${aprovadas} de ${comProva}` : "sem provas"}</dd></div>
-                  <div><dt className="text-xs text-slate-500">Última atividade no curso</dt><dd className="font-semibold text-marca-900">{ultimaNoCurso ? dataBR(ultimaNoCurso) : "—"}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Última atividade no curso</dt><dd className="font-semibold text-marca-900">{ultimaNoCurso ? dataHoraBR(ultimaNoCurso) : "—"}</dd></div>
                   <div>
                     <dt className="text-xs text-slate-500">Certificado</dt>
                     <dd className="mt-0.5">
@@ -330,7 +330,7 @@ export default async function Ficha({ searchParams }: Props) {
             const t = tituloAula(a.cursoId, a.aulaId);
             return (
               <li key={i} className="flex flex-wrap gap-x-3 px-5 py-3">
-                <span className="w-24 shrink-0 text-slate-400">{dataBR(a.quando)}</span>
+                <span className="w-36 shrink-0 text-slate-400">{dataHoraBR(a.quando)}</span>
                 <span className="font-semibold text-marca-900">{t.etapa}</span>
                 <span className="text-slate-600">{t.aula}</span>
                 <span className="text-slate-400">· {t.curso}</span>
