@@ -4,6 +4,7 @@ import "./globals.css";
 import { Cabecalho } from "@/components/Cabecalho";
 import { Rodape } from "@/components/Rodape";
 import { AvisoDadosExemplo } from "@/components/AvisoDadosExemplo";
+import { BarraCarregamento } from "@/components/carregando/BarraCarregamento";
 
 const titulo = Poppins({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--fonte-titulo" });
 const texto = Inter({ subsets: ["latin"], variable: "--fonte-texto" });
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR" className={`${titulo.variable} ${texto.variable}`}>
       <body className="flex min-h-screen flex-col font-sans antialiased">
+        <BarraCarregamento />
         <AvisoDadosExemplo />
         <Cabecalho />
         <main className="flex-1">{children}</main>
