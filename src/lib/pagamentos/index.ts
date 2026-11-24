@@ -2,8 +2,9 @@ import "server-only";
 import type { Cobranca, Comprador, DadosBoleto, DadosPix, NovaCobranca } from "./tipos";
 import {
   asaasConfigurado, boletoAsaas, clientePorEmailAsaas, cobrancasDoEmailAsaas, consultarCobrancaAsaas, criarCobrancaAsaas,
-  listarCobrancasAsaas, pixAsaas, saldoAsaas,
+  compradorDoClienteAsaas, listarCobrancasAsaas, pixAsaas, saldoAsaas,
 } from "./asaas";
+import { certificadoFoiPago } from "../dados";
 import {
   boletoSimulado, consultarCobrancaSimulada, criarCobrancaSimulada, listarCobrancasSimuladas, pixSimulado,
 } from "./simulador";
@@ -33,7 +34,33 @@ export async function consultarCobranca(id: string): Promise<Cobranca | null> {
     if (r.acabouDePagar && r.cobranca.produto) await processarPagamento(id, r.comprador, r.cobranca.produto);
     return r.cobranca;
   }
-  return consultarCobrancaAsaas(id);
+  const cobranca = await consultarCobrancaAsaas(id);
+  if (cobranca?.situacao === "pago") await garantirLiberacao(cobranca);
+  return cobranca;
+}
+
+/**
+ * Rede de segurança caso o aviso automático do Asaas (webhook) atrase ou falhe:
+ * quando a tela do pedido vê a cobrança paga, libera o curso/certificado se ainda não foi liberado.
+ * Tudo é idempotente (a matrícula confere o vínculo na Escola Avançada e o certificado pago só é
+ * gravado uma vez), e a lista em memória evita repetir o trabalho a cada visita.
+ */
+const gLib = globalThis as unknown as { __cobrancasLiberadas?: Set<string> };
+const jaLiberadas = (gLib.__cobrancasLiberadas ??= new Set());
+
+async function garantirLiberacao(c: Cobranca): Promise<void> {
+  if (!c.produto || !c.clienteId || jaLiberadas.has(c.id)) return;
+  try {
+    // Certificado: se o curso já consta como pago, o webhook já fez o trabalho (não recria créditos já usados).
+    if (c.produto.tipo === "certificado" && (await certificadoFoiPago(c.produto.email, c.produto.cursoId))) {
+      jaLiberadas.add(c.id);
+      return;
+    }
+    await processarPagamento(c.id, await compradorDoClienteAsaas(c.clienteId), c.produto);
+    jaLiberadas.add(c.id);
+  } catch (e) {
+    console.error(`[pagamentos] não consegui liberar a cobrança paga ${c.id}`, e);
+  }
 }
 
 /** Cobranças mais recentes (padrão: 50; o painel financeiro pede mais). */

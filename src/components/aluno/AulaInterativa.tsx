@@ -45,9 +45,13 @@ function useVideoPanda(ativo: boolean, aoAtingir: (assistido: number, duracao: n
       const m = d as Record<string, unknown>;
       const msg = String(m.message ?? "");
       const t = Number(m.currentTime);
-      const du = Number(m.duration ?? m.videoDuration ?? 0);
+      // O Panda não manda a duração no panda_timeupdate; ela vem no panda_allData (playerData.duration).
+      const pd = (m.playerData && typeof m.playerData === "object" ? m.playerData : {}) as Record<string, unknown>;
+      const du = Number(m.duration ?? m.videoDuration ?? pd.duration ?? 0);
       if (du > 0) s.duracao = du;
-      if (msg === "panda_timeupdate" && Number.isFinite(t)) {
+      if (msg === "panda_allData") {
+        if (!(du > 0)) return;
+      } else if (msg === "panda_timeupdate" && Number.isFinite(t)) {
         if (s.ultimo !== null && t > s.ultimo && t - s.ultimo <= 3) {
           for (let x = Math.floor(s.ultimo); x < Math.floor(t); x++) s.vistos.add(x);
         }

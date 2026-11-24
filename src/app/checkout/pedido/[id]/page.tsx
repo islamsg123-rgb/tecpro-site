@@ -35,7 +35,7 @@ export default async function Pedido({ params }: Props) {
         </span>
         <h1 className="mt-6 text-3xl font-extrabold text-marca-900 sm:text-4xl">Certificado liberado!</h1>
         <p className="mt-4 text-lg text-slate-600">
-          Pagamento recebido. Agora é só confirmar o seu nome e emitir o certificado de <strong className="text-marca-900">{nomeCurso}</strong>.
+          Pagamento recebido. Agora é só emitir o certificado de <strong className="text-marca-900">{nomeCurso}</strong>.
         </p>
         <Link
           href={curso ? `/minha-conta/cursos/${curso.slug}#certificado` : "/minha-conta"}
@@ -63,7 +63,7 @@ export default async function Pedido({ params }: Props) {
           <div>
             <p className="font-bold text-marca-900">Confira seu e-mail</p>
             <p className="mt-1 text-sm text-slate-600">
-              Enviamos o seu login e a sua senha de acesso. Se não encontrar, olhe a caixa de spam ou promoções.
+              Enviamos um e-mail de boas-vindas. Para estudar, entre na Área do aluno com este mesmo e-mail: você recebe um link de acesso, sem senha. Se não encontrar, olhe a caixa de spam ou promoções.
             </p>
           </div>
         </div>
@@ -110,7 +110,7 @@ export default async function Pedido({ params }: Props) {
             {ePix ? <IconePix className="h-7 w-7" /> : <IconeCodigoBarras className="h-7 w-7" />}
           </span>
           <h1 className="mt-5 text-3xl font-extrabold text-marca-900">
-            {ePix ? "Pague com Pix para liberar seu acesso" : "Seu boleto está pronto"}
+            {ePix ? (eCertificado ? "Pague com Pix para liberar seu certificado" : "Pague com Pix para liberar seu acesso") : "Seu boleto está pronto"}
           </h1>
           <p className="mt-3 text-slate-600">
             {nomeCurso} · <strong className="text-marca-900">{formatarPreco(cobranca.valorCentavos)}</strong>
@@ -182,7 +182,9 @@ export default async function Pedido({ params }: Props) {
         </div>
 
         <p className="mt-6 text-center text-sm text-slate-500">
-          Assim que o pagamento for confirmado, enviamos o acesso para o seu e-mail.
+          {eCertificado
+            ? "Assim que o pagamento for confirmado, o certificado fica liberado na sua Área do aluno."
+            : "Assim que o pagamento for confirmado, enviamos o acesso para o seu e-mail."}
         </p>
       </div>
     </section>
