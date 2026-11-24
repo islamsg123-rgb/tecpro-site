@@ -16,7 +16,7 @@ import { ESTADOS } from "@/lib/estados";
 import { DIAS_PARA_INATIVO } from "@/lib/painel-resumo";
 import { TabelaVendas } from "@/components/admin/TabelaVendas";
 import { EtiquetaAluno } from "@/components/admin/Blocos";
-import { adicionarCursoAluno, removerCursoAluno, salvarDadosAlunoAcao } from "../../acoes";
+import { adicionarCursoAluno, concluirCursosTesteAcao, desfazerCursosTesteAcao, removerCursoAluno, salvarDadosAlunoAcao } from "../../acoes";
 import { IconeChevron } from "@/components/Icones";
 
 export const metadata: Metadata = { title: "Ficha do aluno" };
@@ -33,12 +33,16 @@ const avisos: Record<string, [string, boolean]> = {
   "erro:cpf": ["CPF inválido.", false],
   "erro:telefone": ["Telefone inválido.", false],
   "erro:colunas": ["Falta rodar o SQL novo no Supabase (painel-completo.sql) para salvar isso.", false],
+  "salvo:teste": ["Pronto: todos os cursos deste aluno estão como concluídos. Entre no site com a conta dele para testar o certificado.", true],
+  "salvo:teste-desfeito": ["Modo teste desfeito: o progresso voltou ao que era antes.", true],
+  "erro:teste": ["Não foi possível concluir agora (a Escola Avançada ou o banco não respondeu). Tente de novo.", false],
+  "erro:dono": ["Só o dono do site pode usar o modo teste.", false],
   "erro:banco": ["Não foi possível salvar agora.", false],
   "erro:curso": ["Escolha um curso.", false],
   "erro:matricula": ["A Escola Avançada não aceitou a matrícula. Veja o motivo em Alunos > Últimas tentativas de matrícula (no fim da página Alunos). Se faltar CPF ou telefone, preencha os dados acima.", false],
 };
 
-const nomeEtapa: Record<string, string> = { inicio: "abriu a aula", video: "assistiu ao vídeo", prova: "passou na prova" };
+const nomeEtapa: Record<string, string> = { inicio: "abriu a aula", video: "assistiu ao vídeo", prova: "passou na prova", teste: "curso concluído pelo modo teste" };
 const nomeCert: Record<EstadoCertificado, [string, string]> = {
   em_andamento: ["Em andamento", "bg-slate-100 text-slate-600"],
   aguardando_pagamento: ["Concluiu, falta pagar", "bg-amber-100 text-amber-800"],
@@ -47,7 +51,7 @@ const nomeCert: Record<EstadoCertificado, [string, string]> = {
 };
 
 export default async function Ficha({ searchParams }: Props) {
-  await exigirAdmin("alunos");
+  const acesso = await exigirAdmin("alunos");
   const params = await searchParams;
   const email = String(params.email ?? "").trim().toLowerCase();
   const [registro, { lista: carrinhosTodos }] = await Promise.all([email ? obterAluno(email) : null, listarCarrinhos(2000)]);
@@ -213,6 +217,26 @@ export default async function Ficha({ searchParams }: Props) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {acesso.dono && cursos && cursos.length > 0 && (
+        <div id="teste" className="mt-4 scroll-mt-24 rounded-2xl border-2 border-dashed border-amber-400 bg-amber-50 p-5 text-sm">
+          <p className="font-bold text-marca-900">Modo teste: concluir todos os cursos deste aluno</p>
+          <p className="mt-1 text-amber-900">
+            Marca todas as aulas dos {cursos.length} cursos acima como assistidas, para testar o certificado sem assistir às aulas.
+            Use só na sua conta de teste. O botão &quot;Desfazer&quot; volta o progresso ao que era antes (certificados já emitidos continuam).
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <form action={concluirCursosTesteAcao}>
+              <input type="hidden" name="email" value={email} />
+              <button className="rounded-full bg-amber-500 px-5 py-2 font-bold text-marca-900 hover:bg-amber-400">Concluir todos os cursos</button>
+            </form>
+            <form action={desfazerCursosTesteAcao}>
+              <input type="hidden" name="email" value={email} />
+              <button className="rounded-full border border-amber-500 px-5 py-2 font-semibold text-marca-900 hover:bg-white">Desfazer</button>
+            </form>
+          </div>
         </div>
       )}
 
