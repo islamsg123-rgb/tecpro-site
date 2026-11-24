@@ -8,6 +8,7 @@
 
 interface SdkMercadoPago {
   getPaymentMethods(p: { bin: string }): Promise<{ results?: { id: string; issuer?: { id?: number | string } }[] }>;
+  getInstallments(p: { amount: string; bin: string; paymentTypeId?: string }): Promise<{ payer_costs?: { installments: number }[] }[]>;
   createCardToken(p: {
     cardNumber: string; cardholderName: string; cardExpirationMonth: string; cardExpirationYear: string;
     securityCode: string; identificationType: string; identificationNumber: string;
@@ -54,6 +55,8 @@ function bandeiraPeloNumero(n: string): { id: string; issuer?: { id?: number | s
 
 export interface CartaoDigitado {
   numero: string; nome: string; mes: string; ano: string; cvv: string; cpf: string;
+  /** Valor da compra em centavos e parcelas escolhidas, para conferir se o Mercado Pago aceita esse parcelamento. */
+  valorCentavos: number; parcelas: number;
 }
 
 export async function tokenizarCartao(chavePublica: string, c: CartaoDigitado): Promise<{ token: string; bandeira: string; emissor?: string }> {
@@ -67,6 +70,21 @@ export async function tokenizarCartao(chavePublica: string, c: CartaoDigitado): 
   // Se o Mercado Pago não reconhecer o início do número, deduz a bandeira pelos primeiros dígitos.
   const metodo = metodos?.results?.[0] ?? bandeiraPeloNumero(c.numero);
   if (!metodo) throw new Error("Não reconhecemos este cartão. Confira o número ou use outro cartão.");
+  if (c.parcelas > 1) {
+    // Confere quantas parcelas o Mercado Pago libera para este cartão e valor (depende da configuração da conta).
+    const opcoes = await mp
+      .getInstallments({ amount: (c.valorCentavos / 100).toFixed(2), bin: c.numero.slice(0, 8), paymentTypeId: "credit_card" })
+      .catch(() => null);
+    const permitidas = opcoes?.[0]?.payer_costs?.map((p) => p.installments) ?? [];
+    if (permitidas.length && !permitidas.includes(c.parcelas)) {
+      const max = Math.max(...permitidas);
+      throw new Error(
+        max <= 1
+          ? "No momento este cartão só pode ser usado à vista. Escolha \"À vista\" ou pague com Pix."
+          : `Este cartão aceita no máximo ${max}x. Escolha um parcelamento menor.`,
+      );
+    }
+  }
   const ano = c.ano.length === 2 ? `20${c.ano}` : c.ano;
   try {
     const { id } = await mp.createCardToken({

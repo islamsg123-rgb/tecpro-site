@@ -122,6 +122,7 @@ export function FormularioCheckout({
     const cartao = {
       numero: soDigitos(v("numeroCartao")), nome: v("nomeNoCartao"), mes: soDigitos(v("mesValidade")),
       ano: soDigitos(v("anoValidade")), cvv: soDigitos(v("cvv")), cpf: soDigitos(v("cpf")),
+      valorCentavos: valor, parcelas: Number(v("parcelas")) || 1,
     };
     const erros: Record<string, string> = {};
     if (!cartaoValido(cartao.numero)) erros.numeroCartao = "Número do cartão inválido.";

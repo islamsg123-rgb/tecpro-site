@@ -111,6 +111,9 @@ function mensagemDoErro(e: ErroMp): string {
     const codigo = detalhes.match(/(cc_rejected_\w+|insufficient_amount|high_risk|call_for_authorize|card_disabled|max_attempts|invalid_installments|bad_filled_\w+)/)?.[1] ?? "";
     return motivoRecusa(codigo);
   }
+  if (detalhes.includes("invalid_transaction_amount") || detalhes.includes("installments")) {
+    return "Este cartão não aceita esse parcelamento agora. Escolha \"À vista\" ou pague com Pix.";
+  }
   if (detalhes.includes("zip_code") || detalhes.includes("address")) return "Confira o CEP e o número.";
   if (detalhes.includes("identification")) return "Confira o CPF.";
   if (detalhes.includes("token")) return "Confira os dados do cartão.";
