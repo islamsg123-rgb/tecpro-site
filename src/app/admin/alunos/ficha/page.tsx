@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cursosDoAluno } from "@/lib/area-aluno";
 import { situacaoCertificado, type EstadoCertificado } from "@/lib/certificados";
-import { atividadesDoAluno, obterAluno } from "@/lib/dados";
+import { atividadesDoAluno, obterAluno, saldoCreditos } from "@/lib/dados";
 import { provaDaAula } from "@/lib/provas";
 import { dataBR, diasDesde } from "@/lib/admin-relatorios";
 import { BarraProgresso } from "@/components/aluno/Progresso";
@@ -71,7 +71,11 @@ export default async function Ficha({ searchParams }: Props) {
     listarPesquisas(500),
   ]);
   const pesquisas = pesquisasTodas.filter((p) => p.email === email);
+  // Mais avançados primeiro; empate: o que teve atividade mais recente.
+  const ultimaNo = (id: string) => atividades.find((x) => x.cursoId === id)?.quando ?? "";
+  cursos?.sort((a, b) => b.pct - a.pct || ultimaNo(b.curso.id).localeCompare(ultimaNo(a.curso.id)));
   const certs = cursos ? await Promise.all(cursos.map((c) => situacaoCertificado(email, c))) : [];
+  const creditos = await saldoCreditos(email).catch(() => 0);
   const ultima = atividades[0]?.quando ?? null;
   const dias = diasDesde(ultima);
   const situacao = dias === null ? "interessado" : dias >= DIAS_PARA_INATIVO ? "inativo" : "ativo";
@@ -104,6 +108,11 @@ export default async function Ficha({ searchParams }: Props) {
           </p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm">
+          {creditos > 0 && (
+            <p className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-green-800">
+              Certificados no pacote: <strong>{creditos}</strong>
+            </p>
+          )}
           <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">
             Total pago: <strong className="text-marca-900">{formatarPreco(pagos.reduce((s, p) => s + p.valorCentavos, 0))}</strong>
           </p>

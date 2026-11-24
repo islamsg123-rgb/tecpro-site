@@ -42,12 +42,14 @@ export function Campo({
 }
 
 export function FormularioCheckout({
-  cursoId, precoCentavos, parcelas, tipo = "curso", nomeInicial, emailInicial,
+  cursoId, precoCentavos, parcelas, tipo = "curso", nomeInicial, emailInicial, pacote = "",
 }: {
   cursoId: string;
   precoCentavos: number;
   parcelas: number[];
   tipo?: "curso" | "certificado";
+  /** Certificado: individual, essencial ou profissional */
+  pacote?: string;
   nomeInicial?: string;
   emailInicial?: string;
 }) {
@@ -85,7 +87,7 @@ export function FormularioCheckout({
     if (!cupomDigitado.trim()) return;
     setConferindo(true);
     setErroCupom("");
-    const r = await conferirCupom(cursoId, tipo, cupomDigitado);
+    const r = await conferirCupom(cursoId, tipo, cupomDigitado, pacote);
     setConferindo(false);
     if (!r.ok) {
       setErroCupom(r.erro);
@@ -116,6 +118,7 @@ export function FormularioCheckout({
     >
       <input type="hidden" name="cursoId" value={cursoId} />
       <input type="hidden" name="tipo" value={tipo} />
+      <input type="hidden" name="pacote" value={pacote} />
       <input type="hidden" name="forma" value={forma} />
       <input type="hidden" name="cupom" value={cupom?.codigo ?? ""} />
 

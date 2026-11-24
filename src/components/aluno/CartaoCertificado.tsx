@@ -1,17 +1,19 @@
 import Link from "next/link";
-import { emitir } from "@/app/minha-conta/acoes";
+import { emitir, usarCreditoCertificado } from "@/app/minha-conta/acoes";
 import { formatarPreco } from "@/lib/formatar";
 import type { SituacaoCertificado } from "@/lib/certificados";
 import { IconeCadeado, IconeCertificado, IconeCheck } from "../Icones";
 
 export function CartaoCertificado({
-  s, slug, faltam, nomeSugerido, erroNome,
+  s, slug, faltam, nomeSugerido, erroNome, creditos = 0,
 }: {
   s: SituacaoCertificado;
   slug: string;
   faltam: number;
   nomeSugerido: string;
   erroNome?: boolean;
+  /** Certificados que sobraram de pacotes comprados */
+  creditos?: number;
 }) {
   const pago = s.regra.modo === "pago";
   return (
@@ -24,7 +26,7 @@ export function CartaoCertificado({
           {!pago
             ? "Grátis ao concluir o curso"
             : s.estado === "aguardando_pagamento" && s.regra.modo === "pago"
-              ? `Emissão: ${formatarPreco(s.regra.precoCentavos)}`
+              ? creditos > 0 ? "Use um certificado do seu pacote" : `A partir de ${formatarPreco(s.regra.precoCentavos)}`
               : "Disponível ao concluir o curso"}
         </p>
       </div>
@@ -38,10 +40,20 @@ export function CartaoCertificado({
 
         {s.estado === "aguardando_pagamento" && s.regra.modo === "pago" && (
           <>
-            <p className="text-sm text-slate-600">Parabéns, você concluiu o curso! Pague a emissão para liberar o seu certificado.</p>
-            <Link href={`/minha-conta/cursos/${slug}/certificado`} className="mt-5 block rounded-full bg-laranja-500 py-3.5 text-center font-bold text-marca-900 hover:bg-laranja-400">
-              Pagar {formatarPreco(s.regra.precoCentavos)} e liberar
-            </Link>
+            <p className="text-sm text-slate-600">Parabéns, você concluiu o curso!</p>
+            {creditos > 0 ? (
+              <form action={usarCreditoCertificado} className="mt-4">
+                <input type="hidden" name="slug" value={slug} />
+                <p className="text-sm text-slate-600">
+                  Você tem <strong className="text-marca-900">{creditos} {creditos === 1 ? "certificado disponível" : "certificados disponíveis"}</strong> do seu pacote.
+                </p>
+                <button className="mt-4 w-full rounded-full bg-green-600 py-3.5 font-bold text-white hover:bg-green-700">Usar 1 e liberar</button>
+              </form>
+            ) : (
+              <Link href={`/minha-conta/cursos/${slug}/certificado`} className="mt-5 block rounded-full bg-laranja-500 py-3.5 text-center font-bold text-marca-900 hover:bg-laranja-400">
+                Emitir certificado
+              </Link>
+            )}
           </>
         )}
 

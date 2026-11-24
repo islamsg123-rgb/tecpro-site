@@ -55,6 +55,27 @@ export default async function Configuracoes({ searchParams }: Props) {
           {erro === "meses" && <p className="mt-3 text-sm text-red-700">Informe um número de meses entre 1 e 120.</p>}
         </section>
 
+        <section id="certificados" className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+          <h2 className="text-lg font-bold text-marca-900">Certificado dos cursos gratuitos</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            O que o aluno paga para emitir o certificado ao concluir um curso gratuito. Nos pacotes, 1 certificado vai para o curso concluído
+            e os outros ficam como crédito para os próximos cursos gratuitos. O desconto mostrado ao aluno é calculado sozinho.
+            Nos cursos pagos, o certificado é sempre grátis.
+          </p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            {[
+              ["precoCertIndividual", "Individual (1)", loja.precoCertIndividual],
+              ["precoCertEssencial", "Essencial (3)", loja.precoCertEssencial],
+              ["precoCertProfissional", "Profissional (5)", loja.precoCertProfissional],
+            ].map(([nome, rotulo, valor]) => (
+              <label key={nome as string} className="text-sm font-semibold text-marca-900">{rotulo as string} — R$
+                <input name={nome as string} inputMode="decimal" required defaultValue={((valor as number) / 100).toFixed(2).replace(".", ",")} className={`mt-1 ${campo}`} />
+              </label>
+            ))}
+          </div>
+          {erro === "precos" && <p className="mt-3 text-sm text-red-700">Confira os três valores (mínimo R$ 5,00 cada).</p>}
+        </section>
+
         <section className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
           <h2 className="text-lg font-bold text-marca-900">O que aparece no site</h2>
           <div className="mt-5 space-y-3">

@@ -306,9 +306,14 @@ export interface ConfigLoja {
   whatsapp: string;
   emailContato: string;
   instagram: string;
+  /** Preços da emissão de certificado nos cursos gratuitos, em centavos. */
+  precoCertIndividual: number;
+  precoCertEssencial: number;
+  precoCertProfissional: number;
 }
 const CONFIG_LOJA_PADRAO: ConfigLoja = {
   mesesDeAcesso: null, pesquisaNasAulas: true, mostrarDepoimentos: true, whatsapp: "", emailContato: "", instagram: "",
+  precoCertIndividual: 3790, precoCertEssencial: 8990, precoCertProfissional: 12990,
 };
 
 const gLoja = globalThis as unknown as { __configLojaDemo?: ConfigLoja };
@@ -511,11 +516,73 @@ export async function listarCertificadosPagos(): Promise<{ email: string; cursoI
     return Array.from(certPagos(), ([k, cobrancaId]) => {
       const [email, cursoId] = k.split("|");
       return { email, cursoId, cobrancaId, pagoEm: new Date().toISOString() };
-    });
+    }).filter((p) => !p.cursoId.startsWith(PREFIXO_CREDITO));
   }
   const { data, error } = await db().from("certificados_pagos").select("*").order("pago_em", { ascending: false }).limit(1000);
   if (error) throw error;
-  return (data ?? []).map((r) => ({ email: r.email, cursoId: r.curso_id, cobrancaId: r.cobranca_id, pagoEm: r.pago_em }));
+  return (data ?? [])
+    .filter((r) => !String(r.curso_id).startsWith(PREFIXO_CREDITO))
+    .map((r) => ({ email: r.email, cursoId: r.curso_id, cobrancaId: r.cobranca_id, pagoEm: r.pago_em }));
+}
+
+/* ---------- Créditos de certificado (pacotes) ----------
+ * Quem compra um pacote de 3 ou 5 certificados usa 1 no curso em que comprou e fica com o resto como crédito.
+ * Cada crédito é uma linha em "certificados_pagos" com curso_id = "credito:<cobrança>:<n>" (não precisa de tabela nova).
+ * Usar um crédito = trocar o curso_id dessa linha pelo curso de verdade. */
+
+export const PREFIXO_CREDITO = "credito:";
+
+/** Guarda N créditos de uma cobrança. Pode ser chamada de novo (aviso repetido do Asaas) sem duplicar. */
+export async function registrarCreditos(emailAluno: string, cobrancaId: string, quantidade: number): Promise<void> {
+  const email = norm(emailAluno);
+  if (quantidade < 1) return;
+  const linhas = Array.from({ length: quantidade }, (_, i) => `${PREFIXO_CREDITO}${cobrancaId}:${i + 1}`);
+  if (bancoEmDemonstracao) {
+    for (const l of linhas) if (!certPagos().has(`${email}|${l}`)) certPagos().set(`${email}|${l}`, cobrancaId);
+    return;
+  }
+  const { error } = await db()
+    .from("certificados_pagos")
+    .upsert(linhas.map((curso_id) => ({ email, curso_id, cobranca_id: cobrancaId })), { onConflict: "email,curso_id", ignoreDuplicates: true });
+  if (error) throw error;
+}
+
+async function linhasDeCredito(email: string): Promise<string[]> {
+  if (bancoEmDemonstracao) {
+    return Array.from(certPagos().keys()).filter((k) => k.startsWith(`${email}|${PREFIXO_CREDITO}`)).map((k) => k.split("|")[1]);
+  }
+  const { data, error } = await db().from("certificados_pagos").select("curso_id").eq("email", email).like("curso_id", `${PREFIXO_CREDITO}%`);
+  if (error) throw error;
+  return (data ?? []).map((r) => String(r.curso_id));
+}
+
+/** Quantos certificados o aluno ainda pode emitir com os pacotes que comprou. */
+export async function saldoCreditos(emailAluno: string): Promise<number> {
+  return (await linhasDeCredito(norm(emailAluno))).length;
+}
+
+/** Usa 1 crédito para liberar o certificado de um curso. Devolve false se não havia crédito. */
+export async function usarCredito(emailAluno: string, cursoId: string): Promise<boolean> {
+  const email = norm(emailAluno);
+  if (await certificadoFoiPago(email, cursoId)) return true;
+  for (const linha of await linhasDeCredito(email)) {
+    if (bancoEmDemonstracao) {
+      const cobranca = certPagos().get(`${email}|${linha}`)!;
+      certPagos().delete(`${email}|${linha}`);
+      certPagos().set(`${email}|${cursoId}`, cobranca);
+      return true;
+    }
+    // Troca o "curso" da linha de crédito pelo curso de verdade. Se outra aba usou o mesmo crédito, tenta o próximo.
+    const { data, error } = await db()
+      .from("certificados_pagos").update({ curso_id: cursoId, pago_em: new Date().toISOString() })
+      .eq("email", email).eq("curso_id", linha).select("curso_id");
+    if (error) {
+      if (error.code === "23505") return true; // o curso já estava pago
+      throw error;
+    }
+    if (data?.length) return true;
+  }
+  return false;
 }
 
 /** Quantas aulas cada aluno concluiu em cada curso ("email|curso" -> quantidade). Só aulas reais, sem as etapas. */
