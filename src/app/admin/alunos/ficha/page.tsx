@@ -274,7 +274,7 @@ export default async function Ficha({ searchParams }: Props) {
       <h2 className="mt-10 text-xl font-bold text-marca-900">Pagamentos</h2>
       <div className="mt-4">
         {pagamentos === null ? (
-          <p className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Não conseguimos consultar o Asaas agora.</p>
+          <p className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Não conseguimos consultar os pagamentos agora.</p>
         ) : (
           <TabelaVendas vendas={pagamentos} />
         )}

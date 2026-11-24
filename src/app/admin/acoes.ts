@@ -10,12 +10,11 @@ import {
 } from "@/lib/dados/painel";
 import { concluirCursoTeste, desfazerConclusaoTeste, obterAluno } from "@/lib/dados";
 import { cursosDoAluno } from "@/lib/area-aluno";
-import { clientePorEmail } from "@/lib/pagamentos";
+import { clientePorEmail, cobrancaParaLiberacao, pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { liberarAcesso } from "@/lib/pagamentos/liberacao";
 import { cpfValido, emailValido, soDigitos, telefoneValido } from "@/lib/validacao";
 import { getCursos } from "@/lib/cursos";
 import { configuracoesDosCursos, definirCursoGratuito, definirCursosGratuitos, registrarEventoMatricula, salvarConfigLoja, salvarConfiguracaoCurso, salvarConfiguracoesCursos } from "@/lib/dados";
-import { asaasConfigurado, cobrancaParaLiberacao } from "@/lib/pagamentos/asaas";
 import { processarPagamento } from "@/lib/pagamentos/liberacao";
 import {
   apagarCupom, marcarContatado, MENSAGENS_PADRAO, normCupom, obterCupom, salvarCupom, salvarMensagensProntas,
@@ -90,6 +89,7 @@ export async function salvarConfiguracoes(f: FormData) {
     precoCertIndividual: precos[0] as number,
     precoCertEssencial: precos[1] as number,
     precoCertProfissional: precos[2] as number,
+    gateway: String(f.get("gateway")) === "asaas" ? "asaas" : "mercadopago",
   });
   revalidatePath("/", "layout");
   redirect("/admin/configuracoes?salvo=1");
@@ -99,7 +99,7 @@ export async function salvarConfiguracoes(f: FormData) {
 export async function matricularDeNovo(f: FormData) {
   await exigirAdmin("financeiro");
   const id = String(f.get("cobrancaId") ?? "");
-  if (!asaasConfigurado || !id) redirect("/admin/vendas");
+  if (pagamentoEmSimulacao || !id) redirect("/admin/vendas");
   try {
     const { pago, comprador, produto } = await cobrancaParaLiberacao(id);
     if (!pago || !produto) {

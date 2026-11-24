@@ -4,7 +4,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCursos } from "@/lib/cursos";
 import { opcoesParcelas } from "@/lib/config-loja";
-import { criarCobranca } from "@/lib/pagamentos";
+import { criarCobranca, gatewayAtivo } from "@/lib/pagamentos";
+import { enderecoPorCep } from "@/lib/pagamentos/mercadopago";
 import { ErroPagamento, type FormaPagamento, type NovaCobranca, type Produto } from "@/lib/pagamentos/tipos";
 import { alunoLogado } from "@/lib/auth";
 import { cursoDoAluno } from "@/lib/area-aluno";
@@ -137,7 +138,18 @@ export async function pagar(_anterior: EstadoCheckout, f: FormData): Promise<Est
     comprador,
   };
 
-  if (forma === "CREDIT_CARD") {
+  const gateway = await gatewayAtivo();
+  const parcelas = Number(texto(f, "parcelas")) || 1;
+
+  if (forma === "CREDIT_CARD" && gateway === "mercadopago") {
+    // O navegador já trocou o cartão por um token do Mercado Pago: o número do cartão não chega aqui.
+    const token = texto(f, "mpToken");
+    const bandeira = texto(f, "mpBandeira");
+    if (!token || !bandeira) campos.numeroCartao = "Confira os dados do cartão.";
+    if (!opcoesParcelas(item.valorCentavos).includes(parcelas)) campos.parcelas = "Parcelamento inválido.";
+    nova.cartaoMp = { token, bandeira, emissor: texto(f, "mpEmissor") || undefined };
+    nova.parcelas = parcelas;
+  } else if (forma === "CREDIT_CARD") {
     const cartao = {
       nomeNoCartao: texto(f, "nomeNoCartao"),
       numero: soDigitos(texto(f, "numeroCartao")),
@@ -153,12 +165,22 @@ export async function pagar(_anterior: EstadoCheckout, f: FormData): Promise<Est
     if (cartao.cvv.length < 3 || cartao.cvv.length > 4) campos.cvv = "CVV inválido.";
     if (!cepValido(cartao.cep)) campos.cep = "CEP inválido.";
     if (!cartao.numeroEndereco) campos.numeroEndereco = "Informe o número.";
-    const parcelas = Number(texto(f, "parcelas")) || 1;
     if (!opcoesParcelas(item.valorCentavos).includes(parcelas)) campos.parcelas = "Parcelamento inválido.";
     nova.cartao = cartao;
     nova.parcelas = parcelas;
     const h = await headers();
     nova.ipComprador = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || undefined;
+  } else if (forma === "BOLETO" && gateway === "mercadopago") {
+    // O boleto do Mercado Pago exige endereço: pedimos só CEP e número e completamos pelo CEP.
+    const cep = soDigitos(texto(f, "cepBoleto"));
+    const numero = texto(f, "numeroBoleto").slice(0, 20);
+    if (!cepValido(cep)) campos.cepBoleto = "CEP inválido.";
+    if (!numero) campos.numeroBoleto = "Informe o número (ou S/N).";
+    if (!campos.cepBoleto) {
+      const end = await enderecoPorCep(cep);
+      if (!end) campos.cepBoleto = "Não encontramos este CEP.";
+      else nova.endereco = { cep, numero, ...end };
+    }
   }
 
   if (Object.keys(campos).length) return { erro: "Confira os campos destacados.", campos };

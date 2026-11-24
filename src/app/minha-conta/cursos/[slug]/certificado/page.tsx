@@ -6,7 +6,7 @@ import { situacaoCertificado } from "@/lib/certificados";
 import { obterAluno, saldoCreditos } from "@/lib/dados";
 import { opcoesParcelas } from "@/lib/config-loja";
 import { formatarPreco } from "@/lib/formatar";
-import { pagamentoEmSimulacao } from "@/lib/pagamentos";
+import { infoCheckout } from "@/lib/pagamentos";
 import { pacotesCertificado } from "@/lib/pacotes-certificado";
 import { FormularioCheckout } from "@/components/checkout/FormularioCheckout";
 import { TotalResumo } from "@/components/checkout/TotalResumo";
@@ -25,6 +25,7 @@ export default async function EmitirCertificado({ params, searchParams }: Props)
   if (s.estado !== "aguardando_pagamento" || s.regra.modo !== "pago") redirect(`/minha-conta/cursos/${slug}#certificado`);
   const [pacotes, registro, creditos] = await Promise.all([pacotesCertificado(), obterAluno(aluno.email), saldoCreditos(aluno.email)]);
   const pacote = pacotes.find((p) => p.id === escolhido);
+  const pagamento = await infoCheckout();
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -91,13 +92,15 @@ export default async function EmitirCertificado({ params, searchParams }: Props)
       ) : (
         <>
           <h1 className="mt-4 text-3xl font-extrabold text-marca-900">Liberar certificado</h1>
-          {pagamentoEmSimulacao && (
+          {(pagamento.gateway === "simulador" || pagamento.emTeste) && (
             <p className="mt-4 rounded-2xl border border-laranja-500/40 bg-laranja-300/20 p-4 text-sm text-marca-900">
               <strong>Modo de teste:</strong> nenhum valor será cobrado.
+              {pagamento.emTeste && <> No cartão, use um cartão de teste do Mercado Pago com o nome <strong>APRO</strong>.</>}
             </p>
           )}
           <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px] lg:items-start">
             <FormularioCheckout
+              pagamento={pagamento}
               tipo="certificado"
               pacote={pacote.id}
               cursoId={c.curso.id}

@@ -91,10 +91,24 @@ export default async function Pedido({ params }: Props) {
     );
   }
 
+  /* ----- Aguardando: cartão em análise (Mercado Pago) ----- */
+  if (cobranca.forma === "CREDIT_CARD") {
+    return (
+      <section className="mx-auto max-w-xl px-4 py-16 text-center sm:py-24">
+        <h1 className="text-3xl font-extrabold text-marca-900">Pagamento em análise</h1>
+        <p className="mt-4 text-slate-600">
+          O pagamento de <strong className="text-marca-900">{formatarPreco(cobranca.valorCentavos)}</strong> com cartão está sendo analisado.
+          Isso costuma levar poucos minutos. Assim que for aprovado, {eCertificado ? "o certificado é liberado" : "enviamos o acesso para o seu e-mail"}.
+        </p>
+        <div className="mt-6"><AcompanharPagamento id={id} /></div>
+      </section>
+    );
+  }
+
   /* ----- Aguardando: Pix ou boleto ----- */
   const ePix = cobranca.forma === "PIX";
-  // Se o Asaas não devolver o QR Code/linha digitável (ex.: conta sem chave Pix), a página não quebra:
-  // mostra o link da fatura do Asaas, onde o aluno também consegue pagar.
+  // Se o sistema de pagamento não devolver o QR Code/linha digitável (ex.: conta sem chave Pix), a página não quebra:
+  // mostra o link da fatura, onde o aluno também consegue pagar.
   const pix = ePix ? await dadosPix(id).catch((e) => (console.error("[pedido] pix", id, e), null)) : null;
   const boleto =
     cobranca.forma === "BOLETO"

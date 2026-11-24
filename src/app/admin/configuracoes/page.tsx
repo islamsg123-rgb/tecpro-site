@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { exigirAdmin } from "@/lib/admin";
 import { obterConfigLoja } from "@/lib/dados";
+import { situacaoChaves } from "@/lib/pagamentos";
 import { Titulo } from "@/components/admin/Blocos";
 import { salvarConfiguracoes } from "../acoes";
 
@@ -25,7 +26,7 @@ function Chave({ nome, ligado, titulo, texto }: { nome: string; ligado: boolean;
 
 export default async function Configuracoes({ searchParams }: Props) {
   await exigirAdmin("loja");
-  const [{ salvo, erro }, loja] = await Promise.all([searchParams, obterConfigLoja()]);
+  const [{ salvo, erro }, loja, chavesConfiguradas] = await Promise.all([searchParams, obterConfigLoja(), situacaoChaves()]);
   const vitalicio = loja.mesesDeAcesso === null;
 
   return (
@@ -53,6 +54,31 @@ export default async function Configuracoes({ searchParams }: Props) {
             </label>
           </div>
           {erro === "meses" && <p className="mt-3 text-sm text-red-700">Informe um número de meses entre 1 e 120.</p>}
+        </section>
+
+        <section id="pagamentos" className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+          <h2 className="text-lg font-bold text-marca-900">Sistema de pagamento</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Onde os novos pagamentos (cartão, Pix e boleto) são processados. Pagamentos já feitos continuam aparecendo no Financeiro.
+            Se o sistema escolhido estiver sem chave na Vercel, o site usa o outro sozinho.
+          </p>
+          <div className="mt-5 space-y-3">
+            {([
+              ["mercadopago", "Mercado Pago", chavesConfiguradas.mercadopago, chavesConfiguradas.mercadopagoEmTeste ? "chave de TESTE" : "chave de produção"],
+              ["asaas", "Asaas", chavesConfiguradas.asaas, ""],
+            ] as const).map(([valor, rotulo, ligado, modo]) => (
+              <label key={valor} className="flex cursor-pointer flex-wrap items-center gap-3 rounded-2xl border border-slate-200 p-4 has-[:checked]:border-marca-900 has-[:checked]:bg-marca-50">
+                <input type="radio" name="gateway" value={valor} defaultChecked={(loja.gateway ?? "mercadopago") === valor} className="h-4 w-4 accent-marca-900" />
+                <span className="font-semibold text-marca-900">{rotulo}</span>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${ligado ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-500"}`}>
+                  {ligado ? `ligado${modo ? ` (${modo})` : ""}` : "sem chave na Vercel"}
+                </span>
+              </label>
+            ))}
+          </div>
+          {chavesConfiguradas.mercadopago && !chavesConfiguradas.mercadopagoChavePublica && (
+            <p className="mt-3 text-sm text-red-700">Falta a MERCADOPAGO_PUBLIC_KEY na Vercel: sem ela, o pagamento com cartão não funciona.</p>
+          )}
         </section>
 
         <section id="certificados" className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
