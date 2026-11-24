@@ -5,6 +5,7 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import QRCode from "qrcode";
 import type { Certificado } from "./dados";
+import { CNPJ_TECPRO, SITE_OFICIAL } from "./site";
 
 /** Gera o PDF do certificado (A4 deitado) no padrão visual da Tecpro. */
 
@@ -23,6 +24,11 @@ function dataPorExtenso(iso: string) {
     .formatToParts(d)
     .reduce<Record<string, string>>((a, p) => ({ ...a, [p.type]: p.value }), {});
   return `${partes.day} de ${MESES[Number(partes.month) - 1]} de ${partes.year}`;
+}
+
+function formatarCpf(cpf?: string | null): string | null {
+  const d = (cpf ?? "").replace(/\D/g, "");
+  return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : null;
 }
 
 function centralizado(page: PDFPage, texto: string, y: number, font: PDFFont, size: number, color = AZUL) {
@@ -45,7 +51,7 @@ function quebrar(texto: string, font: PDFFont, size: number, largura: number): s
   return linhas;
 }
 
-export async function gerarPdfCertificado(c: Certificado, urlValidacao: string): Promise<Uint8Array> {
+export async function gerarPdfCertificado(c: Certificado & { cpf?: string | null }, urlValidacao: string): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
   pdf.setTitle(`Certificado - ${c.cursoNome}`);
@@ -86,31 +92,47 @@ export async function gerarPdfCertificado(c: Certificado, urlValidacao: string):
   const larguraLinha = Math.min(negrito.widthOfTextAtSize(c.nomeAluno, tam) + 40, W - 140);
   page.drawLine({ start: { x: (W - larguraLinha) / 2, y: H - 270 }, end: { x: (W + larguraLinha) / 2, y: H - 270 }, thickness: 0.8, color: CINZA_CLARO });
 
-  const frase = `concluiu com êxito o curso livre online “${c.cursoNome}”, com carga horária de ${c.cargaHoraria} horas.`;
-  quebrar(frase, regular, 13, W - 150).forEach((linha, i) => centralizado(page, linha, H - 304 - i * 20, regular, 13, CINZA));
+  // Frase com CPF (quando o aluno tem CPF no cadastro) e o nome do curso em destaque na linha de baixo
+  const cpf = formatarCpf(c.cpf);
+  const frase = cpf
+    ? `portador(a) do CPF ${cpf}, concluiu com êxito o curso online`
+    : "concluiu com êxito o curso online";
+  centralizado(page, frase, H - 300, regular, 13, CINZA);
+  const linhasCurso = quebrar(c.cursoNome, semi, 16, W - 180).slice(0, 2);
+  linhasCurso.forEach((linha, i) => centralizado(page, linha, H - 326 - i * 20, semi, 16));
 
-  centralizado(page, `Emitido em ${dataPorExtenso(c.emitidoEm)}.`, H - 362, regular, 11, CINZA);
+  // Carga horária, conclusão e código de verificação
+  const yRotulo = 228;
+  const yValor = 211;
+  const colunas: [number, string, string][] = [
+    [110, "Carga horária", `${c.cargaHoraria} horas`],
+    [290, "Conclusão", dataPorExtenso(c.emitidoEm)],
+    [490, "Código de verificação", c.codigo],
+  ];
+  for (const [x, rotulo, valor] of colunas) {
+    page.drawText(rotulo, { x, y: yRotulo, size: 8, font: regular, color: CINZA });
+    page.drawText(valor, { x, y: yValor, size: 13, font: negrito, color: AZUL });
+    page.drawLine({ start: { x, y: yValor - 8 }, end: { x: x + Math.max(150, negrito.widthOfTextAtSize(valor, 13)), y: yValor - 8 }, thickness: 0.6, color: CINZA_CLARO });
+  }
 
-  // Assinatura institucional
-  const ax = 110;
-  // Rubrica da coordenação (PNG com fundo transparente), centralizada sobre a linha e passando um pouco dela
-  const assLargura = 190;
-  const assAltura = (assinaturaPng.height / assinaturaPng.width) * assLargura;
-  page.drawImage(assinaturaPng, { x: ax + (230 - assLargura) / 2, y: 107, width: assLargura, height: assAltura });
-  page.drawLine({ start: { x: ax, y: 112 }, end: { x: ax + 230, y: 112 }, thickness: 0.8, color: AZUL });
-  page.drawText("Tecpro Multi Ensino", { x: ax, y: 96, size: 11, font: semi, color: AZUL });
-  page.drawText("Coordenação pedagógica", { x: ax, y: 82, size: 9, font: regular, color: CINZA });
-
-  // Validação
-  page.drawImage(qr, { x: W - 190, y: 56, width: 84, height: 84 });
-  const vx = W - 360;
-  page.drawText("Código de validação", { x: vx, y: 120, size: 8, font: regular, color: CINZA });
-  page.drawText(c.codigo, { x: vx, y: 104, size: 13, font: negrito, color: AZUL });
-  page.drawText("Confira a autenticidade em:", { x: vx, y: 84, size: 8, font: regular, color: CINZA });
-  // Mostra só o endereço da página de validação (o código já está acima e o QR leva ao link completo),
-  // para o texto não invadir o QR code.
+  // Validação: QR code + endereço (o código já está acima e o QR leva ao link completo)
+  page.drawImage(qr, { x: W - 176, y: 112, width: 92, height: 92 });
+  page.drawText("Confira a autenticidade em:", { x: 490, y: 172, size: 8, font: regular, color: CINZA });
   const urlCurta = urlValidacao.replace(/^https?:\/\//, "").replace(/\/[^/]*$/, "");
-  page.drawText(urlCurta, { x: vx, y: 72, size: 8, font: regular, color: AZUL });
+  page.drawText(urlCurta, { x: 490, y: 160, size: 8, font: regular, color: AZUL });
+
+  // Assinatura institucional: rubrica (PNG transparente) encostada na linha
+  const ax = 110;
+  const assLargura = 125;
+  const assAltura = (assinaturaPng.height / assinaturaPng.width) * assLargura;
+  page.drawImage(assinaturaPng, { x: ax + (230 - assLargura) / 2, y: 106, width: assLargura, height: assAltura });
+  page.drawLine({ start: { x: ax, y: 108 }, end: { x: ax + 230, y: 108 }, thickness: 0.8, color: AZUL });
+  page.drawText("Tecpro Multi Ensino", { x: ax, y: 92, size: 11, font: semi, color: AZUL });
+  page.drawText("Coordenação pedagógica", { x: ax, y: 78, size: 9, font: regular, color: CINZA });
+
+  // Rodapé com os dados da escola
+  const site = SITE_OFICIAL.replace(/^https?:\/\//, "");
+  centralizado(page, `Tecpro Multi Ensino  ·  CNPJ ${CNPJ_TECPRO}  ·  ${site}`, 40, regular, 8, CINZA);
 
   return pdf.save();
 }
