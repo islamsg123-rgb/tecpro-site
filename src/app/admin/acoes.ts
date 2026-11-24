@@ -73,11 +73,10 @@ export async function salvarConfiguracoes(f: FormData) {
     meses = Number(String(f.get("meses") ?? "").trim());
     if (!Number.isInteger(meses) || meses < 1 || meses > 120) redirect("/admin/configuracoes?erro=meses");
   }
-  const whatsapp = String(f.get("whatsapp") ?? "").trim().slice(0, 30);
+  const whatsapp = ""; // a escola não mostra mais WhatsApp no site (atendimento só por e-mail)
   const emailContato = String(f.get("emailContato") ?? "").trim().toLowerCase().slice(0, 120);
   const instagram = String(f.get("instagram") ?? "").trim().replace(/^https?:\/\/(www\.)?instagram\.com\//, "@").replace(/\/$/, "").slice(0, 60);
-  const digitos = whatsapp.replace(/\D/g, "");
-  if ((whatsapp && (digitos.length < 10 || digitos.length > 13)) || (emailContato && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailContato))) {
+  if ((emailContato && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailContato))) {
     redirect("/admin/configuracoes?erro=contato");
   }
   const precos = ["precoCertIndividual", "precoCertEssencial", "precoCertProfissional"].map((k) => lerPreco(f.get(k)));

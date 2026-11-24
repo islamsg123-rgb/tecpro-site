@@ -18,6 +18,7 @@ Escreva a resposta que a equipe vai colar no Gmail e enviar para a pessoa:
 - Para problemas técnicos (vídeo que não abre, erro, não consegue entrar), dê de 2 a 4 passos práticos (atualizar a página, testar outro navegador ou o celular, conferir a internet, entrar pelo link/código enviado ao e-mail e olhar o spam) e diga que a equipe já está verificando.
 - Só fale do valor do certificado se a pessoa perguntar sobre certificado.
 - Não prometa reembolso, desconto ou prazo de solução.
+- Nunca indique WhatsApp ou telefone da escola: o atendimento é só por e-mail e pelo botão de ajuda do site.
 - Responda só com o texto do e-mail, de 60 a 160 palavras.`;
 
 function dadosDaEscola(loja: Awaited<ReturnType<typeof obterConfigLoja>>) {
@@ -28,7 +29,7 @@ function dadosDaEscola(loja: Awaited<ReturnType<typeof obterConfigLoja>>) {
     `Cursos gratuitos: a matrícula é grátis; ao concluir, o certificado pode ser emitido por ${formatarPreco(loja.precoCertIndividual)} (ou pacotes: 3 por ${formatarPreco(loja.precoCertEssencial)}, 5 por ${formatarPreco(loja.precoCertProfissional)}).`,
     `Para concluir uma aula: assistir pelo menos 80% do vídeo e acertar a prova da aula.`,
     `Certificados podem ser validados em /validar. Correção de nome no certificado só pelo suporte.`,
-    loja.whatsapp ? `WhatsApp da escola: ${loja.whatsapp}.` : "",
+    `Contato da escola: só por e-mail (${loja.emailContato || "contato@tecpromultiensino.com.br"}) e pelo botão de ajuda do site. A escola não atende por WhatsApp nem telefone.`,
   ].filter(Boolean).join("\n");
 }
 

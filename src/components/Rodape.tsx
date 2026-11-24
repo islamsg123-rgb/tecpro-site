@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
 import { obterConfigLoja } from "@/lib/dados";
+import { BotaoAbrirAjuda } from "./ajuda/BotaoAbrirAjuda";
 
 export async function Rodape() {
   const loja = await obterConfigLoja().catch(() => null);
-  const zap = loja?.whatsapp.replace(/\D/g, "") ?? "";
+  // Atendimento só por e-mail e pelo botão de ajuda: o WhatsApp da escola não aparece no site.
+  const email = loja?.emailContato || "contato@tecpromultiensino.com.br";
   const insta = loja?.instagram.replace(/^@/, "") ?? "";
   return (
     <footer className="bg-marca-950 text-slate-400">
@@ -35,10 +37,9 @@ export async function Rodape() {
           <p className="font-semibold text-white">Atendimento</p>
           {/* Contatos editáveis no painel: Loja virtual > Configurações da loja */}
           <ul className="mt-4 space-y-3">
-            {zap && <li><a href={`https://wa.me/${zap.length <= 11 ? `55${zap}` : zap}`} target="_blank" rel="noreferrer" className="hover:text-white">WhatsApp: {loja!.whatsapp}</a></li>}
-            {loja?.emailContato && <li><a href={`mailto:${loja.emailContato}`} className="hover:text-white">{loja.emailContato}</a></li>}
+            <li><a href={`mailto:${email}`} className="hover:text-white">{email}</a></li>
             {insta && <li><a href={`https://instagram.com/${insta}`} target="_blank" rel="noreferrer" className="hover:text-white">Instagram: @{insta}</a></li>}
-            {!zap && !loja?.emailContato && !insta && <li>contato@tecpromultiensino.com.br</li>}
+            <li><BotaoAbrirAjuda className="hover:text-white">Botão de ajuda do site</BotaoAbrirAjuda></li>
           </ul>
         </div>
       </div>

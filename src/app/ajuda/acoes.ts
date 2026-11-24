@@ -79,7 +79,7 @@ export async function enviarMensagemAjuda(_: EstadoAjuda, f: FormData): Promise<
   const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "";
   const ipHash = ip ? createHash("sha256").update(`tecpro-ajuda|${ip}`).digest("hex").slice(0, 32) : null;
   if (ipHash && (await envioRecentesDoIp(ipHash, new Date(Date.now() - 60 * 60 * 1000))) >= LIMITE_POR_HORA) {
-    return { erro: "Você já enviou várias mensagens agora há pouco. Aguarde um pouco ou fale com a gente pelo WhatsApp." };
+    return { erro: "Você já enviou várias mensagens agora há pouco. Aguarde um pouco ou escreva para contato@tecpromultiensino.com.br." };
   }
 
   const { curso, aula } = await cursoDaPagina(caminho);
