@@ -16,8 +16,9 @@ async function lerTudo(
   return out;
 }
 import { getCursos, getModulos } from "./cursos";
+import { listarCarrinhos } from "./dados/carrinhos";
 import { telefonesDemonstracao } from "./dados/painel";
-import { emailConfigurado, emailLembrete, enviarEmail } from "./email";
+import { emailConfigurado, emailLembrete, emailNuncaComecou, enviarEmail } from "./email";
 import { SITE_OFICIAL } from "./site";
 
 /**
@@ -27,7 +28,8 @@ import { SITE_OFICIAL } from "./site";
  *  - Só 3 lembretes por "parada" (padrão: 3, 7 e 14 dias). Depois disso, para.
  *  - Se o aluno voltar a estudar, a contagem recomeça do zero.
  *  - Curso concluído, curso removido pelo painel, aluno excluído ou descadastrado: não recebe.
- *  - No máximo 1 e-mail por aluno a cada 3 dias, mesmo com vários cursos parados.
+ *  - No máximo 1 e-mail por pessoa a cada 2 dias, mesmo com vários cursos parados.
+ *  - Também (liga separado no painel): matriculados que nunca abriram uma aula (padrão: 1, 3 e 7 dias).
  * Roda todo dia sozinho (Cron da Vercel, vercel.json) e também pelo botão do painel.
  * Tabelas: supabase/migrations/0010_lembretes_estudo.sql.
  */
@@ -47,7 +49,19 @@ export interface ConfigLembretes {
   maximoPorDia: number;
   /** Mensagem pronta do botão "Chamar no WhatsApp" */
   mensagemWhatsapp: string;
+  /** Matriculados que nunca abriram uma aula (dias contados da matrícula) */
+  nuncaComecou: GrupoExtra;
 }
+
+export interface GrupoExtra {
+  ligado: boolean;
+  dias: [number, number, number];
+  mensagemWhatsapp: string;
+}
+
+/** Tipo de lembrete: aluno parado no meio do curso ou matriculado que nunca começou. */
+export type TipoLembrete = "parado" | "nunca";
+export const NOME_TIPO: Record<TipoLembrete, string> = { parado: "Parou de estudar", nunca: "Nunca começou" };
 
 export const MENSAGEM_WHATSAPP_PADRAO =
   "Oi, {nome}! Tudo bem? Aqui é da Tecpro Multi Ensino 😊\n\n" +
@@ -55,9 +69,25 @@ export const MENSAGEM_WHATSAPP_PADRAO =
   "Que tal separar 15 minutinhos hoje? É só continuar de onde parou: {link}\n\n" +
   "Se tiver qualquer dificuldade, me chama aqui que eu te ajudo.";
 
+export const MENSAGEM_WHATSAPP_NUNCA =
+  "Oi, {nome}! Tudo bem? Aqui é da Tecpro Multi Ensino 😊\n\n" +
+  "Seu curso *{curso}* já está liberado faz {dias} dias, mas vi que você ainda não assistiu à primeira aula. Aconteceu alguma coisa? Conseguiu entrar?\n\n" +
+  "É só entrar aqui com o seu e-mail: {link}\n\n" +
+  "Se tiver qualquer dificuldade, me chama aqui que eu te ajudo.";
+
 export const CONFIG_LEMBRETES_PADRAO: ConfigLembretes = {
   ligado: false, dias: [3, 7, 14], limiteDias: 45, maximoPorDia: 90, mensagemWhatsapp: MENSAGEM_WHATSAPP_PADRAO,
+  nuncaComecou: { ligado: false, dias: [1, 3, 7], mensagemWhatsapp: MENSAGEM_WHATSAPP_NUNCA },
 };
+
+/** Junta o que está salvo com o padrão (configurações antigas não têm os grupos novos). */
+function completar(c: Partial<ConfigLembretes> | undefined): ConfigLembretes {
+  const p = CONFIG_LEMBRETES_PADRAO;
+  return {
+    ...p, ...c,
+    nuncaComecou: { ...p.nuncaComecou, ...c?.nuncaComecou },
+  };
+}
 
 const gMem = globalThis as unknown as {
   __lembretesDemo?: { config?: ConfigLembretes; registros: RegistroLembrete[]; descadastro: Set<string>; seq: number; ultima?: UltimaRodada };
@@ -65,10 +95,10 @@ const gMem = globalThis as unknown as {
 const mem = () => (gMem.__lembretesDemo ??= { registros: [], descadastro: new Set(), seq: 1 });
 
 export async function obterConfigLembretes(): Promise<ConfigLembretes> {
-  if (bancoEmDemonstracao) return { ...CONFIG_LEMBRETES_PADRAO, ...mem().config };
+  if (bancoEmDemonstracao) return completar(mem().config);
   const { data, error } = await db().from("configuracoes_loja").select("valor").eq("chave", "lembretes").maybeSingle();
   if (error) return CONFIG_LEMBRETES_PADRAO;
-  return { ...CONFIG_LEMBRETES_PADRAO, ...((data?.valor as Partial<ConfigLembretes>) ?? {}) };
+  return completar((data?.valor as Partial<ConfigLembretes>) ?? undefined);
 }
 
 export async function salvarConfigLembretes(c: ConfigLembretes): Promise<void> {
@@ -86,6 +116,7 @@ export async function salvarConfigLembretes(c: ConfigLembretes): Promise<void> {
 
 export interface RegistroLembrete {
   id: number;
+  tipo: TipoLembrete;
   email: string;
   nome: string | null;
   cursoId: string;
@@ -93,6 +124,7 @@ export interface RegistroLembrete {
   etapa: number;
   diasParado: number;
   progressoPct: number | null;
+  /** Data de referência: última aula (parado), matrícula (nunca começou)  */
   ultimaAtividade: string;
   status: "enviado" | "erro";
   detalhe: string | null;
@@ -100,7 +132,7 @@ export interface RegistroLembrete {
 }
 
 const daLinha = (r: Record<string, unknown>): RegistroLembrete => ({
-  id: Number(r.id), email: String(r.email), nome: (r.nome as string) ?? null, cursoId: String(r.curso_id),
+  id: Number(r.id), tipo: ((r.tipo as TipoLembrete) ?? "parado"), email: String(r.email), nome: (r.nome as string) ?? null, cursoId: String(r.curso_id),
   cursoNome: (r.curso_nome as string) ?? null, etapa: Number(r.etapa), diasParado: Number(r.dias_parado),
   progressoPct: r.progresso_pct == null ? null : Number(r.progresso_pct), ultimaAtividade: String(r.ultima_atividade),
   status: r.status as "enviado" | "erro", detalhe: (r.detalhe as string) ?? null, enviadoEm: String(r.enviado_em),
@@ -134,10 +166,19 @@ async function registrar(r: Omit<RegistroLembrete, "id" | "enviadoEm">): Promise
     return;
   }
   const { error } = await db().from("lembretes_estudo").insert({
+    // Sem a coluna "tipo" (SQL lembretes-novos-alunos.sql não rodado), os lembretes de parados continuam funcionando.
+    ...(r.tipo !== "parado" ? { tipo: r.tipo } : {}),
     email: r.email, nome: r.nome, curso_id: r.cursoId, curso_nome: r.cursoNome, etapa: r.etapa, dias_parado: r.diasParado,
     progresso_pct: r.progressoPct, ultima_atividade: r.ultimaAtividade, status: r.status, detalhe: r.detalhe?.slice(0, 500) ?? null,
   });
   if (error) throw new Error(`Não deu para gravar o registro do lembrete: ${error.message}`);
+}
+
+/** true quando falta rodar o SQL que cria a coluna "tipo" (lembretes para quem nunca começou). */
+export async function faltaSqlTipos(): Promise<boolean> {
+  if (bancoEmDemonstracao) return false;
+  const { error } = await db().from("lembretes_estudo").select("tipo").limit(1);
+  return Boolean(error);
 }
 
 /* ---------- Descadastro (LGPD) ---------- */
@@ -199,8 +240,11 @@ export interface AlunoParado {
  * Cursos começados e não concluídos, com os dias sem estudar (do mais recente para o mais antigo).
  * Lê a tabela de progresso inteira em páginas de 1000 linhas.
  */
-export async function cursosParados(minimoDias = 1): Promise<AlunoParado[]> {
-  const porPar = new Map<string, { aulas: Set<string>; ultima: string }>();
+type Progresso = Map<string, { aulas: Set<string>; ultima: string }>;
+
+/** Progresso de todos os alunos: "email|curso" -> aulas concluídas e data da última atividade. */
+async function lerProgresso(): Promise<Progresso> {
+  const porPar: Progresso = new Map();
   const somar = (email: string, cursoId: string, aulaId: string, quando: string) => {
     const k = `${norm(email)}|${cursoId}`;
     const p = porPar.get(k) ?? { aulas: new Set<string>(), ultima: quando };
@@ -227,6 +271,11 @@ export async function cursosParados(minimoDias = 1): Promise<AlunoParado[]> {
       if (!data || data.length < 1000) break;
     }
   }
+  return porPar;
+}
+
+export async function cursosParados(minimoDias = 1, progresso?: Progresso): Promise<AlunoParado[]> {
+  const porPar = progresso ?? (await lerProgresso());
 
   const [alunos, cursos, removidos, telefones] = await Promise.all([
     todosAlunos(), getCursos(), todosCursosRemovidos(), telefonesDosAlunos(),
@@ -297,12 +346,74 @@ export async function telefonesDosAlunos(): Promise<Map<string, string>> {
   return out;
 }
 
+/* ---------- Quem se matriculou e nunca começou ---------- */
+
+export interface PessoaSemAula {
+  email: string;
+  nome: string | null;
+  telefone: string | null;
+  cursoId: string;
+  cursoNome: string;
+  cursoSlug: string;
+  gratuito: boolean;
+  /** Data da matrícula */
+  desde: string;
+  dias: number;
+}
+
+interface LinhaCarrinho { email: string; cursoId: string; nome: string | null; telefone: string | null; etapa: string; criadoEm: string; atualizadoEm: string }
+
+async function carrinhosDeCurso(): Promise<LinhaCarrinho[]> {
+  if (bancoEmDemonstracao) {
+    const { lista } = await listarCarrinhos(5000);
+    return lista.filter((c) => c.tipo === "curso").map((c) => ({ ...c, email: norm(c.email) }));
+  }
+  const linhas = await lerTudo((de, ate) =>
+    db().from("carrinhos").select("email, curso_id, nome, telefone, etapa, criado_em, atualizado_em").eq("tipo", "curso")
+      .order("email").order("curso_id").range(de, ate)).catch(() => []);
+  return linhas.map((r) => ({
+    email: norm(String(r.email)), cursoId: String(r.curso_id), nome: (r.nome as string) ?? null, telefone: (r.telefone as string) ?? null,
+    etapa: String(r.etapa), criadoEm: String(r.criado_em), atualizadoEm: String(r.atualizado_em),
+  }));
+}
+
+/**
+ * Matriculados pelo site (inscrição concluída) que não abriram nenhuma aula daquele curso.
+ * O curso de cada pessoa vem da inscrição feita no site (alunos cadastrados só pelo painel ficam de fora).
+ */
+export async function semAula(minimoDias = 1, progresso?: Progresso): Promise<{ nunca: PessoaSemAula[] }> {
+  const [porPar, carrinhos, alunos, cursos, removidos, telefones] = await Promise.all([
+    progresso ?? lerProgresso(), carrinhosDeCurso(), todosAlunos(), getCursos(), todosCursosRemovidos(), telefonesDosAlunos(),
+  ]);
+  const aluno = new Map(alunos.map((a) => [norm(a.email), a]));
+  const agora = Date.now();
+  const nunca: PessoaSemAula[] = [];
+  for (const c of carrinhos) {
+    const curso = cursos.find((x) => x.id === c.cursoId);
+    if (!curso) continue;
+    if (c.etapa !== "pago" && c.etapa !== "matriculado") continue;
+    const desde = c.atualizadoEm;
+    const dias = Math.floor((agora - new Date(desde).getTime()) / DIA);
+    if (dias < minimoDias) continue;
+    const base = {
+      email: c.email, telefone: telefones.get(c.email) ?? c.telefone, cursoId: c.cursoId, cursoNome: curso.nome, cursoSlug: curso.slug,
+      gratuito: curso.gratuito, desde, dias,
+    };
+    const a = aluno.get(c.email);
+    if (!a || porPar.has(`${c.email}|${c.cursoId}`) || removidos.has(`${c.email}|${c.cursoId}`)) continue;
+    nunca.push({ ...base, nome: a.nome ?? c.nome });
+  }
+  const ordem = (x: PessoaSemAula, y: PessoaSemAula) => x.dias - y.dias;
+  return { nunca: nunca.sort(ordem) };
+}
+
 /* ---------- Envio ---------- */
 
 /** Qual lembrete (1, 2 ou 3) cabe para quem está há `dias` sem estudar. 0 = nenhum. */
-export function etapaPara(dias: number, cfg: ConfigLembretes): number {
+export function etapaPara(dias: number, cfg: ConfigLembretes, tipo: TipoLembrete = "parado"): number {
+  const lista = tipo === "parado" ? cfg.dias : cfg.nuncaComecou.dias;
   let etapa = 0;
-  cfg.dias.forEach((d, i) => { if (dias >= d) etapa = i + 1; });
+  lista.forEach((d, i) => { if (dias >= d) etapa = i + 1; });
   return dias > cfg.limiteDias ? 0 : etapa;
 }
 
@@ -345,10 +456,23 @@ export async function rodarLembretes(origem: UltimaRodada["origem"], base = SITE
   return u;
 }
 
+interface Envio {
+  tipo: TipoLembrete;
+  email: string;
+  nome: string | null;
+  cursoId: string;
+  cursoNome: string;
+  referencia: string;
+  dias: number;
+  pct: number | null;
+  montar: (etapa: number) => { assunto: string; html: string; texto: string };
+}
+
 async function rodada(base: string): Promise<ResultadoRodada> {
   const cfg = await obterConfigLembretes();
   const r: ResultadoRodada = { enviados: 0, erros: 0, pulados: [], detalhes: [] };
-  if (!cfg.ligado) {
+  const extras = cfg.nuncaComecou.ligado;
+  if (!cfg.ligado && !extras) {
     r.pulados.push("Lembretes desligados no painel.");
     return r;
   }
@@ -356,38 +480,61 @@ async function rodada(base: string): Promise<ResultadoRodada> {
     r.pulados.push("RESEND_API_KEY não está na Vercel: nenhum e-mail pode ser enviado.");
     return r;
   }
-  const [parados, sairam, { lista: historico, tabelaFaltando }] = await Promise.all([
-    cursosParados(Math.min(...cfg.dias)), descadastrados(), listarLembretes(Math.max(cfg.limiteDias, 30) + 30),
+  const progresso = await lerProgresso();
+  const [parados, sem, sairam, { lista: historico, tabelaFaltando }, faltaTipo] = await Promise.all([
+    cfg.ligado ? cursosParados(Math.min(...cfg.dias), progresso) : Promise.resolve([]),
+    extras ? semAula(1, progresso) : Promise.resolve({ nunca: [] }),
+    descadastrados(), listarLembretes(Math.max(cfg.limiteDias, 30) + 30), extras ? faltaSqlTipos() : Promise.resolve(false),
   ]);
   if (tabelaFaltando) throw new Error("Tabela de lembretes não encontrada: rode o SQL lembretes-estudo.sql no Supabase.");
 
+  const sair = (email: string) => linkDescadastro(email, base);
+  // Ordem de prioridade: quem parou no meio do curso, depois quem nunca começou.
+  const fila: Envio[] = [
+    ...parados.map((p): Envio => ({
+      tipo: "parado", email: p.email, nome: p.nome, cursoId: p.cursoId, cursoNome: p.cursoNome, referencia: p.ultimaAtividade, dias: p.diasParado, pct: p.pct,
+      montar: (etapa) => emailLembrete({
+        nome: p.nome ?? "", curso: p.cursoNome, pct: p.pct, feitas: p.feitas, total: p.total, dias: p.diasParado, etapa,
+        linkContinuar: linkContinuar(p.cursoSlug, base), linkSair: sair(p.email),
+      }),
+    })),
+  ];
+  if (extras && faltaTipo) {
+    r.pulados.push("Lembretes para quem nunca começou: falta rodar o SQL lembretes-novos-alunos.sql no Supabase.");
+  } else {
+    if (cfg.nuncaComecou.ligado) {
+      fila.push(...sem.nunca.map((p): Envio => ({
+        tipo: "nunca", email: p.email, nome: p.nome, cursoId: p.cursoId, cursoNome: p.cursoNome, referencia: p.desde, dias: p.dias, pct: 0,
+        montar: (etapa) => emailNuncaComecou({ nome: p.nome ?? "", curso: p.cursoNome, dias: p.dias, etapa, link: linkContinuar(p.cursoSlug, base), linkSair: sair(p.email) }),
+      })));
+    }
+  }
+
   const enviados = historico.filter((h) => h.status === "enviado");
-  const jaFoi = new Set(enviados.map((h) => `${h.email}|${h.cursoId}|${h.etapa}|${new Date(h.ultimaAtividade).getTime()}`));
+  const chaveEnvio = (tipo: string, email: string, curso: string, etapa: number, ref: string) => `${tipo}|${email}|${curso}|${etapa}|${new Date(ref).getTime()}`;
+  const jaFoi = new Set(enviados.map((h) => chaveEnvio(h.tipo, h.email, h.cursoId, h.etapa, h.ultimaAtividade)));
   const ultimoPorAluno = new Map<string, number>();
   for (const h of enviados) ultimoPorAluno.set(h.email, Math.max(ultimoPorAluno.get(h.email) ?? 0, new Date(h.enviadoEm).getTime()));
 
-  // Um curso por aluno: o que ele estudou mais recentemente (os parados vêm do mais recente para o mais antigo).
+  // Um e-mail por pessoa por rodada, e no máximo um a cada 2 dias.
   const vistos = new Set<string>();
-  for (const p of parados) {
+  for (const p of fila) {
     if (r.enviados + r.erros >= cfg.maximoPorDia) {
       r.pulados.push(`Limite de ${cfg.maximoPorDia} e-mails por dia atingido; o resto fica para amanhã.`);
       break;
     }
     if (vistos.has(p.email) || sairam.has(p.email) || (p.email === EMAIL_DEMO && !bancoEmDemonstracao)) continue;
-    const etapa = etapaPara(p.diasParado, cfg);
+    const etapa = etapaPara(p.dias, cfg, p.tipo);
     if (!etapa) continue;
-    if (jaFoi.has(`${p.email}|${p.cursoId}|${etapa}|${new Date(p.ultimaAtividade).getTime()}`)) continue;
-    if (Date.now() - (ultimoPorAluno.get(p.email) ?? 0) < 3 * DIA - 3_600_000) continue;
+    if (jaFoi.has(chaveEnvio(p.tipo, p.email, p.cursoId, etapa, p.referencia))) continue;
+    if (Date.now() - (ultimoPorAluno.get(p.email) ?? 0) < 2 * DIA - 3_600_000) continue;
     vistos.add(p.email);
 
-    const email = emailLembrete({
-      nome: p.nome ?? "", curso: p.cursoNome, pct: p.pct, feitas: p.feitas, total: p.total, dias: p.diasParado, etapa,
-      linkContinuar: linkContinuar(p.cursoSlug, base), linkSair: linkDescadastro(p.email, base),
-    });
+    const email = p.montar(etapa);
     let status: "enviado" | "erro" = "enviado";
     let detalhe: string | null = null;
     try {
-      await enviarEmail({ para: p.email, ...email, cabecalhos: { "List-Unsubscribe": `<${linkDescadastro(p.email, base)}>` } });
+      await enviarEmail({ para: p.email, ...email, cabecalhos: { "List-Unsubscribe": `<${sair(p.email)}>` } });
       r.enviados++;
     } catch (e) {
       status = "erro";
@@ -396,11 +543,30 @@ async function rodada(base: string): Promise<ResultadoRodada> {
       r.detalhes.push(`${p.email}: ${detalhe}`);
     }
     await registrar({
-      email: p.email, nome: p.nome, cursoId: p.cursoId, cursoNome: p.cursoNome, etapa, diasParado: p.diasParado,
-      progressoPct: p.pct, ultimaAtividade: p.ultimaAtividade, status, detalhe,
+      tipo: p.tipo, email: p.email, nome: p.nome, cursoId: p.cursoId, cursoNome: p.cursoNome, etapa, diasParado: p.dias,
+      progressoPct: p.pct, ultimaAtividade: p.referencia, status, detalhe,
     });
     // O Resend aceita no máximo 2 e-mails por segundo.
     await new Promise((ok) => setTimeout(ok, 600));
   }
   return r;
+}
+
+/** E-mail com dados de exemplo (prévia e teste do painel). */
+export function emailDeExemplo(tipo: TipoLembrete, etapa: number, cfg: ConfigLembretes, nome: string, emailSair: string) {
+  const linkSair = linkDescadastro(emailSair);
+  if (tipo === "nunca") {
+    return emailNuncaComecou({ nome, curso: "Excel Avançado", dias: cfg.nuncaComecou.dias[etapa - 1], etapa, link: linkContinuar("excel-avancado"), linkSair });
+  }
+  return emailLembrete({
+    nome, curso: "Excel Avançado", pct: 40 + etapa * 5, feitas: 8 + etapa, total: 20, dias: cfg.dias[etapa - 1], etapa,
+    linkContinuar: linkContinuar("excel-avancado"), linkSair,
+  });
+}
+
+/** As três listas do painel, lendo o progresso uma vez só. */
+export async function listasDoPainel(cfg: ConfigLembretes) {
+  const progresso = await lerProgresso();
+  const [parados, sem] = await Promise.all([cursosParados(Math.min(...cfg.dias), progresso), semAula(1, progresso)]);
+  return { parados, ...sem };
 }

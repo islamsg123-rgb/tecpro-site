@@ -4,12 +4,12 @@ import { exigirAdmin } from "@/lib/admin";
 import { ultimaAtividadePorAluno } from "@/lib/dados";
 import { emailConfigurado } from "@/lib/email";
 import {
-  cursosParados, descadastrados, etapaPara, linkContinuar, listarLembretes, obterConfigLembretes, ultimaRodada,
-  type AlunoParado, type ConfigLembretes, type RegistroLembrete,
+  descadastrados, etapaPara, faltaSqlTipos, linkContinuar, listarLembretes, listasDoPainel, NOME_TIPO, obterConfigLembretes, ultimaRodada,
+  type AlunoParado, type ConfigLembretes, type PessoaSemAula, type RegistroLembrete, type TipoLembrete,
 } from "@/lib/lembretes";
 import { AvisoSql, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { Dica } from "@/components/admin/Dica";
-import { enviarTeste, rodarAgora, salvarLembretes } from "./acoes";
+import { rodarAgora, salvarLembretes, testeNunca, testeParado } from "./acoes";
 
 export const metadata: Metadata = { title: "Lembretes de estudo" };
 export const dynamic = "force-dynamic";
@@ -19,21 +19,27 @@ type Props = { searchParams: Promise<{ salvo?: string; erro?: string; teste?: st
 
 const dataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+const dataCurta = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 
 const campoNum = "w-20 rounded-xl border border-slate-300 px-3 py-2 text-center text-marca-900";
+const ficha = (email: string) => `/admin/alunos/ficha?email=${encodeURIComponent(email)}`;
 
 export default async function Lembretes({ searchParams }: Props) {
   await exigirAdmin("alunos");
   const q = await searchParams;
   const cfg = await obterConfigLembretes();
-  const [parados, historico, sairam, atividade, rodada] = await Promise.all([
-    cursosParados(Math.min(...cfg.dias)).catch(() => [] as AlunoParado[]),
+  const vazio = { parados: [] as AlunoParado[], nunca: [] as PessoaSemAula[] };
+  const [listas, historico, sairam, atividade, rodada, faltaTipo] = await Promise.all([
+    listasDoPainel(cfg).catch(() => vazio),
     listarLembretes(120),
     descadastrados().catch(() => new Set<string>()),
     ultimaAtividadePorAluno().catch(() => new Map<string, string>()),
     ultimaRodada().catch(() => null),
+    faltaSqlTipos(),
   ]);
+  const { parados, nunca } = listas;
   const cronOk = Boolean(process.env.CRON_SECRET);
+  const algumLigado = cfg.ligado || cfg.nuncaComecou.ligado;
   const enviados = historico.lista.filter((h) => h.status === "enviado");
   const voltou = (h: RegistroLembrete) => {
     const a = atividade.get(h.email);
@@ -43,43 +49,38 @@ export default async function Lembretes({ searchParams }: Props) {
   const alunos30 = new Set(ultimos30.map((h) => h.email));
   const voltaram30 = new Set(ultimos30.filter(voltou).map((h) => h.email));
   const ultimoDoPar = new Map<string, RegistroLembrete>();
-  for (const h of enviados) if (!ultimoDoPar.has(`${h.email}|${h.cursoId}`)) ultimoDoPar.set(`${h.email}|${h.cursoId}`, h);
-  const mostrar = q.ver === "todos" ? parados : parados.slice(0, 100);
+  for (const h of enviados) if (!ultimoDoPar.has(`${h.tipo}|${h.email}|${h.cursoId}`)) ultimoDoPar.set(`${h.tipo}|${h.email}|${h.cursoId}`, h);
+  const enviadoDesta = (tipo: TipoLembrete, email: string, cursoId: string, ref: string) => {
+    const u = ultimoDoPar.get(`${tipo}|${email}|${cursoId}`);
+    return u && new Date(u.ultimaAtividade).getTime() === new Date(ref).getTime() ? u : null;
+  };
+  const todos = q.ver === "todos";
 
   return (
     <>
       <Titulo
-        descricao={<>Quando um aluno começa um curso, não termina e fica alguns dias sem estudar, o site manda sozinho um e-mail chamando ele de volta, com o progresso e um botão <strong>Continuar de onde parei</strong>. São no máximo 3 lembretes; se o aluno voltar a estudar, a contagem recomeça. Quem concluiu o curso não recebe.</>}
+        descricao={<>O site manda sozinho, todo dia às 10h, e-mails chamando de volta dois tipos de aluno: quem <strong>parou de estudar</strong> no meio do curso e quem se <strong>matriculou e nunca abriu uma aula</strong>. Cada tipo liga separado, tem no máximo 3 lembretes e cada pessoa recebe no máximo um e-mail a cada 2 dias.</>}
       >
         Lembretes de estudo
       </Titulo>
 
       {historico.tabelaFaltando && <AvisoSql arquivo="lembretes-estudo.sql" />}
+      {!historico.tabelaFaltando && faltaTipo && <AvisoSql arquivo="lembretes-novos-alunos.sql" />}
       {q.salvo && <Aviso cor="verde">Configuração salva.</Aviso>}
-      {q.teste && <Aviso cor="verde">Mandamos os 3 modelos de lembrete para <strong>{q.teste}</strong>. Confira a caixa de entrada (e o spam).</Aviso>}
+      {q.teste && <Aviso cor="verde">Mandamos os 3 modelos para <strong>{q.teste}</strong>. Confira a caixa de entrada (e o spam).</Aviso>}
       {q.erroTeste && <Aviso cor="vermelho">Não deu para mandar o teste: {q.erroTeste}</Aviso>}
 
       <section className="mb-6 rounded-3xl border border-slate-200 bg-white p-6">
         <div className="flex flex-wrap items-center gap-3">
-          <Dica texto={cfg.ligado ? "Os lembretes saem sozinhos todo dia às 10h (horário de Brasília)." : "Nenhum lembrete é enviado. Marque “Ligar os lembretes automáticos” abaixo e salve."}>
-            <span className={`rounded-full px-3 py-1 text-sm font-bold ${cfg.ligado ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600"}`}>
-              {cfg.ligado ? "● Ligado: todo dia às 10h" : "○ Desligado"}
+          <Dica texto={algumLigado ? "Os lembretes ligados saem sozinhos todo dia às 10h (horário de Brasília)." : "Nenhum lembrete é enviado. Ligue os tipos que quiser na Configuração abaixo e salve."}>
+            <span className={`rounded-full px-3 py-1 text-sm font-bold ${algumLigado ? "bg-green-100 text-green-800" : "bg-slate-100 text-slate-600"}`}>
+              {algumLigado ? "● Ligado: todo dia às 10h" : "○ Desligado"}
             </span>
           </Dica>
           <Item ok={emailConfigurado} sim="E-mail (Resend) configurado" nao="Falta RESEND_API_KEY na Vercel" dica="O Resend é o serviço que entrega os e-mails do site." />
           <Item ok={cronOk} sim="Envio diário configurado" nao="Falta CRON_SECRET na Vercel" dica="CRON_SECRET é uma senha que a Vercel usa para disparar o envio diário. Sem ela, o envio automático não acontece (o botão Rodar agora funciona)." />
-        </div>
-        <div className="mt-5 flex flex-wrap gap-2">
-          {[1, 2, 3].map((n) => (
-            <a key={n} href={`/admin/lembretes/previa?etapa=${n}`} target="_blank" rel="noopener" className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-marca-900 hover:border-marca-900">
-              Ver {n}º e-mail
-            </a>
-          ))}
-          <form action={enviarTeste}>
-            <button className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-marca-900 hover:border-marca-900">Mandar os 3 para o meu e-mail</button>
-          </form>
-          {cfg.ligado && (
-            <form action={rodarAgora}>
+          {algumLigado && (
+            <form action={rodarAgora} className="ml-auto">
               <Dica texto="Manda agora os lembretes de hoje, sem esperar as 10h. Quem já recebeu não recebe de novo." temLink>
                 <button className="rounded-full bg-laranja-500 px-4 py-2 text-sm font-bold text-marca-900 hover:bg-laranja-400">Rodar agora</button>
               </Dica>
@@ -98,77 +99,39 @@ export default async function Lembretes({ searchParams }: Props) {
         )}
       </section>
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-4">
-        <Numero rotulo="Parados agora" valor={String(new Set(parados.map((p) => p.email)).size)} cor="laranja" href="#parados" dica={`Alunos com curso começado e não concluído, há ${cfg.dias[0]} dias ou mais sem estudar.`} />
-        <Numero rotulo="Lembrados (30 dias)" valor={String(alunos30.size)} detalhe={`${ultimos30.length} e-mails`} href="#enviados" dica="Alunos que receberam pelo menos um lembrete nos últimos 30 dias." />
-        <Numero rotulo="Voltaram a estudar" valor={String(voltaram30.size)} cor="verde" detalhe={alunos30.size ? `${Math.round((voltaram30.size / alunos30.size) * 100)}% dos lembrados` : undefined} dica="Dos alunos lembrados nos últimos 30 dias, quantos estudaram alguma aula depois do e-mail." />
+      <div className="mb-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <Numero rotulo="Pararam de estudar" valor={String(new Set(parados.map((p) => p.email)).size)} cor="laranja" href="#parados" dica={`Alunos com curso começado e não concluído, há ${cfg.dias[0]} dias ou mais sem estudar.`} />
+        <Numero rotulo="Nunca começaram" valor={String(new Set(nunca.map((p) => p.email)).size)} cor="laranja" href="#nunca" dica="Se matricularam pelo site, mas ainda não abriram nenhuma aula do curso." />
+        <Numero rotulo="Lembrados (30 dias)" valor={String(alunos30.size)} detalhe={`${ultimos30.length} e-mails`} href="#enviados" dica="Pessoas que receberam pelo menos um lembrete nos últimos 30 dias." />
+        <Numero rotulo="Voltaram a estudar" valor={String(voltaram30.size)} cor="verde" detalhe={alunos30.size ? `${Math.round((voltaram30.size / alunos30.size) * 100)}% dos lembrados` : undefined} dica="Das pessoas lembradas nos últimos 30 dias, quantas estudaram alguma aula depois do e-mail." />
         <Numero rotulo="Não querem lembretes" valor={String(sairam.size)} cor="cinza" dica="Clicaram no link do fim do e-mail para não receber mais lembretes. O site respeita (LGPD)." />
       </div>
 
       <Config cfg={cfg} erro={q.erro} />
 
-      <h2 id="parados" className="mt-12 scroll-mt-24 text-xl font-bold text-marca-900">Alunos parados agora</h2>
-      <p className="mt-1 text-sm text-slate-500">
-        Quem está há {cfg.dias[0]} dias ou mais sem estudar um curso que começou. Use <strong>Chamar no WhatsApp</strong> para mandar a mensagem pronta (abre o seu WhatsApp com o texto preenchido).
-      </p>
-      {!parados.length ? (
-        <div className="mt-4"><Vazio>Ninguém parado agora. 🎉</Vazio></div>
-      ) : (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[820px] text-left text-sm">
-            <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
-              <tr>
-                <th className="px-5 py-3 font-semibold">Aluno</th>
-                <th className="px-5 py-3 font-semibold">Curso</th>
-                <th className="px-5 py-3 font-semibold">Sem estudar</th>
-                <th className="px-5 py-3 font-semibold">E-mail de lembrete</th>
-                <th className="px-5 py-3 font-semibold">WhatsApp</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {mostrar.map((p) => {
-                const ultimo = ultimoDoPar.get(`${p.email}|${p.cursoId}`);
-                const desta = ultimo && new Date(ultimo.ultimaAtividade).getTime() === new Date(p.ultimaAtividade).getTime() ? ultimo : null;
-                return (
-                  <tr key={`${p.email}|${p.cursoId}`} className="hover:bg-marca-50/50">
-                    <td className="px-5 py-3">
-                      <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(p.email)}`} className="font-medium text-marca-900 underline decoration-laranja-500 underline-offset-4">{p.nome ?? p.email}</Link>
-                      <span className="block text-xs text-slate-500">{p.email}</span>
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className="block max-w-[240px] truncate" title={p.cursoNome}>{p.cursoNome}</span>
-                      <Dica texto={`${p.feitas} de ${p.total} aulas concluídas.`}>
-                        <span className="mt-1 flex items-center gap-2 text-xs text-slate-500">
-                          <span className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200"><span className="block h-full bg-laranja-500" style={{ width: `${p.pct}%` }} /></span>
-                          {p.pct}%
-                        </span>
-                      </Dica>
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${p.diasParado >= 30 ? "bg-red-100 text-red-700" : p.diasParado >= 7 ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"}`}>
-                        {p.diasParado} dias
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-xs text-slate-600"><SituacaoEmail p={p} cfg={cfg} enviado={desta} saiu={sairam.has(p.email)} /></td>
-                    <td className="px-5 py-3">
-                      {p.telefone ? (
-                        <a href={linkWhatsapp(p, cfg)} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#25D366] px-3 py-2 text-xs font-bold text-white hover:bg-[#1ebe5a]">
-                          Chamar no WhatsApp
-                        </a>
-                      ) : (
-                        <Dica texto="Este aluno não tem celular cadastrado. Dá para incluir na ficha do aluno."><span className="text-xs text-slate-400">sem celular</span></Dica>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {parados.length > mostrar.length && (
-            <p className="border-t border-slate-100 p-4 text-center text-sm"><Link href="/admin/lembretes?ver=todos#parados" className="font-semibold text-marca-700">Ver todos os {parados.length}</Link></p>
-          )}
-        </div>
-      )}
+      <Secao id="parados" titulo="Pararam de estudar" texto={<>Quem está há {cfg.dias[0]} dias ou mais sem estudar um curso que começou.</>} total={parados.length} todos={todos}>
+        {parados.slice(0, todos ? undefined : 100).map((p) => (
+          <Linha
+            key={`${p.email}|${p.cursoId}`} email={p.email} nome={p.nome} curso={p.cursoNome}
+            detalhe={<Progresso pct={p.pct} feitas={p.feitas} total={p.total} />}
+            dias={p.diasParado} rotuloDias="sem estudar"
+            situacao={<SituacaoEmail tipo="parado" dias={p.diasParado} cfg={cfg} enviado={enviadoDesta("parado", p.email, p.cursoId, p.ultimaAtividade)} saiu={sairam.has(p.email)} />}
+            whatsapp={p.telefone ? linkWhatsapp(p.telefone, cfg.mensagemWhatsapp, { nome: p.nome, curso: p.cursoNome, progresso: `${p.pct}%`, dias: p.diasParado, link: linkContinuar(p.cursoSlug) }) : null}
+          />
+        ))}
+      </Secao>
+
+      <Secao id="nunca" titulo="Matriculados que nunca começaram" texto="Se matricularam pelo site (pago ou gratuito) e não abriram nenhuma aula daquele curso. Os dias contam desde a matrícula." total={nunca.length} todos={todos}>
+        {nunca.slice(0, todos ? undefined : 100).map((p) => (
+          <Linha
+            key={`${p.email}|${p.cursoId}`} email={p.email} nome={p.nome} curso={p.cursoNome}
+            detalhe={<span className="text-xs text-slate-500">matriculado em {dataCurta(p.desde)}</span>}
+            dias={p.dias} rotuloDias="desde a matrícula"
+            situacao={<SituacaoEmail tipo="nunca" dias={p.dias} cfg={cfg} enviado={enviadoDesta("nunca", p.email, p.cursoId, p.desde)} saiu={sairam.has(p.email)} />}
+            whatsapp={p.telefone ? linkWhatsapp(p.telefone, cfg.nuncaComecou.mensagemWhatsapp, { nome: p.nome, curso: p.cursoNome, progresso: "0%", dias: p.dias, link: linkContinuar(p.cursoSlug) }) : null}
+          />
+        ))}
+      </Secao>
 
       <h2 id="enviados" className="mt-12 scroll-mt-24 text-xl font-bold text-marca-900">Lembretes enviados</h2>
       <p className="mt-1 text-sm text-slate-500">Os últimos 200 e-mails de lembrete, mais recentes primeiro.</p>
@@ -176,11 +139,11 @@ export default async function Lembretes({ searchParams }: Props) {
         <div className="mt-4"><Vazio>Nenhum lembrete enviado ainda.</Vazio></div>
       ) : (
         <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
               <tr>
                 <th className="px-5 py-3 font-semibold">Quando</th>
-                <th className="px-5 py-3 font-semibold">Aluno</th>
+                <th className="px-5 py-3 font-semibold">Pessoa</th>
                 <th className="px-5 py-3 font-semibold">Curso</th>
                 <th className="px-5 py-3 font-semibold">Lembrete</th>
                 <th className="px-5 py-3 font-semibold">Resultado</th>
@@ -191,17 +154,20 @@ export default async function Lembretes({ searchParams }: Props) {
                 <tr key={h.id}>
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">{dataHora(h.enviadoEm)}</td>
                   <td className="px-5 py-3">
-                    <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(h.email)}`} className="text-marca-900 underline decoration-laranja-500 underline-offset-4">{h.nome ?? h.email}</Link>
+                    <Link href={ficha(h.email)} className="text-marca-900 underline decoration-laranja-500 underline-offset-4">{h.nome ?? h.email}</Link>
                   </td>
-                  <td className="px-5 py-3 text-slate-600">{h.cursoNome}{h.progressoPct !== null && <span className="text-slate-400"> · {h.progressoPct}%</span>}</td>
-                  <td className="whitespace-nowrap px-5 py-3 text-slate-600">{h.etapa}º ({h.diasParado} dias)</td>
+                  <td className="px-5 py-3 text-slate-600">{h.cursoNome}{h.tipo === "parado" && h.progressoPct !== null && <span className="text-slate-400"> · {h.progressoPct}%</span>}</td>
+                  <td className="px-5 py-3 text-slate-600">
+                    <span className="block whitespace-nowrap">{h.etapa}º ({h.diasParado} dias)</span>
+                    <span className="block text-xs text-slate-400">{NOME_TIPO[h.tipo]}</span>
+                  </td>
                   <td className="px-5 py-3">
                     {h.status === "erro" ? (
                       <Dica texto={h.detalhe ?? "Erro ao enviar."}><span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">não enviado</span></Dica>
                     ) : voltou(h) ? (
-                      <Dica texto="O aluno estudou alguma aula depois deste e-mail."><span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">voltou a estudar ✓</span></Dica>
+                      <Dica texto="A pessoa estudou alguma aula depois deste e-mail."><span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">voltou a estudar ✓</span></Dica>
                     ) : (
-                      <Dica texto="E-mail entregue ao Resend. O aluno ainda não voltou a estudar."><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">enviado</span></Dica>
+                      <Dica texto="E-mail entregue ao Resend. A pessoa ainda não estudou depois dele."><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">enviado</span></Dica>
                     )}
                   </td>
                 </tr>
@@ -229,75 +195,176 @@ function Item({ ok, sim, nao, dica }: { ok: boolean; sim: string; nao: string; d
   );
 }
 
-function SituacaoEmail({ p, cfg, enviado, saiu }: { p: AlunoParado; cfg: ConfigLembretes; enviado: RegistroLembrete | null; saiu: boolean }) {
-  if (saiu) return <>pediu para não receber</>;
-  if (p.diasParado > cfg.limiteDias) {
-    return <Dica texto={`Parado há mais de ${cfg.limiteDias} dias: o e-mail automático não vai para ele. Chame no WhatsApp.`}><span>parado há muito tempo</span></Dica>;
-  }
-  const etapa = etapaPara(p.diasParado, cfg);
-  const proximo = cfg.dias.find((d) => d > p.diasParado);
+function Progresso({ pct, feitas, total }: { pct: number; feitas: number; total: number }) {
+  return (
+    <Dica texto={`${feitas} de ${total} aulas concluídas.`}>
+      <span className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+        <span className="h-1.5 w-20 overflow-hidden rounded-full bg-slate-200"><span className="block h-full bg-laranja-500" style={{ width: `${pct}%` }} /></span>
+        {pct}%
+      </span>
+    </Dica>
+  );
+}
+
+function Secao({ id, titulo, texto, total, todos, children }: { id: string; titulo: string; texto: React.ReactNode; total: number; todos: boolean; children: React.ReactNode }) {
   return (
     <>
-      {enviado ? <span className="block">{enviado.etapa}º enviado em {new Date(enviado.enviadoEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}</span> : etapa ? <span className="block">{etapa}º sai {cfg.ligado ? "na próxima rodada" : "quando ligar"}</span> : null}
+      <h2 id={id} className="mt-12 scroll-mt-24 text-xl font-bold text-marca-900">{titulo} <span className="text-base font-normal text-slate-400">({total})</span></h2>
+      <p className="mt-1 text-sm text-slate-500">{texto} Use <strong>Chamar no WhatsApp</strong> para mandar a mensagem pronta (abre o seu WhatsApp com o texto preenchido).</p>
+      {!total ? (
+        <div className="mt-4"><Vazio>Ninguém aqui agora. 🎉</Vazio></div>
+      ) : (
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+          <table className="w-full min-w-[820px] text-left text-sm">
+            <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
+              <tr>
+                <th className="px-5 py-3 font-semibold">Pessoa</th>
+                <th className="px-5 py-3 font-semibold">Curso</th>
+                <th className="px-5 py-3 font-semibold">Dias</th>
+                <th className="px-5 py-3 font-semibold">E-mail de lembrete</th>
+                <th className="px-5 py-3 font-semibold">WhatsApp</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">{children}</tbody>
+          </table>
+          {!todos && total > 100 && (
+            <p className="border-t border-slate-100 p-4 text-center text-sm"><Link href={`/admin/lembretes?ver=todos#${id}`} className="font-semibold text-marca-700">Ver todos os {total}</Link></p>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function Linha({ email, nome, curso, detalhe, dias, rotuloDias, situacao, whatsapp }: {
+  email: string; nome: string | null; curso: string; detalhe: React.ReactNode; dias: number; rotuloDias: string;
+  situacao: React.ReactNode; whatsapp: string | null;
+}) {
+  return (
+    <tr className="hover:bg-marca-50/50">
+      <td className="px-5 py-3">
+        <Link href={ficha(email)} className="font-medium text-marca-900 underline decoration-laranja-500 underline-offset-4">{nome ?? email}</Link>
+        <span className="block text-xs text-slate-500">{email}</span>
+      </td>
+      <td className="px-5 py-3">
+        <span className="block max-w-[240px] truncate" title={curso}>{curso}</span>
+        {detalhe}
+      </td>
+      <td className="whitespace-nowrap px-5 py-3">
+        <Dica texto={`${dias} dias ${rotuloDias}.`}>
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${dias >= 30 ? "bg-red-100 text-red-700" : dias >= 7 ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"}`}>{dias} dias</span>
+        </Dica>
+      </td>
+      <td className="px-5 py-3 text-xs text-slate-600">{situacao}</td>
+      <td className="px-5 py-3">
+        {whatsapp ? (
+          <a href={whatsapp} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#25D366] px-3 py-2 text-xs font-bold text-white hover:bg-[#1ebe5a]">
+            Chamar no WhatsApp
+          </a>
+        ) : (
+          <Dica texto="Sem celular cadastrado."><span className="text-xs text-slate-400">sem celular</span></Dica>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+function SituacaoEmail({ tipo, dias, cfg, enviado, saiu }: { tipo: TipoLembrete; dias: number; cfg: ConfigLembretes; enviado: RegistroLembrete | null; saiu: boolean }) {
+  if (saiu) return <>pediu para não receber</>;
+  const grupo = tipo === "parado" ? { ligado: cfg.ligado, dias: cfg.dias } : cfg.nuncaComecou;
+  if (dias > cfg.limiteDias) {
+    return <Dica texto={`Há mais de ${cfg.limiteDias} dias: o e-mail automático não vai para essa pessoa. Chame no WhatsApp.`}><span>faz muito tempo</span></Dica>;
+  }
+  const etapa = etapaPara(dias, cfg, tipo);
+  const proximo = grupo.dias.find((d) => d > dias);
+  return (
+    <>
+      {enviado ? <span className="block">{enviado.etapa}º enviado em {dataCurta(enviado.enviadoEm)}</span> : etapa ? <span className="block">{etapa}º sai {grupo.ligado ? "na próxima rodada" : "quando ligar"}</span> : null}
       {proximo ? <span className="block text-slate-400">próximo com {proximo} dias</span> : <span className="block text-slate-400">último lembrete</span>}
     </>
   );
 }
 
-function linkWhatsapp(p: AlunoParado, cfg: ConfigLembretes) {
-  const texto = cfg.mensagemWhatsapp
-    .replaceAll("{nome}", (p.nome ?? "").trim().split(/\s+/)[0] ?? "")
-    .replaceAll("{curso}", p.cursoNome)
-    .replaceAll("{progresso}", `${p.pct}%`)
-    .replaceAll("{dias}", String(p.diasParado))
-    .replaceAll("{link}", linkContinuar(p.cursoSlug));
-  const numero = (p.telefone ?? "").replace(/\D/g, "");
+function linkWhatsapp(telefone: string, modelo: string, d: { nome: string | null; curso: string; progresso: string; dias: number; link: string }) {
+  const texto = modelo
+    .replaceAll("{nome}", (d.nome ?? "").trim().split(/\s+/)[0] ?? "")
+    .replaceAll("{curso}", d.curso)
+    .replaceAll("{progresso}", d.progresso)
+    .replaceAll("{dias}", String(d.dias))
+    .replaceAll("{link}", d.link);
+  const numero = telefone.replace(/\D/g, "");
   const comPais = numero.length <= 11 ? `55${numero}` : numero;
   return `https://wa.me/${comPais}?text=${encodeURIComponent(texto)}`;
+}
+
+/** Um bloco da configuração: ligar, 3 dias, prévias, teste e mensagem do WhatsApp. */
+function Grupo({ tipo, titulo, explica, ligado, nomeLigado, prefixo, dias, rotuloDias, nomeMensagem, mensagem, variaveis }: {
+  tipo: TipoLembrete; titulo: string; explica: string; ligado: boolean; nomeLigado: string; prefixo: string; dias: number[];
+  rotuloDias: string; nomeMensagem: string; mensagem: string; variaveis: string;
+}) {
+  return (
+    <div className="space-y-4 rounded-2xl border border-slate-200 p-5">
+      <label className="flex cursor-pointer items-start gap-3">
+        <input type="checkbox" name={nomeLigado} defaultChecked={ligado} className="mt-1 h-4 w-4 accent-marca-900" />
+        <span>
+          <span className="block font-semibold text-marca-900">{titulo}</span>
+          <span className="block text-sm text-slate-500">{explica}</span>
+        </span>
+      </label>
+      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+        <span>1º com</span><input name={`${prefixo}1`} type="number" min={1} max={120} defaultValue={dias[0]} className={campoNum} />
+        <span>dias, 2º com</span><input name={`${prefixo}2`} type="number" min={1} max={120} defaultValue={dias[1]} className={campoNum} />
+        <span>e 3º com</span><input name={`${prefixo}3`} type="number" min={1} max={120} defaultValue={dias[2]} className={campoNum} />
+        <span>dias {rotuloDias}.</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {[1, 2, 3].map((n) => (
+          <a key={n} href={`/admin/lembretes/previa?tipo=${tipo}&etapa=${n}`} target="_blank" rel="noopener" className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-marca-900 hover:border-marca-900">
+            Ver {n}º e-mail
+          </a>
+        ))}
+        <button formAction={tipo === "nunca" ? testeNunca : testeParado} formNoValidate className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-marca-900 hover:border-marca-900">
+          Mandar os 3 para o meu e-mail
+        </button>
+      </div>
+      <details className="text-sm">
+        <summary className="cursor-pointer font-semibold text-marca-700">Mensagem pronta do WhatsApp</summary>
+        <span className="mt-2 block text-xs text-slate-500">O site troca {variaveis} pelos dados da pessoa.</span>
+        <textarea name={nomeMensagem} rows={7} defaultValue={mensagem} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-marca-900" />
+      </details>
+    </div>
+  );
 }
 
 function Config({ cfg, erro }: { cfg: ConfigLembretes; erro?: string }) {
   return (
     <form id="config" action={salvarLembretes} className="scroll-mt-24 space-y-5 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
       <h2 className="text-lg font-bold text-marca-900">Configuração</h2>
-      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 p-4 has-[:checked]:border-marca-900 has-[:checked]:bg-marca-50">
-        <input type="checkbox" name="ligado" defaultChecked={cfg.ligado} className="mt-1 h-4 w-4 accent-marca-900" />
-        <span>
-          <span className="block font-semibold text-marca-900">Ligar os lembretes automáticos por e-mail</span>
-          <span className="block text-sm text-slate-500">Todo dia às 10h (horário de Brasília) o site procura quem parou de estudar e manda o e-mail.</span>
-        </span>
-      </label>
-      <div>
-        <p className="font-semibold text-marca-900">Quando mandar</p>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-          <span>1º lembrete com</span><input name="d1" type="number" min={1} max={60} defaultValue={cfg.dias[0]} className={campoNum} />
-          <span>dias, 2º com</span><input name="d2" type="number" min={1} max={90} defaultValue={cfg.dias[1]} className={campoNum} />
-          <span>e 3º com</span><input name="d3" type="number" min={1} max={120} defaultValue={cfg.dias[2]} className={campoNum} />
-          <span>dias sem estudar. Depois do 3º, para.</span>
-        </div>
-        {erro === "dias" && <p className="mt-2 text-sm text-red-700">Os dias precisam ser crescentes (ex.: 3, 7 e 14).</p>}
-      </div>
+      {erro === "dias" && <p className="text-sm text-red-700">Os dias de cada tipo precisam ser crescentes (ex.: 3, 7 e 14).</p>}
+      <Grupo
+        tipo="parado" titulo="Quem parou de estudar no meio do curso" explica="Começou o curso, não terminou e ficou sem estudar."
+        ligado={cfg.ligado} nomeLigado="ligado" prefixo="d" dias={cfg.dias} rotuloDias="sem estudar"
+        nomeMensagem="mensagemWhatsapp" mensagem={cfg.mensagemWhatsapp} variaveis="{nome}, {curso}, {progresso}, {dias} e {link}"
+      />
+      <Grupo
+        tipo="nunca" titulo="Quem se matriculou e nunca começou" explica="Fez a matrícula (paga ou gratuita), mas não abriu nenhuma aula. O botão do e-mail leva direto para o curso."
+        ligado={cfg.nuncaComecou.ligado} nomeLigado="nLigado" prefixo="n" dias={cfg.nuncaComecou.dias} rotuloDias="depois da matrícula"
+        nomeMensagem="nMensagem" mensagem={cfg.nuncaComecou.mensagemWhatsapp} variaveis="{nome}, {curso}, {dias} e {link}"
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm text-slate-600">
-          <span className="font-semibold text-marca-900">Não mandar para quem parou há mais de</span>
+          <span className="font-semibold text-marca-900">Não mandar para quem está assim há mais de</span>
           <span className="mt-2 flex items-center gap-2"><input name="limite" type="number" min={1} max={365} defaultValue={cfg.limiteDias} className={campoNum} /> dias</span>
-          <span className="mt-1 block text-xs text-slate-500">Evita mandar e-mail para quem sumiu há meses. Esses aparecem na lista abaixo para chamar no WhatsApp.</span>
-          {erro === "limite" && <span className="mt-1 block text-red-700">Precisa ser igual ou maior que o dia do 3º lembrete.</span>}
+          <span className="mt-1 block text-xs text-slate-500">Evita mandar e-mail para quem sumiu há meses. Essas pessoas continuam nas listas abaixo para chamar no WhatsApp.</span>
+          {erro === "limite" && <span className="mt-1 block text-red-700">Precisa ser igual ou maior que o dia do último lembrete.</span>}
         </label>
         <label className="block text-sm text-slate-600">
           <span className="font-semibold text-marca-900">Máximo de e-mails por dia</span>
           <span className="mt-2 flex items-center gap-2"><input name="maximo" type="number" min={1} max={1000} defaultValue={cfg.maximoPorDia} className={campoNum} /> e-mails</span>
-          <span className="mt-1 block text-xs text-slate-500">O plano grátis do Resend manda até 100 e-mails por dia, somando todos os e-mails do site.</span>
+          <span className="mt-1 block text-xs text-slate-500">O plano grátis do Resend manda até 100 e-mails por dia, somando todos os e-mails do site. No plano Pro, pode aumentar.</span>
           {erro === "maximo" && <span className="mt-1 block text-red-700">Informe um número entre 1 e 1000.</span>}
         </label>
       </div>
-      <label className="block">
-        <span className="font-semibold text-marca-900">Mensagem pronta do WhatsApp</span>
-        <span className="mt-1 block text-xs text-slate-500">
-          Usada no botão Chamar no WhatsApp. O site troca <code>{"{nome}"}</code>, <code>{"{curso}"}</code>, <code>{"{progresso}"}</code>, <code>{"{dias}"}</code> e <code>{"{link}"}</code> pelos dados do aluno.
-        </span>
-        <textarea name="mensagemWhatsapp" rows={8} defaultValue={cfg.mensagemWhatsapp} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-marca-900" />
-      </label>
       <button className="rounded-full bg-marca-900 px-6 py-3 font-bold text-white hover:bg-marca-700">Salvar</button>
     </form>
   );

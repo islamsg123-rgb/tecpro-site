@@ -163,3 +163,69 @@ ${v.paragrafos.map((p) => `<p style="font-size:15px;line-height:1.6;margin:0 0 1
 </td></tr></table></body></html>`;
   return { assunto: v.assunto, html, texto };
 }
+
+/** Moldura comum dos e-mails de lembrete (topo azul, botão laranja, link para sair da lista no rodapé). */
+function moldura(d: { ola: string; paragrafos: string[]; meio?: string; botao: string; link: string; dica: string; linkSair: string; motivo: string }) {
+  return `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#f4f7fe;font-family:Arial,Helvetica,sans-serif;color:#011749">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px"><tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:16px;overflow:hidden">
+<tr><td style="background:#011749;padding:20px 28px;color:#ffffff;font-size:20px;font-weight:bold">TECPRO <span style="color:#FFA500">Multi Ensino</span></td></tr>
+<tr><td style="padding:28px">
+<p style="font-size:18px;font-weight:bold;margin:0 0 12px">${escapar(d.ola)}</p>
+${d.paragrafos.map((p) => `<p style="font-size:15px;line-height:1.6;margin:0 0 12px">${p}</p>`).join("\n")}
+${d.meio ?? ""}
+<p style="margin:24px 0"><a href="${escapar(d.link)}" style="display:inline-block;background:#FFA500;color:#011749;text-decoration:none;font-weight:bold;padding:14px 28px;border-radius:999px;font-size:16px">${escapar(d.botao)}</a></p>
+<p style="font-size:14px;line-height:1.6;margin:0 0 20px;color:#475569">${d.dica}</p>
+<p style="font-size:13px;color:#64748b;margin:0">Bons estudos!<br>Equipe Tecpro Multi Ensino</p>
+</td></tr></table>
+<p style="max-width:520px;font-size:12px;line-height:1.5;color:#94a3b8;margin:16px auto 0;text-align:center">${escapar(d.motivo)}<br><a href="${escapar(d.linkSair)}" style="color:#94a3b8">Não quero mais receber lembretes de estudo</a></p>
+</td></tr></table></body></html>`;
+}
+
+const semTagsTexto = (t: string) => t.replace(/<[^>]+>/g, "");
+
+function textoSimples(ola: string, paragrafos: string[], botao: string, link: string, linkSair: string) {
+  return [ola, ``, ...paragrafos.map(semTagsTexto).flatMap((p) => [p, ``]), `${botao}: ${link}`, ``, `Bons estudos!`, `Equipe Tecpro Multi Ensino`, ``,
+    `Não quer mais receber lembretes de estudo? ${linkSair}`].join("\n");
+}
+
+/** Matriculado que ainda não abriu nenhuma aula do curso (1º, 2º ou 3º lembrete). */
+export function emailNuncaComecou(d: { nome: string; curso: string; dias: number; etapa: number; link: string; linkSair: string }) {
+  const primeiro = d.nome.trim().split(/\s+/)[0] || "";
+  const ola = primeiro ? `Olá, ${primeiro}!` : "Olá!";
+  const c = `<strong>${escapar(d.curso)}</strong>`;
+  const variacoes = [
+    {
+      assunto: `${primeiro ? `${primeiro}, s` : "S"}eu curso de ${d.curso} já está liberado`,
+      paragrafos: [
+        `Seu curso ${c} já está liberado e esperando por você! A primeira aula é o passo mais importante.`,
+        `As aulas são em vídeo, curtas e você assiste quando e onde quiser, até pelo celular. Seu progresso fica salvo e você continua de onde parou.`,
+      ],
+    },
+    {
+      assunto: `A primeira aula de ${d.curso} está te esperando`,
+      paragrafos: [
+        `Faz ${d.dias} dias que você se matriculou em ${c}, mas ainda não assistiu à primeira aula.`,
+        `Que tal começar hoje? Separe só 15 minutinhos: em poucos dias você já vai perceber a diferença no que sabe.`,
+      ],
+    },
+    {
+      assunto: `${primeiro ? `${primeiro}, a` : "A"}inda dá tempo de começar ${d.curso}`,
+      paragrafos: [
+        `Você deu o primeiro passo quando se matriculou em ${c}. Agora falta só começar!`,
+        `Quem estuda um pouco todo dia termina o curso sem perceber, e sai com mais conhecimento e mais chances no mercado de trabalho. Seu acesso continua liberado.`,
+      ],
+    },
+  ];
+  const v = variacoes[Math.min(Math.max(d.etapa, 1), 3) - 1];
+  const botao = "Começar meu curso";
+  return {
+    assunto: v.assunto,
+    texto: textoSimples(ola, v.paragrafos, botao, d.link, d.linkSair),
+    html: moldura({
+      ola, paragrafos: v.paragrafos, botao, link: d.link, linkSair: d.linkSair,
+      dica: "Para entrar, use este mesmo e-mail. Se não lembrar a senha, o site manda um link de acesso na hora.",
+      motivo: "Você recebeu este e-mail porque está matriculado em um curso da Tecpro Multi Ensino.",
+    }),
+  };
+}
