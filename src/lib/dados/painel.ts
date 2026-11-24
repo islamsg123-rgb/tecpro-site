@@ -228,6 +228,13 @@ export interface DadosExtrasAluno {
   estado?: string | null;
 }
 
+/** Modo demonstração: celulares digitados na ficha (para testar os botões de WhatsApp). */
+export function telefonesDemonstracao(): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [e, d] of mem().extras) if (d.telefone) out.set(e, d.telefone);
+  return out;
+}
+
 export async function dadosExtrasAluno(email: string): Promise<DadosExtrasAluno & { colunasFaltando: boolean }> {
   const e = norm(email);
   if (bancoEmDemonstracao) return { telefone: null, cpf: null, observacoes: null, ...mem().extras.get(e), colunasFaltando: false };

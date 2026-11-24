@@ -70,6 +70,8 @@ export interface Formado {
   email: string;
   cursoId: string;
   cursoNome: string;
+  /** Endereço do curso no site (vazio se o curso saiu do catálogo) */
+  cursoSlug: string;
   certificado: Certificado | null;
   /** O certificado é pago, ainda não foi pago e não foi emitido */
   faltaPagarCertificado: boolean;
@@ -84,6 +86,7 @@ export async function listarFormados(): Promise<Formado[]> {
   const pago = new Set(pagos.map((p) => `${p.email}|${p.cursoId}`));
   const cert = new Map(certificados.map((c) => [`${c.email}|${c.cursoId}`, c]));
   const nomeCurso = (id: string) => cursos.find((c) => c.id === id)?.nome ?? `Curso ${id}`;
+  const slugCurso = (id: string) => cursos.find((c) => c.id === id)?.slug ?? "";
 
   // Total de aulas de cada curso que aparece no progresso.
   const idsCursos = Array.from(new Set(Array.from(contagem.keys()).map((k) => k.split("|")[1])));
@@ -110,7 +113,7 @@ export async function listarFormados(): Promise<Formado[]> {
     const regra = regras.get(cursoId)!;
     const c = cert.get(k) ?? null;
     out.push({
-      email, cursoId, cursoNome: c?.cursoNome ?? nomeCurso(cursoId), certificado: c,
+      email, cursoId, cursoNome: c?.cursoNome ?? nomeCurso(cursoId), cursoSlug: slugCurso(cursoId), certificado: c,
       faltaPagarCertificado: !c && regra.modo === "pago" && !pago.has(k),
       precoCertificadoCentavos: regra.modo === "pago" ? regra.precoCentavos : null,
     });
