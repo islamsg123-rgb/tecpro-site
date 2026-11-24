@@ -6,6 +6,7 @@ import { opcoesParcelas } from "@/lib/config-loja";
 import { pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { CapaCurso } from "@/components/CapaCurso";
 import { FormularioCheckout } from "@/components/checkout/FormularioCheckout";
+import { TotalResumo } from "@/components/checkout/TotalResumo";
 import { FormularioGratis } from "@/components/checkout/FormularioGratis";
 import { alunoLogado } from "@/lib/auth";
 import { obterAluno } from "@/lib/dados";
@@ -72,7 +73,7 @@ export default async function Checkout({ params }: Props) {
             </div>
             <div className="mx-5 mb-5 mt-1 flex items-center justify-between border-t border-slate-100 pt-4 lg:mx-6 lg:mb-6 lg:mt-6 lg:pt-5">
               <span className="font-semibold text-slate-600">Total</span>
-              <span className="font-display text-2xl font-extrabold text-marca-900">{precoDoCurso(curso)}</span>
+              {gratis ? <span className="font-display text-2xl font-extrabold text-marca-900">{precoDoCurso(curso)}</span> : <TotalResumo valorCentavos={curso.precoCentavos} />}
             </div>
           </aside>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { startTransition, useActionState, useState } from "react";
+import { startTransition, useActionState, useEffect, useState } from "react";
+import { EVENTO_TOTAL } from "./TotalResumo";
 import { conferirCupom, pagar, salvarContato, type EstadoCheckout } from "@/app/checkout/acoes";
 import { formatarPreco } from "@/lib/formatar";
 import {
@@ -65,6 +66,8 @@ export function FormularioCheckout({
   const [erroCupom, setErroCupom] = useState("");
   const [conferindo, setConferindo] = useState(false);
   const [valor, setValor] = useState(precoCentavos);
+  // Avisa o resumo ao lado (TotalResumo) quando o cupom muda o total.
+  useEffect(() => { window.dispatchEvent(new CustomEvent(EVENTO_TOTAL, { detail: valor })); }, [valor]);
   const [opcoes, setOpcoes] = useState(parcelas);
 
   const e = { ...(contato.campos ?? {}), ...(estado.campos ?? {}) };
