@@ -5,6 +5,7 @@ import { Cabecalho } from "@/components/Cabecalho";
 import { Rodape } from "@/components/Rodape";
 import { AvisoDadosExemplo } from "@/components/AvisoDadosExemplo";
 import { BarraCarregamento } from "@/components/carregando/BarraCarregamento";
+import { BotaoAjuda } from "@/components/ajuda/BotaoAjuda";
 
 const titulo = Poppins({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--fonte-titulo" });
 const texto = Inter({ subsets: ["latin"], variable: "--fonte-texto" });
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Cabecalho />
         <main className="flex-1">{children}</main>
         <Rodape />
+        <BotaoAjuda />
       </body>
     </html>
   );

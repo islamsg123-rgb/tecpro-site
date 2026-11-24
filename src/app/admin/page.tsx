@@ -8,6 +8,7 @@ import {
 } from "@/lib/painel-resumo";
 import { Caixa, dataCurta, GraficoMensal, LinkVerTudo, Numero, PorForma, Vazio } from "@/components/admin/Blocos";
 import type { Cobranca } from "@/lib/pagamentos/tipos";
+import { contarNovas } from "@/lib/dados/mensagens";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +37,13 @@ export default async function PainelRapido({ searchParams }: Props) {
   const verAlunos = acesso.permissoes.includes("alunos");
   const semPermissao = Boolean((await searchParams)["sem-permissao"]);
 
-  const [cobrancas, pessoas, formados, cursos] = await Promise.all([
+  const verMensagens = acesso.permissoes.includes("mensagens");
+  const [cobrancas, pessoas, formados, cursos, novas] = await Promise.all([
     cobrancasParaRelatorio().catch(() => [] as Cobranca[]),
     pessoasDoPainel(),
     listarFormados().catch(() => []),
     getCursos(),
+    verMensagens ? contarNovas().catch(() => ({ aluno: 0, loja: 0 })) : { aluno: 0, loja: 0 },
   ]);
   const acontecimentos = await ultimosAcontecimentos(verFinanceiro ? cobrancas : []);
   const fin = resumoFinanceiro(cobrancas);
@@ -66,6 +69,19 @@ export default async function PainelRapido({ searchParams }: Props) {
         <p className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           Seu acesso não inclui aquela parte do painel. Peça ao responsável para liberar em Funcionários.
         </p>
+      )}
+
+      {novas.aluno + novas.loja > 0 && (
+        <Link
+          href={novas.aluno ? "/admin/mensagens/aluno" : "/admin/mensagens/loja"}
+          className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-laranja-500/50 bg-laranja-300/20 p-4 text-sm text-marca-900 hover:border-laranja-500"
+        >
+          <span>
+            <strong>{novas.aluno + novas.loja === 1 ? "1 mensagem nova" : `${novas.aluno + novas.loja} mensagens novas`}</strong> no botão de ajuda
+            {" "}({novas.aluno} da Área do aluno, {novas.loja} da Loja virtual).
+          </span>
+          <span className="font-semibold underline">Ver mensagens</span>
+        </Link>
       )}
 
       {verFinanceiro && (

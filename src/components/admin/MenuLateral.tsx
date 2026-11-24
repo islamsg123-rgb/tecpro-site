@@ -10,7 +10,9 @@ import { useEffect, useState } from "react";
  * Também mostra as abas da seção aberta no topo da página.
  */
 
-type Secao = "painel" | "financeiro" | "vendas" | "alunos" | "cursos" | "loja" | "funcionarios" | "sistema";
+type Secao = "painel" | "financeiro" | "vendas" | "alunos" | "cursos" | "loja" | "funcionarios" | "mensagens" | "sistema";
+/** Números de "novas" mostrados ao lado do item do menu, pelo endereço (ex.: mensagens novas). */
+export type Contadores = Record<string, number>;
 
 interface Item {
   secao: Secao;
@@ -65,6 +67,14 @@ export const MENU: Item[] = [
       { rotulo: "Configurações da loja", href: "/admin/configuracoes" },
     ],
   },
+  {
+    secao: "mensagens", rotulo: "Mensagens", href: "/admin/mensagens/aluno",
+    icone: svg(<><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4A1.5 1.5 0 0 1 4 14.5z" /><path d="M8 8.5h8M8 11.5h5" /></>),
+    sub: [
+      { rotulo: "Área do aluno", href: "/admin/mensagens/aluno" },
+      { rotulo: "Loja virtual", href: "/admin/mensagens/loja" },
+    ],
+  },
   { secao: "funcionarios", rotulo: "Funcionários", href: "/admin/funcionarios", icone: svg(<><rect x="4" y="3" width="16" height="18" rx="2" /><circle cx="12" cy="10" r="2.8" /><path d="M7.5 17.5c.7-2 2.5-3.2 4.5-3.2s3.8 1.2 4.5 3.2" /></>) },
   { secao: "sistema", rotulo: "Integrações", href: "/admin/integracoes", icone: svg(<><path d="M9 15 15 9" /><path d="M11 6.5 12.5 5a3.5 3.5 0 0 1 5 5L16 11.5M13 17.5 11.5 19a3.5 3.5 0 0 1-5-5L8 12.5" /></>) },
   { secao: "sistema", rotulo: "Conexão (API)", href: "/admin/diagnostico", icone: svg(<><path d="M9 7 4 12l5 5M15 7l5 5-5 5" /></>) },
@@ -82,7 +92,10 @@ function ativo(pathname: string, itens: Item[]) {
   return melhor;
 }
 
-export function MenuLateral({ secoes, email, sair }: { secoes: Secao[]; email: string; sair: React.ReactNode }) {
+const Bolinha = ({ n, className = "" }: { n?: number; className?: string }) =>
+  n ? <span className={`grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1.5 text-[11px] font-bold leading-none text-white ${className}`} aria-label={`${n} novas`}>{n > 99 ? "99+" : n}</span> : null;
+
+export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: Secao[]; email: string; sair: React.ReactNode; contadores?: Contadores }) {
   const pathname = usePathname();
   const [aberto, setAberto] = useState(false);
   useEffect(() => setAberto(false), [pathname]);
@@ -100,6 +113,7 @@ export function MenuLateral({ secoes, email, sair }: { secoes: Secao[]; email: s
     <ul className="space-y-1" onClick={(e) => (e.target as HTMLElement).closest("a") && setAberto(false)}>
       {itens.map((m) => {
         const eAtual = atual?.item === m;
+        const total = m.sub ? m.sub.reduce((t, x) => t + (contadores[x.href] ?? 0), 0) : contadores[m.href] ?? 0;
         return (
           <li key={m.href}>
             <Link
@@ -107,8 +121,14 @@ export function MenuLateral({ secoes, email, sair }: { secoes: Secao[]; email: s
               title={m.rotulo}
               className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${eAtual ? "bg-laranja-500 text-marca-900" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
             >
-              {m.icone}
-              <span className={`whitespace-nowrap ${expandido ? "" : "opacity-0 transition-opacity duration-150 group-hover:opacity-100"}`}>{m.rotulo}</span>
+              <span className="relative">
+                {m.icone}
+                {!expandido && <Bolinha n={total} className="absolute -right-2 -top-2 group-hover:hidden" />}
+              </span>
+              <span className={`flex flex-1 items-center justify-between gap-2 whitespace-nowrap ${expandido ? "" : "opacity-0 transition-opacity duration-150 group-hover:opacity-100"}`}>
+                {m.rotulo}
+                <Bolinha n={total} />
+              </span>
             </Link>
             {m.sub && (
               <ul className={`ml-12 mt-1 space-y-0.5 ${expandido ? "" : "hidden group-hover:block"}`}>
@@ -116,9 +136,10 @@ export function MenuLateral({ secoes, email, sair }: { secoes: Secao[]; email: s
                   <li key={s.href}>
                     <Link
                       href={s.href}
-                      className={`block whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium ${atual?.href === s.href ? "text-laranja-400" : "text-white/60 hover:text-white"}`}
+                      className={`flex items-center justify-between gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium ${atual?.href === s.href ? "text-laranja-400" : "text-white/60 hover:text-white"}`}
                     >
                       {s.rotulo}
+                      <Bolinha n={contadores[s.href]} />
                     </Link>
                   </li>
                 ))}
@@ -152,7 +173,7 @@ export function MenuLateral({ secoes, email, sair }: { secoes: Secao[]; email: s
 
       {/* Celular: botão que abre o menu */}
       <div className="sticky top-[72px] z-20 flex items-center justify-between border-t border-white/10 bg-marca-800 px-4 py-3 md:hidden print:hidden">
-        <span className="text-sm font-bold uppercase tracking-wider text-laranja-500">Painel</span>
+        <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-laranja-500">Painel <Bolinha n={Object.values(contadores).reduce((a, b) => a + b, 0)} /></span>
         <button onClick={() => setAberto((v) => !v)} aria-expanded={aberto} className="rounded-lg border border-white/20 px-3 py-1.5 text-sm font-semibold text-white">
           {aberto ? "Fechar" : "Menu"}
         </button>
@@ -175,7 +196,7 @@ export function MenuLateral({ secoes, email, sair }: { secoes: Secao[]; email: s
 }
 
 /** Abas da seção aberta (ex.: Financeiro > Resumo | Matrículas e recebimentos | Devedores). */
-export function AbasSecao({ secoes }: { secoes: Secao[] }) {
+export function AbasSecao({ secoes, contadores = {} }: { secoes: Secao[]; contadores?: Contadores }) {
   const pathname = usePathname();
   const atual = ativo(pathname, MENU.filter((m) => secoes.includes(m.secao)));
   if (!atual?.item.sub) return null;
@@ -185,9 +206,10 @@ export function AbasSecao({ secoes }: { secoes: Secao[] }) {
         <Link
           key={s.href}
           href={s.href}
-          className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold ${atual.href === s.href ? "border-laranja-500 text-marca-900" : "border-transparent text-slate-500 hover:text-marca-900"}`}
+          className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold ${atual.href === s.href ? "border-laranja-500 text-marca-900" : "border-transparent text-slate-500 hover:text-marca-900"}`}
         >
           {s.rotulo}
+          <Bolinha n={contadores[s.href]} />
         </Link>
       ))}
     </nav>

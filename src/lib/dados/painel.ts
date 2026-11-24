@@ -42,6 +42,7 @@ export const SECOES = {
   cursos: "Cursos",
   loja: "Loja virtual",
   funcionarios: "Funcionários",
+  mensagens: "Mensagens",
 } as const;
 export type Secao = keyof typeof SECOES;
 export const LISTA_SECOES = Object.keys(SECOES) as Secao[];
