@@ -6,8 +6,9 @@ import { redirect } from "next/navigation";
 import { eDono, exigirAdmin } from "@/lib/admin";
 import {
   apagarDepoimento, apagarFuncionario, apagarPesquisa, LISTA_SECOES, listarFuncionarios, obterDepoimento,
-  salvarDepoimento, salvarFuncionario, type Secao, dadosExtrasAluno, definirCursoRemovido, salvarDadosAluno,
+  salvarDepoimento, salvarFuncionario, type Secao, dadosExtrasAluno, definirCursoRemovido, salvarDadosAluno, obterFuncionario,
 } from "@/lib/dados/painel";
+import { excluirAluno } from "@/lib/dados/excluir-aluno";
 import { concluirCursoTeste, desfazerConclusaoTeste, obterAluno } from "@/lib/dados";
 import { cursosDoAluno } from "@/lib/area-aluno";
 import { clientePorEmail, cobrancaParaLiberacao, pagamentoEmSimulacao } from "@/lib/pagamentos";
@@ -387,4 +388,40 @@ export async function desfazerCursosTesteAcao(f: FormData) {
   }
   revalidatePath("/", "layout");
   redirect(ficha(email, "salvo=teste-desfeito#teste"));
+}
+
+/**
+ * Exclui o aluno do site (login + dados). Só o dono, com o e-mail digitado de novo para confirmar.
+ * Nunca exclui o dono, funcionários nem quem está logado.
+ */
+export async function excluirAlunoAcao(f: FormData) {
+  const quem = await exigirAdmin("alunos");
+  const email = String(f.get("email") ?? "").trim().toLowerCase();
+  const confirmacao = String(f.get("confirmacao") ?? "").trim().toLowerCase();
+  const voltar = (e: string) => redirect(ficha(email, `erro=${e}#excluir`));
+  if (!quem.dono) voltar("excluir-dono");
+  if (!emailValido(email)) redirect("/admin/alunos");
+  if (email === quem.email.toLowerCase() || eDono(email)) voltar("excluir-admin");
+  const funcionario = await obterFuncionario(email).catch(() => "erro" as const);
+  if (funcionario === "erro") voltar("excluir-falhou");
+  if (funcionario) voltar("excluir-funcionario");
+  if (confirmacao !== email) voltar("excluir-confirmacao");
+  const aluno = await obterAluno(email).catch(() => null);
+  let r: Awaited<ReturnType<typeof excluirAluno>>;
+  try {
+    r = await excluirAluno(email);
+  } catch (e) {
+    console.error("[excluir aluno]", (e as Error).message);
+    voltar((e as Error).message === "demonstracao" ? "excluir-demo" : "excluir-falhou");
+    return;
+  }
+  const [usuario, dominio] = email.split("@");
+  await registrarEventoMatricula(
+    "painel",
+    true,
+    `${quem.email} excluiu o aluno ${usuario.slice(0, 2)}***@${dominio}${aluno?.eaUsuarioId ? ` (código ${aluno.eaUsuarioId} na Escola Avançada, que continua lá)` : ""}`,
+  ).catch(() => {});
+  revalidatePath("/", "layout");
+  const q = new URLSearchParams({ excluido: aluno?.nome || "1", ea: aluno?.eaUsuarioId ?? "", certs: String(r.certificados), pedidos: String(r.pedidos) });
+  redirect(`/admin/alunos?${q}`);
 }
