@@ -67,7 +67,7 @@ export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cu
 
 /** E-mail de boas-vindas do próprio site. Se falhar, o curso continua liberado; só registramos. */
 async function enviarBoasVindas(comprador: Comprador, cursoNome: string): Promise<void> {
-  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://tecpro-site.vercel.app";
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://www.tecpromultiensino.com.br";
   try {
     await enviarEmail({ para: comprador.email, ...emailBoasVindas(comprador.nome, cursoNome, site) });
     await registrarEventoMatricula("e-mail de boas-vindas", true, `Enviado para ${comprador.email}`);

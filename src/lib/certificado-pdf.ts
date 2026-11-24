@@ -51,11 +51,12 @@ export async function gerarPdfCertificado(c: Certificado, urlValidacao: string):
   pdf.setTitle(`Certificado - ${c.cursoNome}`);
   pdf.setAuthor("Tecpro Multi Ensino");
 
-  const [regular, semi, negrito, logoPng] = await Promise.all([
+  const [regular, semi, negrito, logoPng, assinaturaPng] = await Promise.all([
     ler("src/assets/fontes/Poppins-400.ttf").then((b) => pdf.embedFont(b, { subset: true })),
     ler("src/assets/fontes/Poppins-600.ttf").then((b) => pdf.embedFont(b, { subset: true })),
     ler("src/assets/fontes/Poppins-700.ttf").then((b) => pdf.embedFont(b, { subset: true })),
     ler("public/logo-tecpro-transparente.png").then((b) => pdf.embedPng(b)),
+    ler("src/assets/assinatura-coordenacao.png").then((b) => pdf.embedPng(b)),
   ]);
   const qr = await pdf.embedPng(await QRCode.toBuffer(urlValidacao, { margin: 1, width: 300, color: { dark: "#011749" } }));
 
@@ -92,6 +93,10 @@ export async function gerarPdfCertificado(c: Certificado, urlValidacao: string):
 
   // Assinatura institucional
   const ax = 110;
+  // Rubrica da coordenação (PNG com fundo transparente), centralizada sobre a linha e passando um pouco dela
+  const assAltura = 112;
+  const assLargura = (assinaturaPng.width / assinaturaPng.height) * assAltura;
+  page.drawImage(assinaturaPng, { x: ax + (230 - assLargura) / 2, y: 104, width: assLargura, height: assAltura });
   page.drawLine({ start: { x: ax, y: 112 }, end: { x: ax + 230, y: 112 }, thickness: 0.8, color: AZUL });
   page.drawText("Tecpro Multi Ensino", { x: ax, y: 96, size: 11, font: semi, color: AZUL });
   page.drawText("Coordenação pedagógica", { x: ax, y: 82, size: 9, font: regular, color: CINZA });
@@ -102,8 +107,10 @@ export async function gerarPdfCertificado(c: Certificado, urlValidacao: string):
   page.drawText("Código de validação", { x: vx, y: 120, size: 8, font: regular, color: CINZA });
   page.drawText(c.codigo, { x: vx, y: 104, size: 13, font: negrito, color: AZUL });
   page.drawText("Confira a autenticidade em:", { x: vx, y: 84, size: 8, font: regular, color: CINZA });
-  const urlCurta = urlValidacao.replace(/^https?:\/\//, "");
-  page.drawText(urlCurta.length > 44 ? `${urlCurta.slice(0, 44)}…` : urlCurta, { x: vx, y: 72, size: 8, font: regular, color: AZUL });
+  // Mostra só o endereço da página de validação (o código já está acima e o QR leva ao link completo),
+  // para o texto não invadir o QR code.
+  const urlCurta = urlValidacao.replace(/^https?:\/\//, "").replace(/\/[^/]*$/, "");
+  page.drawText(urlCurta, { x: vx, y: 72, size: 8, font: regular, color: AZUL });
 
   return pdf.save();
 }
