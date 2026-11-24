@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { exigirAdmin } from "@/lib/admin";
 import { obterConfigLoja } from "@/lib/dados";
-import { iaConfigurada } from "@/lib/resposta-ia";
 import { SugestaoIA } from "@/components/admin/SugestaoIA";
 import { listarMensagens, TIPOS_AJUDA, type MensagemAjuda } from "@/lib/dados/mensagens";
 import { AvisoSql, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
@@ -61,7 +60,7 @@ function linkGmail(m: MensagemAjuda, conta: string) {
   return `https://mail.google.com/mail/?${q.toString().replace(/\+/g, "%20")}`;
 }
 
-function Cartao({ m, conta, ia }: { m: MensagemAjuda; conta: string; ia: boolean }) {
+function Cartao({ m, conta }: { m: MensagemAjuda; conta: string }) {
   const ap = aparelho(m.navegador);
   return (
     <li id={`m${m.id}`} className={`rounded-2xl border bg-white p-5 ${m.status === "nova" ? "border-laranja-500/60 shadow-sm" : "border-slate-200 opacity-90"}`}>
@@ -103,7 +102,7 @@ function Cartao({ m, conta, ia }: { m: MensagemAjuda; conta: string; ia: boolean
         {m.print && <a href={`/admin/mensagens/imagem/${m.id}`} target="_blank" rel="noopener noreferrer" className="text-marca-700 underline">Ver print anexado</a>}
       </div>
 
-      {m.email && <SugestaoIA id={m.id} ligada={ia} />}
+      {m.email && <SugestaoIA id={m.id} />}
       {m.anotacao && <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><strong>Anotação da equipe:</strong> {m.anotacao}</p>}
       {m.status === "resolvida" && m.resolvidaEm && <p className="mt-2 text-xs text-slate-500">Resolvida em {quando(m.resolvidaEm)}{m.resolvidaPor ? ` por ${m.resolvidaPor}` : ""}.</p>}
 
@@ -175,7 +174,7 @@ export default async function Mensagens({ searchParams }: Props) {
         {!lista.length ? (
           <Vazio>{status === "novas" ? "Nenhuma mensagem nova. Tudo em dia!" : "Nenhuma mensagem aqui."}</Vazio>
         ) : (
-          <ul className="space-y-3">{lista.map((m) => <Cartao key={m.id} m={m} conta={conta} ia={iaConfigurada} />)}</ul>
+          <ul className="space-y-3">{lista.map((m) => <Cartao key={m.id} m={m} conta={conta} />)}</ul>
         )}
       </div>
     </>

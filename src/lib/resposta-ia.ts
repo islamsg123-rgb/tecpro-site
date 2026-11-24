@@ -1,21 +1,15 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
 import { obterConfigLoja } from "./dados";
 import { TIPOS_AJUDA, type MensagemAjuda } from "./dados/mensagens";
 import { getCursoPorSlug } from "./cursos";
 import { formatarPreco, precoDoCurso } from "./formatar";
 
 /**
- * Resposta sugerida por IA (Claude) para uma mensagem do botão de ajuda.
- * Só é gerada quando alguém clica em "Sugerir resposta com IA" no painel.
- * Sem ANTHROPIC_API_KEY na Vercel, o botão avisa que a IA não está ligada.
+ * Pedido pronto para o Claude (claude.ai) escrever a resposta de uma mensagem do botão de ajuda.
+ * Gratuito: o painel só monta o texto; a equipe abre o Claude na própria conta e cola.
  */
 
-export const iaConfigurada = Boolean(process.env.ANTHROPIC_API_KEY);
-
-const MODELO = "claude-opus-5-5";
-
-const INSTRUCOES = `Você ajuda a equipe da Tecpro Multi Ensino, uma escola de cursos online (cursos livres e profissionalizantes, com certificado), a responder mensagens que alunos e visitantes enviam pelo botão de ajuda do site.
+const INSTRUCOES = `Você vai ajudar a equipe da Tecpro Multi Ensino, uma escola de cursos online (cursos livres e profissionalizantes, com certificado), a responder mensagens que alunos e visitantes enviam pelo botão de ajuda do site.
 
 Escreva a resposta que a equipe vai colar no Gmail e enviar para a pessoa:
 - Em português do Brasil, tom cordial, simples e direto, como um atendente atencioso. Frases curtas, sem jargão técnico.
@@ -47,14 +41,16 @@ async function dadosDoCurso(pagina: string | null): Promise<string | null> {
     `Curso: ${curso.nome} (${curso.categoria})`,
     `Preço: ${precoDoCurso(curso)}${curso.gratuito ? " (curso gratuito)" : ""}`,
     curso.cargaHoraria ? `Carga horária: ${curso.cargaHoraria} horas` : "",
-    `Descrição: ${curso.descricao.slice(0, 1200)}`,
+    `Descrição: ${curso.descricao.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1200)}`,
   ].filter(Boolean).join("\n");
 }
 
-export async function sugerirRespostaIA(m: MensagemAjuda): Promise<string> {
+export async function montarPedidoClaude(m: MensagemAjuda): Promise<string> {
   const loja = await obterConfigLoja();
   const curso = await dadosDoCurso(m.pagina);
-  const contexto = [
+  return [
+    INSTRUCOES,
+    "",
     `<dados_da_escola>\n${dadosDaEscola(loja)}\n</dados_da_escola>`,
     curso ? `<curso_da_pagina>\n${curso}\n</curso_da_pagina>` : "",
     `<mensagem>`,
@@ -66,20 +62,4 @@ export async function sugerirRespostaIA(m: MensagemAjuda): Promise<string> {
     `Texto da pessoa: ${m.mensagem}`,
     `</mensagem>`,
   ].filter(Boolean).join("\n");
-
-  const client = new Anthropic();
-  const resposta = await client.beta.messages.create({
-    model: MODELO,
-    max_tokens: 4000,
-    output_config: { effort: "low" },
-    // Se o modelo recusar por engano, a própria API tenta de novo em outro modelo.
-    betas: ["server-side-fallback-2026-07-01"],
-    fallbacks: "default",
-    system: INSTRUCOES,
-    messages: [{ role: "user", content: contexto }],
-  });
-  if (resposta.stop_reason === "refusal") throw new Error("A IA não quis responder esta mensagem.");
-  const texto = resposta.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("").trim();
-  if (!texto) throw new Error("A IA não devolveu texto.");
-  return texto;
 }
