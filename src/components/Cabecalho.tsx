@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Logo } from "./Logo";
-import { IconeMenu } from "./Icones";
+import { MenuCelular } from "./MenuCelular";
 
 const links = [
   { href: "/cursos", rotulo: "Cursos" },
@@ -40,22 +40,8 @@ export function Cabecalho() {
           </Link>
         </div>
 
-        {/* Menu do celular (funciona sem JavaScript) */}
-        <details className="relative md:hidden">
-          <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-lg text-white hover:bg-white/10" aria-label="Abrir menu">
-            <IconeMenu />
-          </summary>
-          <div className="absolute right-0 top-12 w-60 overflow-hidden rounded-2xl border border-white/10 bg-marca-800 p-2 shadow-2xl">
-            {links.map((l) => (
-              <Link key={l.href} href={l.href} className="block rounded-xl px-4 py-3 text-sm font-medium text-slate-200 hover:bg-white/10">
-                {l.rotulo}
-              </Link>
-            ))}
-            <Link href="/minha-conta" className="mt-1 block rounded-xl bg-laranja-500 px-4 py-3 text-center text-sm font-bold text-marca-900">
-              Área do aluno
-            </Link>
-          </div>
-        </details>
+        {/* Menu do celular: fecha ao tocar fora, num link, ao trocar de página ou com Esc */}
+        <MenuCelular links={links} />
       </div>
     </header>
   );

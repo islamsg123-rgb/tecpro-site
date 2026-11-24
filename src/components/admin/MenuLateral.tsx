@@ -86,11 +86,18 @@ export function MenuLateral({ secoes, email, sair }: { secoes: Secao[]; email: s
   const pathname = usePathname();
   const [aberto, setAberto] = useState(false);
   useEffect(() => setAberto(false), [pathname]);
+  // Celular: a tecla Esc também fecha o menu
+  useEffect(() => {
+    if (!aberto) return;
+    const tecla = (e: KeyboardEvent) => e.key === "Escape" && setAberto(false);
+    document.addEventListener("keydown", tecla);
+    return () => document.removeEventListener("keydown", tecla);
+  }, [aberto]);
   const itens = MENU.filter((m) => secoes.includes(m.secao));
   const atual = ativo(pathname, itens);
 
   const lista = (expandido: boolean) => (
-    <ul className="space-y-1">
+    <ul className="space-y-1" onClick={(e) => (e.target as HTMLElement).closest("a") && setAberto(false)}>
       {itens.map((m) => {
         const eAtual = atual?.item === m;
         return (
