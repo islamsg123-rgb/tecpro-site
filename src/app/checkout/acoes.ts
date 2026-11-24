@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import { aplicarCupom } from "@/lib/cupons";
 import { pacotePorId } from "@/lib/pacotes-certificado";
 import { estadoValido } from "@/lib/estados";
-import { salvarLocalidadeAluno } from "@/lib/dados/painel";
+import { salvarContatoAluno, salvarLocalidadeAluno } from "@/lib/dados/painel";
 import { opcoesParcelas as parcelasPara } from "@/lib/config-loja";
 import { contarUsoCupom, registrarCarrinho } from "@/lib/dados/carrinhos";
 import type { Curso } from "@/lib/types";
@@ -211,6 +211,7 @@ export async function matricularGratis(_anterior: EstadoGratis, f: FormData): Pr
   try {
     await liberarAcesso(`gratis-${randomUUID().slice(0, 8)}`, comprador, curso.id);
     // Sem o SQL da cidade/estado, a matrícula segue normalmente.
+    await salvarContatoAluno(comprador.email, comprador.cpf, comprador.telefone).catch((e) => console.warn("[matricula-gratis] cpf/celular", e));
     await salvarLocalidadeAluno(comprador.email, cidade, estado).catch((e) => console.warn("[matricula-gratis] cidade/estado", e));
     await registrarCarrinho({ email: comprador.email, cursoId: curso.id, tipo: "curso", etapa: "matriculado", valorCentavos: 0 });
   } catch (e) {

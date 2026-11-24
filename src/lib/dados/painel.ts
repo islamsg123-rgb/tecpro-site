@@ -262,6 +262,17 @@ export async function salvarDadosAluno(email: string, d: DadosExtrasAluno & { no
   if (d.cidade !== undefined) await salvarLocalidadeAluno(e, d.cidade ?? null, d.estado ?? null);
 }
 
+/** Guarda CPF e celular informados no cadastro (para não pedir de novo no pagamento do certificado). */
+export async function salvarContatoAluno(email: string, cpf: string, telefone: string): Promise<void> {
+  const e = norm(email);
+  if (bancoEmDemonstracao) {
+    mem().extras.set(e, { observacoes: null, ...mem().extras.get(e), cpf, telefone });
+    return;
+  }
+  const { error } = await db().from("alunos").update({ cpf, telefone }).eq("email", e);
+  if (error) throw new Error("colunas");
+}
+
 /** Guarda cidade e estado do aluno. Sem o SQL 0008, dá erro "colunas". */
 export async function salvarLocalidadeAluno(email: string, cidade: string | null, estado: string | null): Promise<void> {
   const e = norm(email);
