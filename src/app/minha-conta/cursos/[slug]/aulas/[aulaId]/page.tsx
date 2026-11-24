@@ -6,6 +6,8 @@ import { BarraProgresso } from "@/components/aluno/Progresso";
 import { apostilaDoCurso, conteudoDaAula } from "@/lib/conteudo-escola";
 import { provaDaAula } from "@/lib/provas";
 import { AulaInterativa } from "@/components/aluno/AulaInterativa";
+import { BotaoPesquisa } from "@/components/aluno/BotaoPesquisa";
+import { obterConfigLoja } from "@/lib/dados";
 import { situacaoDaAula } from "@/lib/regras-aula";
 import { IconeCadeado, IconeCheck, IconeChevron, IconeSeta } from "@/components/Icones";
 
@@ -29,7 +31,7 @@ export default async function Aula({ params }: Props) {
   const conteudo = conteudoDaAula(c.curso.id, i, aula.titulo);
   const apostila = apostilaDoCurso(c.curso.id);
   const prova = provaDaAula(c.curso.nome, i, aula.titulo);
-  const sit = await situacaoDaAula(aluno.email, c, i);
+  const [sit, loja] = await Promise.all([situacaoDaAula(aluno.email, c, i), obterConfigLoja()]);
   const link = (id: string) => `/minha-conta/cursos/${slug}/aulas/${encodeURIComponent(id)}`;
 
   return (
@@ -56,6 +58,20 @@ export default async function Aula({ params }: Props) {
           perguntas={prova}
           apostila={apostila}
         />
+
+        {c.total > 0 && c.feitas === c.total && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-marca-900 p-6 text-white">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-widest text-laranja-500">Curso concluído</p>
+              <p className="mt-1 text-lg font-bold">Parabéns! Seu certificado já pode ser emitido.</p>
+            </div>
+            <Link href={`/minha-conta/cursos/${slug}#certificado`} className="rounded-full bg-laranja-500 px-6 py-3 font-bold text-marca-900 hover:bg-laranja-400">
+              Emitir certificado
+            </Link>
+          </div>
+        )}
+
+        {loja.pesquisaNasAulas && <BotaoPesquisa slug={slug} aulaId={aula.id} />}
 
         <div className="mt-8 flex gap-2">
           {anterior && (

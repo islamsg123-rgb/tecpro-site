@@ -78,6 +78,7 @@ export function adaptarCurso(raw: EACursoRaw): Curso | null {
     precoEscolaCentavos: paraCentavos(valor),
     visivel: true,
     destaque: /^(destacar|sim|1|true)$/i.test(campo(raw, "destaque")),
+    gratuito: false,
     capaUrl: capa || null,
     cargaHoraria: parseInt(campo(raw, "carga_horaria", "cargahoraria", "carga", "horas", "duracao"), 10) || 0,
     categoria: tituloCategoria(campo(raw, "categoria_loja", "categoria", "categoria_interna", "category", "area")),

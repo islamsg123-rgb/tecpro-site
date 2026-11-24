@@ -19,7 +19,7 @@ export const EMAIL_DEMO = "aluno@demo.tecpro";
 const norm = (email: string) => email.trim().toLowerCase();
 
 let cliente: SupabaseClient | null = null;
-function db(): SupabaseClient {
+export function db(): SupabaseClient {
   cliente ??= createClient(URL_SUPABASE!, CHAVE_SERVICO!, { auth: { persistSession: false } });
   return cliente;
 }
@@ -267,20 +267,27 @@ export async function configuracoesDosCursos(): Promise<Map<string, ConfigCurso>
 }
 
 export async function salvarConfiguracaoCurso(c: ConfigCurso): Promise<void> {
+  await salvarConfiguracoesCursos([c]);
+}
+
+/** Salva vários cursos de uma vez (uma só chamada ao banco). */
+export async function salvarConfiguracoesCursos(lista: ConfigCurso[]): Promise<void> {
+  if (!lista.length) return;
   if (bancoEmDemonstracao) {
-    configs().set(c.cursoId, c);
+    for (const c of lista) configs().set(c.cursoId, c);
     return;
   }
+  const agora = new Date().toISOString();
   const { error } = await db().from("configuracoes_curso").upsert(
-    {
+    lista.map((c) => ({
       curso_id: c.cursoId,
       preco_centavos: c.precoCentavos,
       visivel: c.visivel,
       destaque: c.destaque,
       certificado_modo: c.certificadoModo,
       certificado_preco_centavos: c.certificadoPrecoCentavos,
-      atualizado_em: new Date().toISOString(),
-    },
+      atualizado_em: agora,
+    })),
     { onConflict: "curso_id" },
   );
   if (error) throw error;
@@ -291,8 +298,23 @@ export async function salvarConfiguracaoCurso(c: ConfigCurso): Promise<void> {
 export interface ConfigLoja {
   /** Prazo de acesso do aluno em meses; null = vitalício. */
   mesesDeAcesso: number | null;
+  /** Mostra o botão "Avaliar" (pesquisa de satisfação) nas aulas. */
+  pesquisaNasAulas: boolean;
+  /** Mostra os depoimentos na página inicial. */
+  mostrarDepoimentos: boolean;
+  /** Contatos mostrados no rodapé do site (vazio = não mostra). */
+  whatsapp: string;
+  emailContato: string;
+  instagram: string;
+  /** Preços da emissão de certificado nos cursos gratuitos, em centavos. */
+  precoCertIndividual: number;
+  precoCertEssencial: number;
+  precoCertProfissional: number;
 }
-const CONFIG_LOJA_PADRAO: ConfigLoja = { mesesDeAcesso: null };
+const CONFIG_LOJA_PADRAO: ConfigLoja = {
+  mesesDeAcesso: null, pesquisaNasAulas: true, mostrarDepoimentos: true, whatsapp: "", emailContato: "", instagram: "",
+  precoCertIndividual: 3790, precoCertEssencial: 8990, precoCertProfissional: 12990,
+};
 
 const gLoja = globalThis as unknown as { __configLojaDemo?: ConfigLoja };
 
@@ -382,4 +404,207 @@ export async function contagens(): Promise<{ alunos: number; certificados: numbe
     db().from("certificados").select("*", { count: "exact", head: true }),
   ]);
   return { alunos: a.count ?? 0, certificados: c.count ?? 0 };
+}
+
+/* ---------- Cursos gratuitos ----------
+ * Guardados em configuracoes_loja (chave "cursos_gratuitos"), assim não é preciso mudar o banco. */
+
+const gGratis = globalThis as unknown as { __gratisDemo?: string[] };
+
+export async function cursosGratuitos(): Promise<Set<string>> {
+  if (bancoEmDemonstracao) return new Set(gGratis.__gratisDemo ?? []);
+  const { data, error } = await db().from("configuracoes_loja").select("valor").eq("chave", "cursos_gratuitos").maybeSingle();
+  if (error) {
+    console.error("[dados] cursos_gratuitos", error.message);
+    return new Set();
+  }
+  return new Set(Array.isArray(data?.valor) ? (data.valor as string[]).map(String) : []);
+}
+
+export async function definirCursoGratuito(cursoId: string, gratuito: boolean): Promise<void> {
+  const atual = await cursosGratuitos();
+  if (gratuito === atual.has(cursoId)) return;
+  if (gratuito) atual.add(cursoId);
+  else atual.delete(cursoId);
+  await definirCursosGratuitos(Array.from(atual));
+}
+
+/** Substitui a lista inteira de cursos gratuitos. */
+export async function definirCursosGratuitos(ids: string[]): Promise<void> {
+  const lista = Array.from(new Set(ids.map(String))).sort();
+  if (bancoEmDemonstracao) {
+    gGratis.__gratisDemo = lista;
+    return;
+  }
+  const { error } = await db()
+    .from("configuracoes_loja")
+    .upsert({ chave: "cursos_gratuitos", valor: lista, atualizado_em: new Date().toISOString() }, { onConflict: "chave" });
+  if (error) throw error;
+}
+
+/* ---------- Relatórios do painel ---------- */
+
+export interface Atividade {
+  email: string;
+  cursoId: string;
+  /** id da aula, ou "id#etapa" (inicio, video, prova) */
+  aulaId: string;
+  quando: string;
+}
+
+/** Tudo o que o aluno fez nas aulas (aulas concluídas e etapas), mais recente primeiro. */
+export async function atividadesDoAluno(emailAluno: string): Promise<Atividade[]> {
+  const email = norm(emailAluno);
+  if (bancoEmDemonstracao) {
+    const out: Atividade[] = [];
+    for (const [k, aulas] of mem.progresso) {
+      const [e, cursoId] = k.split("|");
+      if (e === email) for (const aulaId of aulas) out.push({ email, cursoId, aulaId, quando: new Date().toISOString() });
+    }
+    for (const [k, d] of mem.etapas ?? []) {
+      const [e, cursoId, aulaId] = k.split("|");
+      if (e === email) out.push({ email, cursoId, aulaId, quando: d.toISOString() });
+    }
+    return out.sort((a, b) => b.quando.localeCompare(a.quando));
+  }
+  const { data, error } = await db()
+    .from("progresso")
+    .select("curso_id, aula_id, concluida_em")
+    .eq("email", email)
+    .order("concluida_em", { ascending: false })
+    .limit(5000);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ email, cursoId: r.curso_id, aulaId: r.aula_id, quando: r.concluida_em }));
+}
+
+/** Data da última atividade de cada aluno nas aulas (para achar quem parou de estudar). */
+export async function ultimaAtividadePorAluno(): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (bancoEmDemonstracao) {
+    for (const email of mem.alunos.keys()) {
+      const a = await atividadesDoAluno(email);
+      if (a[0]) out.set(email, a[0].quando);
+    }
+    return out;
+  }
+  // Lê do mais recente para o mais antigo: a primeira linha de cada aluno é a última atividade.
+  // O Supabase devolve no máximo 1000 linhas por vez: lemos em páginas.
+  for (let de = 0; de < 200_000; de += 1000) {
+    const { data, error } = await db()
+      .from("progresso").select("email, concluida_em")
+      .order("concluida_em", { ascending: false }).order("email").order("aula_id").range(de, de + 999);
+    if (error) throw error;
+    for (const r of data ?? []) if (!out.has(r.email)) out.set(r.email, r.concluida_em);
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
+export interface CertificadoListado extends Certificado {}
+
+/** Certificados emitidos (mais recentes primeiro). */
+export async function listarCertificados(limite = 500): Promise<Certificado[]> {
+  if (bancoEmDemonstracao) return Array.from(certs().values()).sort((a, b) => b.emitidoEm.localeCompare(a.emitidoEm));
+  const { data, error } = await db().from("certificados").select("*").order("emitido_em", { ascending: false }).limit(limite);
+  if (error) throw error;
+  return (data ?? []).map((r) => daLinha(r as LinhaCert));
+}
+
+/** Certificados pagos (cobrança confirmada), emitidos ou não. */
+export async function listarCertificadosPagos(): Promise<{ email: string; cursoId: string; cobrancaId: string; pagoEm: string }[]> {
+  if (bancoEmDemonstracao) {
+    return Array.from(certPagos(), ([k, cobrancaId]) => {
+      const [email, cursoId] = k.split("|");
+      return { email, cursoId, cobrancaId, pagoEm: new Date().toISOString() };
+    }).filter((p) => !p.cursoId.startsWith(PREFIXO_CREDITO));
+  }
+  const { data, error } = await db().from("certificados_pagos").select("*").order("pago_em", { ascending: false }).limit(1000);
+  if (error) throw error;
+  return (data ?? [])
+    .filter((r) => !String(r.curso_id).startsWith(PREFIXO_CREDITO))
+    .map((r) => ({ email: r.email, cursoId: r.curso_id, cobrancaId: r.cobranca_id, pagoEm: r.pago_em }));
+}
+
+/* ---------- Créditos de certificado (pacotes) ----------
+ * Quem compra um pacote de 3 ou 5 certificados usa 1 no curso em que comprou e fica com o resto como crédito.
+ * Cada crédito é uma linha em "certificados_pagos" com curso_id = "credito:<cobrança>:<n>" (não precisa de tabela nova).
+ * Usar um crédito = trocar o curso_id dessa linha pelo curso de verdade. */
+
+export const PREFIXO_CREDITO = "credito:";
+
+/** Guarda N créditos de uma cobrança. Pode ser chamada de novo (aviso repetido do Asaas) sem duplicar. */
+export async function registrarCreditos(emailAluno: string, cobrancaId: string, quantidade: number): Promise<void> {
+  const email = norm(emailAluno);
+  if (quantidade < 1) return;
+  const linhas = Array.from({ length: quantidade }, (_, i) => `${PREFIXO_CREDITO}${cobrancaId}:${i + 1}`);
+  if (bancoEmDemonstracao) {
+    for (const l of linhas) if (!certPagos().has(`${email}|${l}`)) certPagos().set(`${email}|${l}`, cobrancaId);
+    return;
+  }
+  const { error } = await db()
+    .from("certificados_pagos")
+    .upsert(linhas.map((curso_id) => ({ email, curso_id, cobranca_id: cobrancaId })), { onConflict: "email,curso_id", ignoreDuplicates: true });
+  if (error) throw error;
+}
+
+async function linhasDeCredito(email: string): Promise<string[]> {
+  if (bancoEmDemonstracao) {
+    return Array.from(certPagos().keys()).filter((k) => k.startsWith(`${email}|${PREFIXO_CREDITO}`)).map((k) => k.split("|")[1]);
+  }
+  const { data, error } = await db().from("certificados_pagos").select("curso_id").eq("email", email).like("curso_id", `${PREFIXO_CREDITO}%`);
+  if (error) throw error;
+  return (data ?? []).map((r) => String(r.curso_id));
+}
+
+/** Quantos certificados o aluno ainda pode emitir com os pacotes que comprou. */
+export async function saldoCreditos(emailAluno: string): Promise<number> {
+  return (await linhasDeCredito(norm(emailAluno))).length;
+}
+
+/** Usa 1 crédito para liberar o certificado de um curso. Devolve false se não havia crédito. */
+export async function usarCredito(emailAluno: string, cursoId: string): Promise<boolean> {
+  const email = norm(emailAluno);
+  if (await certificadoFoiPago(email, cursoId)) return true;
+  for (const linha of await linhasDeCredito(email)) {
+    if (bancoEmDemonstracao) {
+      const cobranca = certPagos().get(`${email}|${linha}`)!;
+      certPagos().delete(`${email}|${linha}`);
+      certPagos().set(`${email}|${cursoId}`, cobranca);
+      return true;
+    }
+    // Troca o "curso" da linha de crédito pelo curso de verdade. Se outra aba usou o mesmo crédito, tenta o próximo.
+    const { data, error } = await db()
+      .from("certificados_pagos").update({ curso_id: cursoId, pago_em: new Date().toISOString() })
+      .eq("email", email).eq("curso_id", linha).select("curso_id");
+    if (error) {
+      if (error.code === "23505") return true; // o curso já estava pago
+      throw error;
+    }
+    if (data?.length) return true;
+  }
+  return false;
+}
+
+/** Quantas aulas cada aluno concluiu em cada curso ("email|curso" -> quantidade). Só aulas reais, sem as etapas. */
+export async function aulasConcluidasPorAlunoCurso(): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (bancoEmDemonstracao) {
+    for (const [k, s] of mem.progresso) out.set(k, s.size);
+    return out;
+  }
+  // O Supabase devolve no máximo 1000 linhas por vez: lemos em páginas.
+  const data: { email: string; curso_id: string }[] = [];
+  for (let de = 0; de < 200_000; de += 1000) {
+    const { data: pag, error } = await db()
+      .from("progresso").select("email, curso_id, aula_id").not("aula_id", "like", "%#%")
+      .order("email").order("curso_id").order("aula_id").range(de, de + 999);
+    if (error) throw error;
+    data.push(...(pag ?? []));
+    if (!pag || pag.length < 1000) break;
+  }
+  for (const r of data) {
+    const k = `${r.email}|${r.curso_id}`;
+    out.set(k, (out.get(k) ?? 0) + 1);
+  }
+  return out;
 }

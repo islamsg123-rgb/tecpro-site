@@ -1,18 +1,31 @@
 import Link from "next/link";
-import { emitir } from "@/app/minha-conta/acoes";
+import { emitir, usarCreditoCertificado } from "@/app/minha-conta/acoes";
 import { formatarPreco } from "@/lib/formatar";
 import type { SituacaoCertificado } from "@/lib/certificados";
 import { IconeCadeado, IconeCertificado, IconeCheck } from "../Icones";
 
 export function CartaoCertificado({
-  s, slug, faltam, nomeSugerido, erroNome,
+  s, slug, faltam, nomeSugerido, erroNome, creditos = 0, whatsappSuporte = "", emailSuporte = "", email = "", cursoNome = "",
 }: {
   s: SituacaoCertificado;
   slug: string;
   faltam: number;
   nomeSugerido: string;
   erroNome?: boolean;
+  /** Certificados que sobraram de pacotes comprados */
+  creditos?: number;
+  /** WhatsApp da escola (Configurações da loja), para pedir correção do nome */
+  whatsappSuporte?: string;
+  emailSuporte?: string;
+  email?: string;
+  cursoNome?: string;
 }) {
+  const zap = whatsappSuporte.replace(/\D/g, "");
+  const linkSuporte = zap
+    ? `https://wa.me/${zap.length <= 11 ? `55${zap}` : zap}?text=${encodeURIComponent(
+        `Olá! Concluí o curso ${cursoNome} e o meu nome está errado no certificado. Meu cadastro: ${nomeSugerido || "(sem nome)"}, ${email}. Nome correto: `,
+      )}`
+    : "";
   const pago = s.regra.modo === "pago";
   return (
     <aside id="certificado" className="h-fit scroll-mt-24 overflow-hidden rounded-3xl border border-slate-200 bg-white">
@@ -20,7 +33,12 @@ export function CartaoCertificado({
         <IconeCertificado className="h-8 w-8 text-laranja-500" />
         <h2 className="mt-3 text-lg font-bold">Certificado</h2>
         <p className="mt-1 text-sm text-slate-300">
-          {pago && s.regra.modo === "pago" ? `Emissão: ${formatarPreco(s.regra.precoCentavos)}` : "Grátis ao concluir o curso"}
+          {/* O valor do certificado pago só aparece depois que o aluno conclui o curso. */}
+          {!pago
+            ? "Grátis ao concluir o curso"
+            : s.estado === "aguardando_pagamento" && s.regra.modo === "pago"
+              ? creditos > 0 ? "Use um certificado do seu pacote" : `A partir de ${formatarPreco(s.regra.precoCentavos)}`
+              : "Disponível ao concluir o curso"}
         </p>
       </div>
       <div className="p-6">
@@ -33,24 +51,43 @@ export function CartaoCertificado({
 
         {s.estado === "aguardando_pagamento" && s.regra.modo === "pago" && (
           <>
-            <p className="text-sm text-slate-600">Parabéns, você concluiu o curso! Pague a emissão para liberar o seu certificado.</p>
-            <Link href={`/minha-conta/cursos/${slug}/certificado`} className="mt-5 block rounded-full bg-laranja-500 py-3.5 text-center font-bold text-marca-900 hover:bg-laranja-400">
-              Pagar {formatarPreco(s.regra.precoCentavos)} e liberar
-            </Link>
+            <p className="text-sm text-slate-600">Parabéns, você concluiu o curso!</p>
+            {creditos > 0 ? (
+              <form action={usarCreditoCertificado} className="mt-4">
+                <input type="hidden" name="slug" value={slug} />
+                <p className="text-sm text-slate-600">
+                  Você tem <strong className="text-marca-900">{creditos} {creditos === 1 ? "certificado disponível" : "certificados disponíveis"}</strong> do seu pacote.
+                </p>
+                <button className="mt-4 w-full rounded-full bg-green-600 py-3.5 font-bold text-white hover:bg-green-700">Usar 1 e liberar</button>
+              </form>
+            ) : (
+              <Link href={`/minha-conta/cursos/${slug}/certificado`} className="mt-5 block rounded-full bg-laranja-500 py-3.5 text-center font-bold text-marca-900 hover:bg-laranja-400">
+                Emitir certificado
+              </Link>
+            )}
           </>
         )}
 
         {s.estado === "disponivel" && (
-          <form action={emitir} className="space-y-3">
-            <p className="text-sm text-slate-600">Tudo pronto! Confira como o seu nome deve aparecer. Depois de emitido, ele não pode ser alterado.</p>
-            <input type="hidden" name="slug" value={slug} />
-            <label className="block">
-              <span className="mb-1.5 block text-sm font-medium text-slate-700">Nome completo no certificado</span>
-              <input name="nome" defaultValue={nomeSugerido} required className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-marca-500 focus:ring-4 focus:ring-marca-100" />
-            </label>
-            {erroNome && <p className="text-xs font-medium text-red-600">Informe nome e sobrenome.</p>}
-            <button className="w-full rounded-full bg-laranja-500 py-3.5 font-bold text-marca-900 hover:bg-laranja-400">Emitir certificado</button>
-          </form>
+<div className="space-y-3">
+            <p className="text-sm text-slate-600">Tudo pronto! O certificado sai com o nome do seu cadastro:</p>
+            <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-bold text-marca-900">{nomeSugerido || "Nome não cadastrado"}</p>
+            {nomeSugerido.trim().split(/\s+/).length >= 2 && (
+              <form action={emitir}>
+                <input type="hidden" name="slug" value={slug} />
+                <button className="w-full rounded-full bg-laranja-500 py-3.5 font-bold text-marca-900 hover:bg-laranja-400">Está certo, emitir certificado</button>
+              </form>
+            )}
+            {erroNome && <p className="text-xs font-medium text-red-600">Seu cadastro está sem nome completo. Fale com o suporte para corrigir.</p>}
+            <p className="text-xs text-slate-500">Depois de emitido, o certificado não pode ser alterado. Se o nome estiver errado, fale com o suporte: confirmamos a sua identidade e corrigimos para você.</p>
+            {linkSuporte ? (
+              <a href={linkSuporte} target="_blank" rel="noreferrer" className="block rounded-full border border-emerald-600 py-3 text-center font-semibold text-emerald-700 hover:bg-emerald-50">
+                Nome errado? Falar no WhatsApp
+              </a>
+            ) : (
+              emailSuporte && <a href={`mailto:${emailSuporte}`} className="block text-center text-sm font-semibold text-marca-700 underline">Nome errado? Escreva para {emailSuporte}</a>
+            )}
+          </div>
         )}
 
         {s.estado === "emitido" && s.certificado && (

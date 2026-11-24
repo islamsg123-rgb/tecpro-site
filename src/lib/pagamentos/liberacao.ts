@@ -5,6 +5,7 @@ import { liberarCertificadoPago } from "../certificados";
 import { getCursos } from "../cursos";
 import { emailBoasVindas, enviarEmail } from "../email";
 import type { Comprador, Produto } from "./tipos";
+import { registrarCarrinho } from "../dados/carrinhos";
 
 /**
  * Depois do pagamento confirmado: cria o aluno na Escola Avançada (se ainda não existir),
@@ -20,8 +21,11 @@ const emAndamento = (g.__liberacoesEmAndamento ??= new Set());
 
 /** Chamado quando um pagamento é confirmado (webhook do Asaas ou simulador). */
 export async function processarPagamento(cobrancaId: string, comprador: Comprador, produto: Produto): Promise<void> {
-  if (produto.tipo === "curso") return liberarAcesso(cobrancaId, comprador, produto.cursoId);
-  await liberarCertificadoPago(produto.email, produto.cursoId, cobrancaId);
+  const email = produto.tipo === "certificado" ? produto.email : comprador.email;
+  if (produto.tipo === "curso") await liberarAcesso(cobrancaId, comprador, produto.cursoId);
+  else await liberarCertificadoPago(produto.email, produto.cursoId, cobrancaId, produto.quantidade ?? 1);
+  // Sai da lista de carrinhos abandonados.
+  await registrarCarrinho({ email, cursoId: produto.cursoId, tipo: produto.tipo, etapa: "pago", cobrancaId, nome: comprador.nome || undefined, telefone: comprador.telefone || undefined });
 }
 
 export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cursoId: string): Promise<void> {

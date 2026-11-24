@@ -1,7 +1,8 @@
 import "server-only";
-import type { Cobranca, DadosBoleto, DadosPix, NovaCobranca } from "./tipos";
+import type { Cobranca, Comprador, DadosBoleto, DadosPix, NovaCobranca } from "./tipos";
 import {
-  asaasConfigurado, boletoAsaas, consultarCobrancaAsaas, criarCobrancaAsaas, listarCobrancasAsaas, pixAsaas,
+  asaasConfigurado, boletoAsaas, clientePorEmailAsaas, cobrancasDoEmailAsaas, consultarCobrancaAsaas, criarCobrancaAsaas,
+  listarCobrancasAsaas, pixAsaas, saldoAsaas,
 } from "./asaas";
 import {
   boletoSimulado, consultarCobrancaSimulada, criarCobrancaSimulada, listarCobrancasSimuladas, pixSimulado,
@@ -35,11 +36,30 @@ export async function consultarCobranca(id: string): Promise<Cobranca | null> {
   return consultarCobrancaAsaas(id);
 }
 
-export async function listarCobrancas(): Promise<Cobranca[]> {
-  if (!pagamentoEmSimulacao) return listarCobrancasAsaas();
+/** Cobranças mais recentes (padrão: 50; o painel financeiro pede mais). */
+export async function listarCobrancas(limite = 50): Promise<Cobranca[]> {
+  if (!pagamentoEmSimulacao) return listarCobrancasAsaas(limite);
   // Na simulação, consulta as pendentes antes (é isso que "paga" o Pix e libera o curso).
   for (const c of listarCobrancasSimuladas()) if (c.situacao === "aguardando") await consultarCobranca(c.id);
-  return listarCobrancasSimuladas();
+  return listarCobrancasSimuladas().slice(0, limite);
+}
+
+/** Pagamentos de um aluno (pelo e-mail). */
+export async function cobrancasDoEmail(email: string): Promise<Cobranca[]> {
+  const e = email.trim().toLowerCase();
+  if (pagamentoEmSimulacao) return listarCobrancasSimuladas().filter((c) => c.clienteEmail === e);
+  return cobrancasDoEmailAsaas(e);
+}
+
+/** CPF e telefone do aluno, como estão no cadastro de pagamento. */
+export async function clientePorEmail(email: string): Promise<Comprador | null> {
+  if (pagamentoEmSimulacao) return null;
+  return clientePorEmailAsaas(email.trim().toLowerCase()).catch(() => null);
+}
+
+/** Saldo disponível para saque (só no Asaas real). */
+export async function saldoDisponivel(): Promise<number | null> {
+  return pagamentoEmSimulacao ? null : saldoAsaas();
 }
 
 export async function dadosPix(id: string): Promise<DadosPix> {

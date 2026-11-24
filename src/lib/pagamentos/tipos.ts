@@ -1,15 +1,26 @@
 /** O que está sendo pago: a matrícula num curso ou o certificado de um curso já feito. */
 export type Produto =
   | { tipo: "curso"; cursoId: string }
-  | { tipo: "certificado"; cursoId: string; email: string };
+  | { tipo: "certificado"; cursoId: string; email: string; /** Pacote: quantos certificados (padrão 1) */ quantidade?: number };
 
 /** Texto guardado no Asaas (externalReference) para saber o que foi pago. */
 export function referenciaProduto(p: Produto): string {
-  return p.tipo === "curso" ? `curso:${p.cursoId}` : `certificado:${p.cursoId}:${p.email}`;
+  if (p.tipo === "curso") return `curso:${p.cursoId}`;
+  // Pacote de certificados: guarda a quantidade junto (ex.: "certpacote:3:69:aluno@email.com").
+  if ((p.quantidade ?? 1) > 1) return `certpacote:${p.quantidade}:${p.cursoId}:${p.email}`;
+  return `certificado:${p.cursoId}:${p.email}`;
 }
 
 export function produtoDaReferencia(ref: unknown): Produto | null {
   if (typeof ref !== "string") return null;
+  if (ref.startsWith("certpacote:")) {
+    const [, qtd, cursoId, ...resto] = ref.split(":");
+    const quantidade = Number(qtd);
+    if (cursoId && resto.length && Number.isInteger(quantidade) && quantidade > 0) {
+      return { tipo: "certificado", cursoId, email: resto.join(":"), quantidade };
+    }
+    return null;
+  }
   const [tipo, cursoId, ...resto] = ref.split(":");
   if (tipo === "curso" && cursoId) return { tipo, cursoId };
   if (tipo === "certificado" && cursoId && resto.length) return { tipo, cursoId, email: resto.join(":") };
@@ -62,6 +73,17 @@ export interface Cobranca {
   criadoEm?: string; // AAAA-MM-DD ou data/hora ISO
   /** Nome do cliente, quando disponível (o Asaas só manda o código do cliente na lista) */
   cliente?: string;
+  /** E-mail do cliente, quando disponível */
+  clienteEmail?: string;
+  clienteTelefone?: string;
+  /** Código do cliente no Asaas */
+  clienteId?: string;
+  /** Data em que o dinheiro foi pago (AAAA-MM-DD) */
+  pagoEm?: string;
+  /** Valor que fica para a Tecpro depois das taxas do Asaas, em centavos */
+  valorLiquidoCentavos?: number;
+  /** Parcela (ex.: 2 de 12) quando o cartão é parcelado */
+  parcela?: number;
 }
 
 export interface DadosPix {

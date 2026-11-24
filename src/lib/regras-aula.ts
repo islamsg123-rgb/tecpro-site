@@ -7,11 +7,11 @@ import { provaDaAula } from "./provas";
 /**
  * Regras para concluir uma aula e liberar a próxima:
  * - vídeo do Panda: assistir pelo menos 80% (medido pelo player);
- * - Google Drive / Slides (o player não informa o tempo assistido): ficar pelo menos 2 minutos na aula;
+ * - Google Drive / Slides (atividades e slides): sem tempo mínimo, pedido do Islam em 2026-11-24;
  * - aula com prova: acertar todas as questões.
  */
 export const PCT_MINIMO_VIDEO = 0.8;
-export const SEGUNDOS_MINIMOS_OUTRO = 120;
+export const SEGUNDOS_MINIMOS_OUTRO = 0;
 
 export type TipoMidia = "panda" | "outro" | "nenhum";
 
@@ -38,6 +38,6 @@ export async function situacaoDaAula(email: string, c: CursoDoAluno, i: number):
   const inicio = e.inicio ?? null;
   const decorrido = inicio ? (Date.now() - inicio.getTime()) / 1000 : 0;
   const faltamSegundos = tipo === "outro" ? Math.max(0, Math.ceil(SEGUNDOS_MINIMOS_OUTRO - decorrido)) : 0;
-  const videoOk = tipo === "nenhum" || Boolean(e.video) || (tipo === "outro" && inicio !== null && faltamSegundos === 0);
+  const videoOk = tipo !== "panda" || Boolean(e.video);
   return { tipo, temProva, videoOk, provaOk: !temProva || Boolean(e.prova), faltamSegundos, inicio };
 }
