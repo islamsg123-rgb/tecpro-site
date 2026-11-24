@@ -12,6 +12,9 @@ import { situacaoCertificado } from "@/lib/certificados";
 import { liberarAcesso } from "@/lib/pagamentos/liberacao";
 import { randomUUID } from "node:crypto";
 import { aplicarCupom } from "@/lib/cupons";
+import { pacotePorId } from "@/lib/pacotes-certificado";
+import { estadoValido } from "@/lib/estados";
+import { salvarContatoAluno, salvarLocalidadeAluno } from "@/lib/dados/painel";
 import { opcoesParcelas as parcelasPara } from "@/lib/config-loja";
 import { contarUsoCupom, registrarCarrinho } from "@/lib/dados/carrinhos";
 import type { Curso } from "@/lib/types";
@@ -28,7 +31,7 @@ const texto = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 
 type Item = { produto: Produto; descricao: string; valorCentavos: number };
 
-async function itemDaCompra(tipo: string, curso: Curso): Promise<Item | { erro: string }> {
+async function itemDaCompra(tipo: string, curso: Curso, idPacote = ""): Promise<Item | { erro: string }> {
   if (tipo !== "certificado") {
     if (!curso.visivel) return { erro: "Este curso não está disponível para venda no momento." };
     if (curso.gratuito) return { erro: "Este curso é gratuito: volte à página do curso para se matricular." };
@@ -40,10 +43,15 @@ async function itemDaCompra(tipo: string, curso: Curso): Promise<Item | { erro: 
   const c = await cursoDoAluno(aluno.email, curso.slug);
   const s = await situacaoCertificado(aluno.email, c);
   if (s.estado !== "aguardando_pagamento" || s.regra.modo !== "pago") return { erro: "Este certificado não está aguardando pagamento." };
+  // Individual ou pacote (3 ou 5 certificados): o preço vem das Configurações da loja, nunca do navegador.
+  const pacote = await pacotePorId(idPacote || "individual");
+  if (!pacote) return { erro: "Escolha uma opção de certificado." };
   return {
-    produto: { tipo: "certificado", cursoId: curso.id, email: aluno.email },
-    descricao: `Certificado: ${curso.nome}`,
-    valorCentavos: s.regra.precoCentavos,
+    produto: { tipo: "certificado", cursoId: curso.id, email: aluno.email, quantidade: pacote.quantidade },
+    descricao: pacote.quantidade > 1
+      ? `${pacote.nome} (${pacote.quantidade} certificados): ${curso.nome} + ${pacote.quantidade - 1} créditos`
+      : `Certificado: ${curso.nome}`,
+    valorCentavos: pacote.precoCentavos,
   };
 }
 
@@ -85,10 +93,10 @@ export type RespostaCupom =
   | { ok: false; erro: string };
 
 /** Confere o cupom digitado no checkout e devolve o novo valor (o pagamento confere de novo). */
-export async function conferirCupom(cursoId: string, tipo: string, codigo: string): Promise<RespostaCupom> {
+export async function conferirCupom(cursoId: string, tipo: string, codigo: string, pacote = ""): Promise<RespostaCupom> {
   const curso = (await getCursos()).find((c) => c.id === cursoId);
   if (!curso) return { ok: false, erro: "Curso não encontrado." };
-  const item = await itemDaCompra(tipo, curso);
+  const item = await itemDaCompra(tipo, curso, pacote);
   if ("erro" in item) return { ok: false, erro: item.erro };
   const r = await aplicarCupom(codigo, { tipo: item.produto.tipo, cursoId: curso.id, valorCentavos: item.valorCentavos });
   if (!r.ok) return r;
@@ -102,7 +110,7 @@ export async function pagar(_anterior: EstadoCheckout, f: FormData): Promise<Est
   // O que está sendo comprado e o preço vêm SEMPRE do servidor, nunca do formulário.
   const curso = (await getCursos()).find((c) => c.id === texto(f, "cursoId"));
   if (!curso) return { erro: "Curso não encontrado." };
-  const item = await itemDaCompra(texto(f, "tipo"), curso);
+  const item = await itemDaCompra(texto(f, "tipo"), curso, texto(f, "pacote"));
   if ("erro" in item) return item;
 
   const forma = texto(f, "forma") as FormaPagamento;
@@ -190,6 +198,10 @@ export async function matricularGratis(_anterior: EstadoGratis, f: FormData): Pr
   if (!curso || !curso.visivel || !curso.gratuito) return { erro: "Este curso não está disponível para matrícula gratuita." };
 
   const { comprador, campos } = lerComprador(f);
+  const estado = texto(f, "estado").toUpperCase();
+  const cidade = texto(f, "cidade").replace(/\s+/g, " ").slice(0, 80);
+  if (!estadoValido(estado)) campos.estado = "Escolha o seu estado.";
+  if (cidade.length < 2) campos.cidade = "Informe a sua cidade.";
   if (f.get("termos") !== "on") campos.termos = "Para continuar, aceite os termos de uso.";
   if (Object.keys(campos).length) return { erro: "Confira os campos destacados.", campos };
 
@@ -198,6 +210,9 @@ export async function matricularGratis(_anterior: EstadoGratis, f: FormData): Pr
   });
   try {
     await liberarAcesso(`gratis-${randomUUID().slice(0, 8)}`, comprador, curso.id);
+    // Sem o SQL da cidade/estado, a matrícula segue normalmente.
+    await salvarContatoAluno(comprador.email, comprador.cpf, comprador.telefone).catch((e) => console.warn("[matricula-gratis] cpf/celular", e));
+    await salvarLocalidadeAluno(comprador.email, cidade, estado).catch((e) => console.warn("[matricula-gratis] cidade/estado", e));
     await registrarCarrinho({ email: comprador.email, cursoId: curso.id, tipo: "curso", etapa: "matriculado", valorCentavos: 0 });
   } catch (e) {
     console.error("[matricula-gratis]", e);

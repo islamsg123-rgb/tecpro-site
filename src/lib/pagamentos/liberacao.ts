@@ -23,7 +23,7 @@ const emAndamento = (g.__liberacoesEmAndamento ??= new Set());
 export async function processarPagamento(cobrancaId: string, comprador: Comprador, produto: Produto): Promise<void> {
   const email = produto.tipo === "certificado" ? produto.email : comprador.email;
   if (produto.tipo === "curso") await liberarAcesso(cobrancaId, comprador, produto.cursoId);
-  else await liberarCertificadoPago(produto.email, produto.cursoId, cobrancaId);
+  else await liberarCertificadoPago(produto.email, produto.cursoId, cobrancaId, produto.quantidade ?? 1);
   // Sai da lista de carrinhos abandonados.
   await registrarCarrinho({ email, cursoId: produto.cursoId, tipo: produto.tipo, etapa: "pago", cobrancaId, nome: comprador.nome || undefined, telefone: comprador.telefone || undefined });
 }

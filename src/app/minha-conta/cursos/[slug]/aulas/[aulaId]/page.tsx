@@ -59,6 +59,18 @@ export default async function Aula({ params }: Props) {
           apostila={apostila}
         />
 
+        {c.total > 0 && c.feitas === c.total && (
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-marca-900 p-6 text-white">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-widest text-laranja-500">Curso concluído</p>
+              <p className="mt-1 text-lg font-bold">Parabéns! Seu certificado já pode ser emitido.</p>
+            </div>
+            <Link href={`/minha-conta/cursos/${slug}#certificado`} className="rounded-full bg-laranja-500 px-6 py-3 font-bold text-marca-900 hover:bg-laranja-400">
+              Emitir certificado
+            </Link>
+          </div>
+        )}
+
         {loja.pesquisaNasAulas && <BotaoPesquisa slug={slug} aulaId={aula.id} />}
 
         <div className="mt-8 flex gap-2">

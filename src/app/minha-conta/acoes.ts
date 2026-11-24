@@ -3,10 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { cursoDoAluno, exigirAluno } from "@/lib/area-aluno";
-import { definirAulaConcluida, marcarEtapa, obterAluno } from "@/lib/dados";
+import { definirAulaConcluida, marcarEtapa, obterAluno, usarCredito } from "@/lib/dados";
 import { registrarPesquisa } from "@/lib/dados/painel";
 import { PCT_MINIMO_VIDEO, situacaoDaAula } from "@/lib/regras-aula";
-import { emitirCertificado, limparNome } from "@/lib/certificados";
+import { emitirCertificado, limparNome, situacaoCertificado } from "@/lib/certificados";
 import { corrigir, type ResultadoProva } from "@/lib/provas";
 
 /** Aula pelo id, só se estiver liberada (as anteriores concluídas). */
@@ -65,11 +65,14 @@ export async function registrarVideo(slug: string, aulaId: string, assistidoSeg:
   return true;
 }
 
-/** Emite o certificado com o nome confirmado pelo aluno. */
+/**
+ * Emite o certificado com o nome do cadastro. O aluno não pode trocar o nome:
+ * se estiver errado, fala com o suporte, que corrige na ficha do aluno no painel.
+ */
 export async function emitir(f: FormData) {
   const aluno = await exigirAluno();
   const slug = String(f.get("slug"));
-  const nome = limparNome(String(f.get("nome") ?? ""));
+  const nome = limparNome((await obterAluno(aluno.email))?.nome ?? "");
   if (nome.split(" ").length < 2) redirect(`/minha-conta/cursos/${slug}?erroNome=1#certificado`);
   const c = await cursoDoAluno(aluno.email, slug);
   await emitirCertificado(aluno.email, c, nome);
@@ -125,4 +128,17 @@ export async function enviarPesquisa(_: { ok?: boolean; erro?: string }, f: Form
     console.error("[pesquisa]", e instanceof Error ? e.message : e);
     return { erro: "Não conseguimos enviar agora. Tente de novo mais tarde." };
   }
+}
+
+/* ---------- Usar um certificado do pacote comprado ---------- */
+
+export async function usarCreditoCertificado(f: FormData) {
+  const aluno = await exigirAluno();
+  const slug = String(f.get("slug") ?? "");
+  const c = await cursoDoAluno(aluno.email, slug);
+  const s = await situacaoCertificado(aluno.email, c);
+  // Só vale para curso concluído que está esperando o pagamento do certificado.
+  if (s.estado === "aguardando_pagamento") await usarCredito(aluno.email, c.curso.id);
+  revalidatePath(`/minha-conta/cursos/${slug}`);
+  redirect(`/minha-conta/cursos/${slug}#certificado`);
 }

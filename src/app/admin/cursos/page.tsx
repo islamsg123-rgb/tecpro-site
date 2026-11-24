@@ -27,11 +27,12 @@ export default async function CursosAdmin({ searchParams }: Props) {
       <h1 className="text-3xl font-extrabold text-marca-900">Cursos</h1>
       <p className="mt-2 max-w-3xl text-sm text-slate-500">
         Nome, descrição e aulas vêm da Escola Avançada. Aqui você ajusta o que é da Tecpro: preço de venda, se o curso aparece no site,
-        se fica em destaque, se é gratuito e a regra do certificado.
+        se fica em destaque e se é gratuito.
       </p>
       <p className="mt-3 max-w-3xl rounded-2xl border border-laranja-500/40 bg-laranja-300/20 p-4 text-sm text-marca-900">
-        <strong>Curso gratuito:</strong> a matrícula é feita sem pagamento e o aluno paga só o certificado depois de concluir
-        (Pix, boleto ou cartão em até 12x). O valor do certificado só aparece para o aluno quando ele termina o curso.
+        <strong>Curso gratuito:</strong> a matrícula é feita sem pagamento e, ao concluir, o aluno escolhe como emitir o certificado:
+        individual, pacote de 3 ou pacote de 5 (preços em <a href="/admin/configuracoes#certificados" className="font-semibold underline">Configurações da loja</a>).
+        <br /><strong>Curso pago:</strong> o certificado é grátis ao concluir.
       </p>
       <form action={gratuitoEmMassa} className="mt-4 flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-5">
         <div className="min-w-[220px] flex-1">
@@ -40,10 +41,6 @@ export default async function CursosAdmin({ searchParams }: Props) {
             Hoje: {cursos.filter((c) => c.gratuito).length} gratuito(s) de {cursos.length}. Preço, vitrine e destaque de cada curso continuam guardados.
           </p>
         </div>
-        <label className="block">
-          <span className="block text-xs font-semibold text-slate-600">Valor do certificado (R$)</span>
-          <input name="certificadoPreco" inputMode="decimal" placeholder="ex.: 49,90" className="mt-1 w-36 rounded-xl border border-slate-300 px-3 py-2 text-sm" />
-        </label>
         <button name="acao" value="gratis" className="rounded-full bg-green-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-800">
           Deixar todos gratuitos
         </button>
@@ -51,13 +48,11 @@ export default async function CursosAdmin({ searchParams }: Props) {
           Voltar todos a pagos
         </button>
         {sp.massa && <p className="w-full text-sm font-medium text-green-700">Pronto, todos os cursos foram atualizados.</p>}
-        {sp.erro === "massa" && <p className="w-full text-sm font-medium text-red-700">Informe o valor do certificado (mínimo R$ 5,00) para deixar todos gratuitos.</p>}
       </form>
 
       <div className="mt-8 space-y-4">
         {cursos.map((c) => {
           const ajuste = cfg.get(c.id);
-          const certPago = ajuste?.certificadoModo === "pago";
           const desteCurso = sp.curso === c.id;
           return (
             <form
@@ -104,25 +99,12 @@ export default async function CursosAdmin({ searchParams }: Props) {
                   </label>
                 </fieldset>
 
-                <fieldset>
-                  <legend className="text-sm font-semibold text-marca-900">Certificado</legend>
-                  <select
-                    name="certificadoModo"
-                    defaultValue={certPago ? "pago" : "gratis"}
-                    className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
-                  >
-                    <option value="gratis">Grátis ao concluir</option>
-                    <option value="pago">Pago</option>
-                  </select>
-                  <input
-                    name="certificadoPreco"
-                    inputMode="decimal"
-                    defaultValue={reais(ajuste?.certificadoPrecoCentavos)}
-                    placeholder="Valor se for pago, ex.: 29,90"
-                    aria-label="Valor do certificado"
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-marca-500 focus:ring-4 focus:ring-marca-100"
-                  />
-                </fieldset>
+                <div>
+                  <p className="text-sm font-semibold text-marca-900">Certificado</p>
+                  <p className="mt-1.5 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
+                    {c.gratuito ? "Pago ao concluir (individual ou pacotes)" : "Grátis ao concluir"}
+                  </p>
+                </div>
 
                 <div className="lg:pt-6">
                   <button className="w-full rounded-full bg-marca-900 px-6 py-2.5 text-sm font-bold text-white hover:bg-marca-800">Salvar</button>

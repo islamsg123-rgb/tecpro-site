@@ -1,4 +1,5 @@
 import "server-only";
+import { localidadesDosAlunos } from "@/lib/dados/painel";
 import { getCursos } from "./cursos";
 import { listarCertificados, listarCertificadosPagos, listarAlunos, ultimaAtividadePorAluno } from "./dados";
 import { listarCobrancas } from "./pagamentos";
@@ -25,11 +26,12 @@ export async function alunosComAtividade() {
 /** Tabela para exportar (primeira linha = títulos). */
 export async function tabelaParaExportar(tipo: string): Promise<string[][] | null> {
   if (tipo === "alunos") {
-    const alunos = await alunosComAtividade();
+    const [alunos, locais] = await Promise.all([alunosComAtividade(), localidadesDosAlunos()]);
     return [
-      ["Nome", "E-mail", "Código na Escola Avançada", "Matriculado em", "Última atividade", "Dias sem estudar"],
+      ["Nome", "E-mail", "Cidade", "Estado", "Código na Escola Avançada", "Matriculado em", "Última atividade", "Dias sem estudar"],
       ...alunos.map((a) => [
-        a.nome ?? "", a.email, a.eaUsuarioId, dataBR(a.criadoEm), dataBR(a.ultimaAtividade),
+        a.nome ?? "", a.email, locais.get(a.email)?.cidade ?? "", locais.get(a.email)?.estado ?? "",
+        a.eaUsuarioId, dataBR(a.criadoEm), dataBR(a.ultimaAtividade),
         String(diasDesde(a.ultimaAtividade) ?? "nunca estudou"),
       ]),
     ];

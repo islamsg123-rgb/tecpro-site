@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cursosDoAluno } from "@/lib/area-aluno";
 import { situacaoCertificado, type EstadoCertificado } from "@/lib/certificados";
-import { atividadesDoAluno, obterAluno } from "@/lib/dados";
+import { atividadesDoAluno, obterAluno, saldoCreditos } from "@/lib/dados";
 import { provaDaAula } from "@/lib/provas";
 import { dataBR, diasDesde } from "@/lib/admin-relatorios";
 import { BarraProgresso } from "@/components/aluno/Progresso";
@@ -12,6 +12,7 @@ import { formatarPreco } from "@/lib/formatar";
 import { cobrancasDoEmail, clientePorEmail } from "@/lib/pagamentos";
 import { listarCarrinhos } from "@/lib/dados/carrinhos";
 import { cursosRemovidos, dadosExtrasAluno, listarPesquisas } from "@/lib/dados/painel";
+import { ESTADOS } from "@/lib/estados";
 import { DIAS_PARA_INATIVO } from "@/lib/painel-resumo";
 import { TabelaVendas } from "@/components/admin/TabelaVendas";
 import { EtiquetaAluno } from "@/components/admin/Blocos";
@@ -71,7 +72,11 @@ export default async function Ficha({ searchParams }: Props) {
     listarPesquisas(500),
   ]);
   const pesquisas = pesquisasTodas.filter((p) => p.email === email);
+  // Mais avançados primeiro; empate: o que teve atividade mais recente.
+  const ultimaNo = (id: string) => atividades.find((x) => x.cursoId === id)?.quando ?? "";
+  cursos?.sort((a, b) => b.pct - a.pct || ultimaNo(b.curso.id).localeCompare(ultimaNo(a.curso.id)));
   const certs = cursos ? await Promise.all(cursos.map((c) => situacaoCertificado(email, c))) : [];
+  const creditos = await saldoCreditos(email).catch(() => 0);
   const ultima = atividades[0]?.quando ?? null;
   const dias = diasDesde(ultima);
   const situacao = dias === null ? "interessado" : dias >= DIAS_PARA_INATIVO ? "inativo" : "ativo";
@@ -104,6 +109,11 @@ export default async function Ficha({ searchParams }: Props) {
           </p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm">
+          {creditos > 0 && (
+            <p className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-green-800">
+              Certificados no pacote: <strong>{creditos}</strong>
+            </p>
+          )}
           <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">
             Total pago: <strong className="text-marca-900">{formatarPreco(pagos.reduce((s, p) => s + p.valorCentavos, 0))}</strong>
           </p>
@@ -129,6 +139,13 @@ export default async function Ficha({ searchParams }: Props) {
         <label className="font-semibold text-marca-900">E-mail (login)<input value={email} readOnly className={`${campo} bg-slate-50`} /></label>
         <label className="font-semibold text-marca-900">CPF<input name="cpf" defaultValue={cpf} disabled={!registro} className={campo} /></label>
         <label className="font-semibold text-marca-900">Telefone / WhatsApp<input name="telefone" defaultValue={telefone} disabled={!registro} className={campo} /></label>
+        <label className="font-semibold text-marca-900">Cidade<input name="cidade" defaultValue={extras.cidade ?? ""} disabled={!registro} className={campo} /></label>
+        <label className="font-semibold text-marca-900">Estado
+          <select name="estado" defaultValue={extras.estado ?? ""} disabled={!registro} className={`${campo} bg-white`}>
+            <option value="">—</option>
+            {ESTADOS.map(([uf, n]) => <option key={uf} value={uf}>{n}</option>)}
+          </select>
+        </label>
         <label className="font-semibold text-marca-900 sm:col-span-2">Observações internas <span className="font-normal text-slate-400">(só a equipe vê)</span>
           <textarea name="observacoes" rows={2} defaultValue={extras.observacoes ?? ""} disabled={!registro} className={campo} />
         </label>
@@ -138,7 +155,7 @@ export default async function Ficha({ searchParams }: Props) {
           ) : (
             <p className="text-slate-500">Esta pessoa só preencheu o contato no checkout. Libere um curso abaixo para virar aluno.</p>
           )}
-          {extras.colunasFaltando && <p className="text-amber-700">Para salvar CPF, telefone e observações, rode o SQL novo no Supabase.</p>}
+          {extras.colunasFaltando && <p className="text-amber-700">Para salvar todos os dados (incluindo cidade e estado), rode o SQL novo no Supabase.</p>}
           {asaas && <p className="text-xs text-slate-400">CPF e telefone vêm do cadastro de pagamento quando não foram editados aqui.</p>}
         </div>
       </form>
