@@ -68,12 +68,8 @@ export const MENU: Item[] = [
     ],
   },
   {
-    secao: "mensagens", rotulo: "Mensagens", href: "/admin/mensagens/aluno",
+    secao: "mensagens", rotulo: "Mensagens", href: "/admin/mensagens",
     icone: svg(<><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4A1.5 1.5 0 0 1 4 14.5z" /><path d="M8 8.5h8M8 11.5h5" /></>),
-    sub: [
-      { rotulo: "Área do aluno", href: "/admin/mensagens/aluno" },
-      { rotulo: "Loja virtual", href: "/admin/mensagens/loja" },
-    ],
   },
   { secao: "funcionarios", rotulo: "Funcionários", href: "/admin/funcionarios", icone: svg(<><rect x="4" y="3" width="16" height="18" rx="2" /><circle cx="12" cy="10" r="2.8" /><path d="M7.5 17.5c.7-2 2.5-3.2 4.5-3.2s3.8 1.2 4.5 3.2" /></>) },
   { secao: "sistema", rotulo: "Integrações", href: "/admin/integracoes", icone: svg(<><path d="M9 15 15 9" /><path d="M11 6.5 12.5 5a3.5 3.5 0 0 1 5 5L16 11.5M13 17.5 11.5 19a3.5 3.5 0 0 1-5-5L8 12.5" /></>) },

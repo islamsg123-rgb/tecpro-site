@@ -18,9 +18,7 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
   // Mensagens novas do botão de ajuda (número vermelho no menu).
   const contadores: Contadores = {};
   if (acesso.permissoes.includes("mensagens")) {
-    const novas = await contarNovas().catch(() => ({ aluno: 0, loja: 0 }));
-    contadores["/admin/mensagens/aluno"] = novas.aluno;
-    contadores["/admin/mensagens/loja"] = novas.loja;
+    contadores["/admin/mensagens"] = await contarNovas().catch(() => 0);
   }
   const avisos = [
     usandoDadosDeExemplo && "cursos de exemplo (falta a chave da Escola Avançada)",

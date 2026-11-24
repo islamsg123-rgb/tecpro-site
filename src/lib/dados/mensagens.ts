@@ -113,18 +113,11 @@ export async function obterMensagem(id: number): Promise<MensagemAjuda | null> {
   return data ? daLinha(data) : null;
 }
 
-/** Quantas mensagens novas (não resolvidas) há, por origem. Usado no contador do menu. */
-export async function contarNovas(): Promise<{ aluno: number; loja: number }> {
-  if (bancoEmDemonstracao) {
-    const novas = mem().lista.filter((m) => m.status === "nova");
-    return { aluno: novas.filter((m) => m.origem === "aluno").length, loja: novas.filter((m) => m.origem === "loja").length };
-  }
-  const conta = async (origem: OrigemMensagem) => {
-    const { count, error } = await db().from("mensagens_ajuda").select("id", { count: "exact", head: true }).eq("status", "nova").eq("origem", origem);
-    return error ? 0 : count ?? 0;
-  };
-  const [aluno, loja] = await Promise.all([conta("aluno"), conta("loja")]);
-  return { aluno, loja };
+/** Quantas mensagens novas (não resolvidas) há. Usado no contador do menu. */
+export async function contarNovas(): Promise<number> {
+  if (bancoEmDemonstracao) return mem().lista.filter((m) => m.status === "nova").length;
+  const { count, error } = await db().from("mensagens_ajuda").select("id", { count: "exact", head: true }).eq("status", "nova");
+  return error ? 0 : count ?? 0;
 }
 
 export async function definirStatus(id: number, status: StatusMensagem, quem: string): Promise<void> {
