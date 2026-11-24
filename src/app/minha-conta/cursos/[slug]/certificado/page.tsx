@@ -9,6 +9,7 @@ import { formatarPreco } from "@/lib/formatar";
 import { pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { pacotesCertificado } from "@/lib/pacotes-certificado";
 import { FormularioCheckout } from "@/components/checkout/FormularioCheckout";
+import { TotalResumo } from "@/components/checkout/TotalResumo";
 import { IconeCertificado, IconeCheck, IconeChevron } from "@/components/Icones";
 import { usarCreditoCertificado } from "@/app/minha-conta/acoes";
 
@@ -117,10 +118,7 @@ export default async function EmitirCertificado({ params, searchParams }: Props)
               )}
               <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
                 <span className="font-semibold text-slate-600">Total</span>
-                <span className="text-right">
-                  {pacote.quantidade > 1 && <span className="block text-xs text-slate-400 line-through">{formatarPreco(pacote.precoCheioCentavos)}</span>}
-                  <span className="font-display text-2xl font-extrabold text-marca-900">{formatarPreco(pacote.precoCentavos)}</span>
-                </span>
+                <TotalResumo valorCentavos={pacote.precoCentavos} riscadoCentavos={pacote.quantidade > 1 ? pacote.precoCheioCentavos : undefined} />
               </div>
             </aside>
           </div>
