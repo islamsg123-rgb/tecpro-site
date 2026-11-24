@@ -40,7 +40,7 @@ export default async function Checkout({ params }: Props) {
         {pagamento?.emTeste && (
           <div className="mt-6 rounded-2xl border border-laranja-500/40 bg-laranja-300/20 p-4 text-sm text-marca-900">
             <strong>Modo de teste do Mercado Pago:</strong> nada é cobrado de verdade. Use um cartão de teste do Mercado Pago
-            (ex.: Mastercard 5031 4332 1540 6351, CVV 123, validade 11/30) com o nome <strong>APRO</strong> para aprovar
+            (ex.: Visa 4235 6477 2802 5682, CVV 123, validade 11/30) com o nome <strong>APRO</strong> para aprovar
             ou <strong>OTHE</strong> para recusar, e o CPF 123.456.789-09.
           </div>
         )}

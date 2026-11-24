@@ -43,6 +43,15 @@ export function preCarregarSdk() {
   carregarSdk().catch(() => {});
 }
 
+function bandeiraPeloNumero(n: string): { id: string; issuer?: { id?: number | string } } | null {
+  if (/^4/.test(n)) return { id: "visa" };
+  if (/^(5[1-5]|2[2-7])/.test(n)) return { id: "master" };
+  if (/^3[47]/.test(n)) return { id: "amex" };
+  if (/^(606282|3841)/.test(n)) return { id: "hipercard" };
+  if (/^(4011|4312|4389|4514|4576|5041|5066|5067|509|6277|6362|6363|650|6516|6550)/.test(n)) return { id: "elo" };
+  return null;
+}
+
 export interface CartaoDigitado {
   numero: string; nome: string; mes: string; ano: string; cvv: string; cpf: string;
 }
@@ -55,8 +64,9 @@ export async function tokenizarCartao(chavePublica: string, c: CartaoDigitado): 
   }
   const mp = new window.MercadoPago!(chavePublica, { locale: "pt-BR" });
   const metodos = await mp.getPaymentMethods({ bin: c.numero.slice(0, 8) }).catch(() => null);
-  const metodo = metodos?.results?.[0];
-  if (!metodo) throw new Error("Não reconhecemos este cartão. Confira o número.");
+  // Se o Mercado Pago não reconhecer o início do número, deduz a bandeira pelos primeiros dígitos.
+  const metodo = metodos?.results?.[0] ?? bandeiraPeloNumero(c.numero);
+  if (!metodo) throw new Error("Não reconhecemos este cartão. Confira o número ou use outro cartão.");
   const ano = c.ano.length === 2 ? `20${c.ano}` : c.ano;
   try {
     const { id } = await mp.createCardToken({
