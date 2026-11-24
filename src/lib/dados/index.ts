@@ -662,3 +662,39 @@ export async function aulasConcluidasPorAlunoCurso(): Promise<Map<string, number
   }
   return out;
 }
+
+export interface LinhaProgresso {
+  email: string;
+  cursoId: string;
+  /** id da aula, ou "id#etapa" (inicio, video, prova), ou "#teste" */
+  aulaId: string;
+  quando: string;
+}
+
+/** Todas as linhas de progresso (aulas e etapas), com data. Usado no ranking dos alunos. */
+export async function todasAsLinhasDeProgresso(): Promise<LinhaProgresso[]> {
+  if (bancoEmDemonstracao) {
+    const out: LinhaProgresso[] = [];
+    const agora = new Date().toISOString();
+    for (const [k, aulas] of mem.progresso) {
+      const [email, cursoId] = k.split("|");
+      for (const aulaId of aulas) out.push({ email, cursoId, aulaId, quando: agora });
+    }
+    for (const [k, d] of mem.etapas ?? []) {
+      const [email, cursoId, aulaId] = k.split("|");
+      out.push({ email, cursoId, aulaId, quando: d.toISOString() });
+    }
+    return out;
+  }
+  // O Supabase devolve no máximo 1000 linhas por vez: lemos em páginas.
+  const out: LinhaProgresso[] = [];
+  for (let de = 0; de < 500_000; de += 1000) {
+    const { data, error } = await db()
+      .from("progresso").select("email, curso_id, aula_id, concluida_em")
+      .order("email").order("curso_id").order("aula_id").range(de, de + 999);
+    if (error) throw error;
+    for (const r of data ?? []) out.push({ email: r.email, cursoId: r.curso_id, aulaId: r.aula_id, quando: r.concluida_em });
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
