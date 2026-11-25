@@ -1,6 +1,6 @@
 "use server";
 
-import { enderecoVideo } from "@/lib/video";
+import { fonteVideo } from "@/lib/video";
 
 import { estadoValido } from "@/lib/estados";
 import { revalidatePath } from "next/cache";
@@ -85,7 +85,7 @@ export async function salvarConfiguracoes(f: FormData) {
   const precos = ["precoCertIndividual", "precoCertEssencial", "precoCertProfissional"].map((k) => lerPreco(f.get(k)));
   if (precos.some((p) => p === null || p === "invalido")) redirect("/admin/configuracoes?erro=precos#certificados");
   const video = String(f.get("videoParabens") ?? "").trim();
-  if (video && !enderecoVideo(video)) redirect("/admin/configuracoes?erro=video#certificados");
+  if (video && !fonteVideo(video)) redirect("/admin/configuracoes?erro=video#certificados");
   await salvarConfigLoja({
     mesesDeAcesso: meses,
     pesquisaNasAulas: f.get("pesquisaNasAulas") === "on",
