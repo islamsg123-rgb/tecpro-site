@@ -8,6 +8,7 @@ import { registrarPesquisa } from "@/lib/dados/painel";
 import { PCT_MINIMO_VIDEO, situacaoDaAula } from "@/lib/regras-aula";
 import { emitirCertificado, limparNome, situacaoCertificado } from "@/lib/certificados";
 import { corrigir, type ResultadoProva } from "@/lib/provas";
+import { certificadoLiberado } from "@/lib/lembrete-certificado";
 
 /** Aula pelo id, só se estiver liberada (as anteriores concluídas). */
 async function aulaLiberada(slug: string, aulaId: string) {
@@ -138,7 +139,7 @@ export async function usarCreditoCertificado(f: FormData) {
   const c = await cursoDoAluno(aluno.email, slug);
   const s = await situacaoCertificado(aluno.email, c);
   // Só vale para curso concluído que está esperando o pagamento do certificado.
-  if (s.estado === "aguardando_pagamento") await usarCredito(aluno.email, c.curso.id);
+  if (s.estado === "aguardando_pagamento" && (await usarCredito(aluno.email, c.curso.id))) await certificadoLiberado(aluno.email, c.curso.id);
   revalidatePath(`/minha-conta/cursos/${slug}`);
   redirect(`/minha-conta/cursos/${slug}#certificado`);
 }

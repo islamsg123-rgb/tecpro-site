@@ -6,15 +6,16 @@ import { listarCertificados, listarCertificadosPagos } from "@/lib/dados";
 import { dataBR } from "@/lib/admin-relatorios";
 import { BotaoExportar } from "@/components/admin/BotaoExportar";
 import { Dica } from "@/components/admin/Dica";
+import { reenviarCertificado } from "./acoes";
 
 export const metadata: Metadata = { title: "Certificados" };
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Promise<{ busca?: string }> };
+type Props = { searchParams: Promise<{ busca?: string; reenviado?: string; erro?: string }> };
 
 export default async function Certificados({ searchParams }: Props) {
   await exigirAdmin("alunos");
-  const [emitidos, pagos, cursos, { busca = "" }] = await Promise.all([listarCertificados(), listarCertificadosPagos(), getCursos(), searchParams]);
+  const [emitidos, pagos, cursos, { busca = "", reenviado, erro }] = await Promise.all([listarCertificados(), listarCertificadosPagos(), getCursos(), searchParams]);
   const pago = new Set(pagos.map((p) => `${p.email}|${p.cursoId}`));
   const termo = busca.trim().toLowerCase();
   const lista = emitidos.filter((c) => !termo || `${c.codigo} ${c.nomeAluno} ${c.email} ${c.cursoNome}`.toLowerCase().includes(termo));
@@ -30,6 +31,9 @@ export default async function Certificados({ searchParams }: Props) {
       <p className="mt-2 text-sm text-slate-500">
         Certificados da Tecpro emitidos pelos alunos ({emitidos.length}), {pagos.length} pagos. Todos podem ser conferidos na página pública de validação.
       </p>
+
+      {reenviado && <p className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">Certificado mandado de novo para <strong>{reenviado}</strong>.</p>}
+      {erro && <p className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">Não deu para mandar o e-mail: {erro === "naoachou" ? "certificado não encontrado." : erro}</p>}
 
       {naoEmitidos.length > 0 && (
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
@@ -84,6 +88,12 @@ export default async function Certificados({ searchParams }: Props) {
                   <td className="whitespace-nowrap px-5 py-3 text-right">
                     <a href={`/certificados/${c.codigo}/pdf`} target="_blank" rel="noopener" className="font-semibold text-marca-700 hover:underline">PDF</a>
                     <Link href={`/validar/${c.codigo}`} className="ml-4 font-semibold text-marca-700 hover:underline">Validar</Link>
+                    <form action={reenviarCertificado} className="ml-4 inline">
+                      <input type="hidden" name="codigo" value={c.codigo} />
+                      <Dica texto={`Manda o PDF deste certificado de novo para ${c.email}.`}>
+                        <button className="font-semibold text-marca-700 hover:underline">Reenviar por e-mail</button>
+                      </Dica>
+                    </form>
                   </td>
                 </tr>
               ))}

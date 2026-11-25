@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { after } from "next/server";
+import { lembrarDeComprar } from "@/lib/lembrete-certificado";
 import { cursoDoAluno, exigirAluno } from "@/lib/area-aluno";
 import { AnelProgresso } from "@/components/aluno/Progresso";
 import { CartaoCertificado } from "@/components/aluno/CartaoCertificado";
@@ -19,6 +21,8 @@ export default async function MeuCurso({ params, searchParams }: Props) {
     situacaoCertificado(aluno.email, c), obterAluno(aluno.email), searchParams, saldoCreditos(aluno.email).catch(() => 0), obterConfigLoja(),
   ]);
   const nomeSugerido = registro?.nome ?? "";
+  // Viu a tela do certificado e ainda não comprou: e-mail de parabéns daqui a 1 hora (cancelado se comprar antes).
+  if (cert.estado === "aguardando_pagamento") after(() => lembrarDeComprar(aluno.email, c.curso.id));
   const link = (id: string) => `/minha-conta/cursos/${slug}/aulas/${encodeURIComponent(id)}`;
 
   return (
