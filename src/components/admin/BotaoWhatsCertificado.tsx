@@ -1,10 +1,16 @@
 import { Dica } from "./Dica";
 
 /** Botão verde "Chamar no WhatsApp" (ou cinza, sem celular) para cobrar o certificado de quem concluiu. */
-export function BotaoWhatsCertificado({ url }: { url: string | null }) {
+export function BotaoWhatsCertificado({
+  url,
+  dicaSemCelular = "Este aluno não tem celular cadastrado. Dá para incluir na ficha do aluno (clique no nome dele).",
+}: {
+  url: string | null;
+  dicaSemCelular?: string;
+}) {
   if (!url) {
     return (
-      <Dica texto="Este aluno não tem celular cadastrado. Dá para incluir na ficha do aluno (clique no nome dele).">
+      <Dica texto={dicaSemCelular}>
         <span aria-disabled="true" className="inline-flex cursor-not-allowed items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-3 py-2 text-xs font-bold text-slate-400">
           <Icone /> Sem celular
         </span>

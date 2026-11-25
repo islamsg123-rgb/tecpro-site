@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cursosDoAluno } from "@/lib/area-aluno";
 import { situacaoCertificado, type EstadoCertificado } from "@/lib/certificados";
-import { atividadesDoAluno, obterAluno, saldoCreditos } from "@/lib/dados";
+import { atividadesDoAluno, obterAluno, obterConfigLoja, saldoCreditos } from "@/lib/dados";
+import { linkEmitirCertificado, linkWhatsapp, mensagemCertificado } from "@/lib/whatsapp-certificado";
+import { BotaoWhatsCertificado } from "@/components/admin/BotaoWhatsCertificado";
 import { provaDaAula } from "@/lib/provas";
 import { dataBR, dataHoraBR, diasDesde } from "@/lib/admin-relatorios";
 import { BarraProgresso } from "@/components/aluno/Progresso";
@@ -75,7 +77,7 @@ export default async function Ficha({ searchParams }: Props) {
     );
   }
 
-  const [cursos, atividades, extras, asaas, pagamentos, removidos, todosCursos, { lista: pesquisasTodas }] = await Promise.all([
+  const [cursos, atividades, extras, asaas, pagamentos, removidos, todosCursos, { lista: pesquisasTodas }, loja] = await Promise.all([
     registro ? cursosDoAluno(email).catch(() => null) : Promise.resolve([]),
     atividadesDoAluno(email),
     dadosExtrasAluno(email),
@@ -84,6 +86,7 @@ export default async function Ficha({ searchParams }: Props) {
     cursosRemovidos(email),
     getCursos(),
     listarPesquisas(500),
+    obterConfigLoja(),
   ]);
   const pesquisas = pesquisasTodas.filter((p) => p.email === email);
   // Mais avançados primeiro; empate: o que teve atividade mais recente.
@@ -96,6 +99,9 @@ export default async function Ficha({ searchParams }: Props) {
   const situacao = dias === null ? "interessado" : dias >= DIAS_PARA_INATIVO ? "inativo" : "ativo";
   const nome = registro?.nome ?? carrinhos[0]?.nome ?? asaas?.nome ?? email;
   const telefone = extras.telefone ?? asaas?.telefone ?? carrinhos.find((c) => c.telefone)?.telefone ?? "";
+  const precosCert = { individual: loja.precoCertIndividual, essencial: loja.precoCertEssencial, profissional: loja.precoCertProfissional };
+  const whatsCertificado = (curso: { nome: string; slug: string }) =>
+    telefone ? linkWhatsapp(telefone, mensagemCertificado({ nome, curso: curso.nome, link: linkEmitirCertificado(curso.slug), precos: precosCert })) : null;
   const cpf = extras.cpf ?? asaas?.cpf ?? "";
   const nomeCurso = (id: string) => todosCursos.find((c) => c.id === id)?.nome ?? `curso ${id}`;
   const idsAtuais = new Set((cursos ?? []).map((c) => c.curso.id));
@@ -221,6 +227,15 @@ export default async function Ficha({ searchParams }: Props) {
                     </dd>
                   </div>
                 </dl>
+                {s.estado === "aguardando_pagamento" && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 p-3">
+                    <p className="flex-1 text-xs text-amber-900">Concluiu e ainda não pagou o certificado. Chame no WhatsApp para dar os parabéns e lembrar de emitir.</p>
+                    <BotaoWhatsCertificado
+                      url={whatsCertificado(c.curso)}
+                      dicaSemCelular="Este aluno não tem celular cadastrado. Preencha o campo Telefone / WhatsApp nos dados do aluno, aqui nesta página, e salve."
+                    />
+                  </div>
+                )}
                 <details className="mt-4 text-sm">
                   <summary className="cursor-pointer text-xs font-semibold text-slate-400 hover:text-red-600">Remover este curso do aluno</summary>
                   <form action={removerCursoAluno} className="mt-2 rounded-xl bg-red-50 p-3">
