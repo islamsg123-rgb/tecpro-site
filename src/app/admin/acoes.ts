@@ -186,7 +186,7 @@ export async function excluirCupom(f: FormData) {
 /* ---------- Pesquisa de satisfação ---------- */
 
 export async function excluirPesquisa(f: FormData) {
-  await exigirAdmin("vendas");
+  await exigirAdmin("alunos");
   await apagarPesquisa(Number(f.get("id")));
   revalidatePath("/admin/pesquisa");
 }

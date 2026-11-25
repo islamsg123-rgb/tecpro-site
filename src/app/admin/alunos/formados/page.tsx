@@ -35,7 +35,7 @@ export default async function Formados() {
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Numero rotulo="Cursos concluídos" valor={String(formados.length)} detalhe={`${new Set(formados.map((f) => f.email)).size} pessoas`} dica="Quantos cursos foram terminados (todas as aulas feitas). Embaixo, quantas pessoas diferentes concluíram." />
         <Numero rotulo="Certificados emitidos" valor={String(emitidos)} cor="verde" dica="Certificados que já foram gerados e têm código de validação." />
-        <Numero rotulo="Falta pagar o certificado" valor={String(faltaPagar)} cor="laranja" href="/admin/financeiro/devedores" dica="Alunos que concluíram um curso grátis e ainda não pagaram o certificado." />
+        <Numero rotulo="Falta pagar o certificado" valor={String(faltaPagar)} cor="laranja" dica="Alunos que concluíram um curso grátis e ainda não pagaram o certificado." />
       </div>
       {exemplo && (
         <details className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm">

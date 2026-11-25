@@ -13,6 +13,7 @@ import {
   boletoSimulado, consultarCobrancaSimulada, criarCobrancaSimulada, listarCobrancasSimuladas, pixSimulado,
 } from "./simulador";
 import { processarPagamento } from "./liberacao";
+import { guardarOrigemDaCobranca } from "../dados/avisos-venda";
 
 /**
  * Porta de entrada dos pagamentos. As páginas só usam estas funções; elas decidem sozinhas
@@ -55,17 +56,21 @@ export async function criarCobranca(n: NovaCobranca): Promise<Cobranca> {
   const gateway = await gatewayAtivo();
   if (gateway === "simulador") {
     const { cobranca, comprador } = await criarCobrancaSimulada(n);
-    if (cobranca.situacao === "pago") await processarPagamento(cobranca.id, comprador, n.produto);
+    await guardarOrigemDaCobranca(cobranca.id, n.origem);
+    if (cobranca.situacao === "pago") await processarPagamento(cobranca.id, comprador, n.produto, cobranca);
     return cobranca;
   }
   if (gateway === "mercadopago") {
     const c = await criarCobrancaMp(n);
+    await guardarOrigemDaCobranca(c.id, n.origem);
     // Cartão aprovado na hora: libera já (o aviso automático pode chegar depois; a liberação não repete).
     if (c.situacao === "pago") await garantirLiberacao(c);
     return c;
   }
   // No Asaas, a liberação acontece quando o aviso (webhook) de pagamento chega.
-  return criarCobrancaAsaas(n);
+  const c = await criarCobrancaAsaas(n);
+  await guardarOrigemDaCobranca(c.id, n.origem);
+  return c;
 }
 
 export async function consultarCobranca(id: string): Promise<Cobranca | null> {
@@ -73,7 +78,7 @@ export async function consultarCobranca(id: string): Promise<Cobranca | null> {
   if (g === "simulador") {
     const r = consultarCobrancaSimulada(id);
     if (!r) return null;
-    if (r.acabouDePagar && r.cobranca.produto) await processarPagamento(id, r.comprador, r.cobranca.produto);
+    if (r.acabouDePagar && r.cobranca.produto) await processarPagamento(id, r.comprador, r.cobranca.produto, r.cobranca);
     return r.cobranca;
   }
   if (g === "mercadopago" && !mpConfigurado) return null;
@@ -101,7 +106,7 @@ async function garantirLiberacao(c: Cobranca): Promise<void> {
       jaLiberadas.add(c.id);
       return;
     }
-    await processarPagamento(c.id, c.comprador ?? (await compradorDoClienteAsaas(c.clienteId!)), c.produto);
+    await processarPagamento(c.id, c.comprador ?? (await compradorDoClienteAsaas(c.clienteId!)), c.produto, c);
     jaLiberadas.add(c.id);
   } catch (e) {
     console.error(`[pagamentos] não consegui liberar a cobrança paga ${c.id}`, e);
@@ -112,7 +117,7 @@ async function garantirLiberacao(c: Cobranca): Promise<void> {
 export async function liberarCobrancaPaga(c: Cobranca): Promise<void> {
   if (!c.produto || !c.comprador) return;
   if (c.produto.tipo === "certificado" && (await certificadoFoiPago(c.produto.email, c.produto.cursoId))) return;
-  await processarPagamento(c.id, c.comprador, c.produto);
+  await processarPagamento(c.id, c.comprador, c.produto, c);
   jaLiberadas.add(c.id);
 }
 

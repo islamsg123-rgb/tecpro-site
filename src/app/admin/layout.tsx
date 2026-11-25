@@ -6,6 +6,7 @@ import { pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { usandoDadosDeExemplo } from "@/lib/escola-avancada/client";
 import { AbasSecao, MenuLateral, type Contadores } from "@/components/admin/MenuLateral";
 import { contarNovas } from "@/lib/dados/mensagens";
+import { BarraPainel } from "@/components/admin/BarraPainel";
 import { sair } from "../entrar/acoes";
 
 export const metadata: Metadata = { title: { default: "Painel", template: "%s | Painel Tecpro" }, robots: { index: false } };
@@ -15,6 +16,7 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
   await exigirAdmin();
   const acesso = (await acessoPainel())!;
   const secoes = ["painel", ...acesso.permissoes, ...(acesso.dono ? ["sistema"] : [])] as Parameters<typeof MenuLateral>[0]["secoes"];
+  const veFinanceiro = acesso.permissoes.includes("financeiro");
   // Mensagens novas do botão de ajuda (número vermelho no menu).
   const contadores: Contadores = {};
   if (acesso.permissoes.includes("mensagens")) {
@@ -27,7 +29,9 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
   ].filter(Boolean);
 
   return (
-    <div className="min-h-[calc(100vh-72px)] bg-[#f3f6fb] md:flex">
+    <>
+    <BarraPainel secoes={secoes} contadores={contadores} veFinanceiro={veFinanceiro} />
+    <div className="min-h-[calc(100vh-56px)] bg-[#f3f6fb] md:flex">
       <MenuLateral
         secoes={secoes}
         contadores={contadores}
@@ -55,5 +59,6 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
         </div>
       </div>
     </div>
+    </>
   );
 }

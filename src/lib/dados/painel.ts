@@ -36,8 +36,8 @@ const mem = (): Mem =>
 
 /** Seções do painel que podem ser liberadas para um funcionário. */
 export const SECOES = {
-  financeiro: "Financeiro",
-  vendas: "Vendas",
+  financeiro: "Financeiro (valores e vendas)",
+  vendas: "Vendas (carrinhos e cupons)",
   alunos: "Alunos",
   cursos: "Cursos",
   loja: "Loja virtual",

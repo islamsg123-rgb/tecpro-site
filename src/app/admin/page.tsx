@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { acessoPainel } from "@/lib/admin";
 import { getCursos } from "@/lib/cursos";
-import { formatarPreco } from "@/lib/formatar";
 import {
-  agruparDevedores, cobrancasEmAtraso, cobrancasParaRelatorio, listarFormados, pessoasDoPainel, resumoFinanceiro,
-  ultimosAcontecimentos, DIAS_PARA_INATIVO, type Acontecimento,
+  listarFormados, pessoasDoPainel, ultimosAcontecimentos, DIAS_PARA_INATIVO, type Acontecimento,
 } from "@/lib/painel-resumo";
-import { Caixa, dataCurta, GraficoMensal, LinkVerTudo, Numero, PorForma, Vazio } from "@/components/admin/Blocos";
-import type { Cobranca } from "@/lib/pagamentos/tipos";
+import { Caixa, dataCurta, LinkVerTudo, Numero, Vazio } from "@/components/admin/Blocos";
 import { contarNovas } from "@/lib/dados/mensagens";
 import { Dica } from "@/components/admin/Dica";
 
@@ -32,38 +29,38 @@ function quandoFoi(iso: string) {
 
 type Props = { searchParams: Promise<{ "sem-permissao"?: string }> };
 
+/**
+ * Painel rápido da GESTÃO: só pessoas (alunos, mensagens, quem está terminando).
+ * Nenhum valor em dinheiro aqui; tudo de dinheiro fica no Painel Financeiro.
+ */
 export default async function PainelRapido({ searchParams }: Props) {
   const acesso = (await acessoPainel())!;
-  const verFinanceiro = acesso.permissoes.includes("financeiro");
   const verAlunos = acesso.permissoes.includes("alunos");
   const semPermissao = Boolean((await searchParams)["sem-permissao"]);
 
   const verMensagens = acesso.permissoes.includes("mensagens");
-  const [cobrancas, pessoas, formados, cursos, novas] = await Promise.all([
-    cobrancasParaRelatorio().catch(() => [] as Cobranca[]),
+  const [pessoas, formados, novas] = await Promise.all([
     pessoasDoPainel(),
     listarFormados().catch(() => []),
-    getCursos(),
     verMensagens ? contarNovas().catch(() => 0) : 0,
   ]);
-  const acontecimentos = await ultimosAcontecimentos(verFinanceiro ? cobrancas : []);
-  const fin = resumoFinanceiro(cobrancas);
-  const devedores = agruparDevedores(cobrancasEmAtraso(cobrancas));
+  // Sem pagamentos: os acontecimentos da Gestão são matrículas, certificados, interesse e pesquisa.
+  const acontecimentos = (await ultimosAcontecimentos([])).filter((a) => a.tipo !== "pagamento" && a.tipo !== "atraso");
   const conta = (s: string) => pessoas.filter((p) => p.situacao === s).length;
   const alunos = pessoas.filter((p) => p.matriculado);
-  const variacao = fin.recebidoMesAnteriorCentavos
-    ? Math.round(((fin.recebidoMesCentavos - fin.recebidoMesAnteriorCentavos) / fin.recebidoMesAnteriorCentavos) * 100)
-    : null;
-  const ultimasMatriculas = cobrancas.filter((c) => c.situacao === "pago" && c.produto?.tipo === "curso").slice(0, 6);
-  const nomeCurso = (id?: string) => cursos.find((c) => c.id === id)?.nome ?? "";
-  const mesAtual = new Date().toLocaleDateString("pt-BR", { month: "long", timeZone: "America/Sao_Paulo" });
+  const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  const diaDe = (iso: string | null) => (iso ? new Date(iso.length === 10 ? `${iso}T12:00:00-03:00` : iso).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : "");
+  const novosHoje = alunos.filter((a) => diaDe(a.desde) === hoje).length;
+  const seteDias = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const novos7 = alunos.filter((a) => a.desde && new Date(a.desde.length === 10 ? `${a.desde}T12:00:00-03:00` : a.desde).toISOString() >= seteDias).length;
+  const semCertificado = formados.filter((f) => f.faltaPagarCertificado);
 
   return (
     <>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-3xl font-extrabold text-marca-900">Painel rápido</h1>
-          <p className="mt-1 text-sm text-slate-500">Um apanhado geral da escola. Números de {mesAtual}, atualizados agora.</p>
+          <p className="mt-1 text-sm text-slate-500">Como estão os alunos hoje. Valores em dinheiro ficam no Painel Financeiro.</p>
         </div>
       </div>
       {semPermissao && (
@@ -84,45 +81,23 @@ export default async function PainelRapido({ searchParams }: Props) {
         </Link>
       )}
 
-      {verFinanceiro && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Numero
-            rotulo={`Recebido em ${mesAtual}`}
-            valor={formatarPreco(fin.recebidoMesCentavos)}
-            detalhe={variacao === null ? `líquido ${formatarPreco(fin.liquidoMesCentavos)}` : `${variacao >= 0 ? "+" : ""}${variacao}% em relação ao mês passado`}
-            href="/admin/financeiro"
-            cor="verde"
-            dica="Total que entrou de fato neste mês (pagamentos confirmados). Embaixo, a comparação com o mês passado."
-          />
-          <Numero rotulo="A receber" valor={formatarPreco(fin.aReceberCentavos)} detalhe="Pix e boletos dentro do prazo" href="/admin/financeiro/recebimentos?situacao=aguardando" dica="Pix e boletos já gerados que ainda não venceram. Pode virar dinheiro se o aluno pagar." />
-          <Numero rotulo="Em atraso" valor={formatarPreco(fin.emAtrasoCentavos)} detalhe={`${devedores.length} ${devedores.length === 1 ? "devedor" : "devedores"}`} href="/admin/financeiro/devedores" cor="vermelho" dica="Valor de pagamentos que passaram do vencimento sem ser pagos." />
-          <Numero rotulo="Matrículas pagas no mês" valor={String(fin.matriculasMes)} detalhe={`${fin.certificadosMes} certificados pagos · ticket médio ${formatarPreco(fin.ticketMedioCentavos)}`} href="/admin/financeiro/recebimentos" cor="laranja" dica="Quantos cursos foram comprados e pagos neste mês. Ticket médio é o valor médio de cada pagamento." />
-        </div>
-      )}
-
-      <div className={`grid gap-4 sm:grid-cols-3 lg:grid-cols-5 ${verFinanceiro ? "mt-4" : ""}`}>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Numero rotulo="Alunos novos hoje" valor={String(novosHoje)} detalhe={`${novos7} nos últimos 7 dias`} href={verAlunos ? "/admin/alunos" : undefined} cor="laranja" dica="Pessoas que se matricularam hoje (curso grátis ou pago). Embaixo, quantas nos últimos 7 dias." />
         <Numero rotulo="Alunos ativos" valor={String(conta("ativo"))} detalhe={`estudaram nos últimos ${DIAS_PARA_INATIVO} dias`} href={verAlunos ? "/admin/alunos?filtro=ativo" : undefined} cor="verde" dica={`Alunos que estudaram alguma aula nos últimos ${DIAS_PARA_INATIVO} dias.`} />
-        <Numero rotulo="Inativos" valor={String(conta("inativo"))} detalhe={`parados há ${DIAS_PARA_INATIVO}+ dias`} href={verAlunos ? "/admin/alunos?filtro=inativo" : undefined} cor="vermelho" dica={`Alunos com curso que não estudam há ${DIAS_PARA_INATIVO} dias ou mais.`} />
-        <Numero rotulo="Interessados" valor={String(conta("interessado"))} detalhe="cadastraram, mas não viram aula" href={verAlunos ? "/admin/alunos?filtro=interessado" : undefined} dica="Pessoas que se cadastraram, mas ainda não abriram nenhuma aula." />
-        <Numero rotulo="Devedores" valor={String(devedores.length)} detalhe={verFinanceiro ? formatarPreco(fin.emAtrasoCentavos) : "pagamentos vencidos"} href={verFinanceiro ? "/admin/financeiro/devedores" : undefined} cor="laranja" dica="Pessoas com pagamento vencido e não pago." />
+        <Numero rotulo="Parados" valor={String(conta("inativo"))} detalhe={`sem estudar há ${DIAS_PARA_INATIVO}+ dias`} href={verAlunos ? "/admin/alunos?filtro=inativo" : undefined} cor="vermelho" dica={`Alunos com curso que não estudam há ${DIAS_PARA_INATIVO} dias ou mais. Vale um lembrete.`} />
+        <Numero rotulo="Nunca abriram aula" valor={String(conta("interessado"))} detalhe="cadastraram, mas não começaram" href={verAlunos ? "/admin/alunos?filtro=interessado" : undefined} dica="Pessoas que se cadastraram, mas ainda não abriram nenhuma aula." />
+      </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Numero rotulo="Formados" valor={String(new Set(formados.map((f) => f.email)).size)} detalhe={`${formados.filter((f) => f.certificado).length} certificados emitidos`} href={verAlunos ? "/admin/alunos/formados" : undefined} cor="cinza" dica="Pessoas que concluíram pelo menos um curso. Embaixo, quantos certificados já foram gerados." />
+        <Numero rotulo="Concluíram sem certificado" valor={String(semCertificado.length)} detalhe="ainda não emitiram" href={verAlunos ? "/admin/alunos/ranking" : undefined} cor="laranja" dica="Alunos que terminaram um curso grátis e ainda não emitiram o certificado. Um lembrete pode ajudar." />
+        <Numero rotulo="Mensagens novas" valor={String(novas)} detalhe="no botão de ajuda" href={verMensagens ? "/admin/mensagens" : undefined} cor={novas ? "vermelho" : "cinza"} dica="Mensagens enviadas pelo botão de ajuda do site que ninguém abriu ainda." />
+        <Numero rotulo="Total de alunos" valor={String(alunos.length)} detalhe="matriculados pelo site" href={verAlunos ? "/admin/alunos" : undefined} dica="Todas as pessoas com pelo menos um curso pelo site." />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {verFinanceiro && (
-          <Caixa titulo="Faturamento mensal" acao={<LinkVerTudo href="/admin/financeiro">Financeiro</LinkVerTudo>} className="lg:col-span-2">
-            <GraficoMensal meses={fin.mensal} />
-          </Caixa>
-        )}
-        {verFinanceiro && (
-          <Caixa titulo={`Recebimentos de ${mesAtual}`}>
-            <PorForma porForma={fin.porForma} />
-          </Caixa>
-        )}
-
         <Caixa titulo="Últimos acontecimentos" className="lg:col-span-2">
           {!acontecimentos.length ? (
-            <Vazio>Nada por aqui ainda. Assim que alguém se cadastrar, pagar ou emitir um certificado, aparece nesta lista.</Vazio>
+            <Vazio>Nada por aqui ainda. Assim que alguém se matricular, emitir um certificado ou responder a pesquisa, aparece nesta lista.</Vazio>
           ) : (
             <ul className="divide-y divide-slate-100">
               {acontecimentos.map((a, i) => {
@@ -148,38 +123,16 @@ export default async function PainelRapido({ searchParams }: Props) {
         </Caixa>
 
         <div className="space-y-6">
-          {verFinanceiro && (
-            <Caixa titulo="Últimas matrículas pagas" acao={<LinkVerTudo href="/admin/financeiro/recebimentos" />}>
-              {!ultimasMatriculas.length ? (
-                <p className="text-sm text-slate-500">Nenhuma matrícula paga ainda.</p>
+          {verAlunos && (
+            <Caixa titulo="Novos alunos" acao={<LinkVerTudo href="/admin/alunos" />}>
+              {!alunos.length ? (
+                <p className="text-sm text-slate-500">Nenhum aluno ainda.</p>
               ) : (
                 <ul className="space-y-3 text-sm">
-                  {ultimasMatriculas.map((c) => (
-                    <li key={c.id} className="flex items-start justify-between gap-3">
-                      <span className="min-w-0">
-                        <span className="block truncate font-semibold text-marca-900">{(c.cliente ?? "").split(" · ")[0] || "Cliente"}</span>
-                        <span className="block truncate text-xs text-slate-500">{nomeCurso(c.produto?.cursoId) || c.descricao} · {dataCurta(c.pagoEm ?? c.criadoEm)}</span>
-                      </span>
-                      <span className="shrink-0 font-semibold text-marca-900">{formatarPreco(c.valorCentavos)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Caixa>
-          )}
-          {verFinanceiro && (
-            <Caixa titulo="Devedores" acao={<LinkVerTudo href="/admin/financeiro/devedores" />}>
-              {!devedores.length ? (
-                <p className="text-sm text-slate-500">Ninguém com pagamento em atraso. 🎉</p>
-              ) : (
-                <ul className="space-y-3 text-sm">
-                  {devedores.slice(0, 5).map((d) => (
-                    <li key={d.chave} className="flex items-start justify-between gap-3">
-                      <span className="min-w-0">
-                        <span className="block truncate font-semibold text-marca-900">{d.nome}</span>
-                        <span className="block text-xs text-slate-500">venceu em {dataCurta(d.vencidoDesde)}</span>
-                      </span>
-                      <span className="shrink-0 font-semibold text-red-700">{formatarPreco(d.totalCentavos)}</span>
+                  {alunos.slice(0, 6).map((a) => (
+                    <li key={a.email}>
+                      <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(a.email)}`} className="block truncate font-semibold text-marca-900 hover:text-marca-700">{a.nome ?? a.email}</Link>
+                      <span className="text-xs text-slate-500">desde {dataCurta(a.desde)}</span>
                     </li>
                   ))}
                 </ul>
@@ -187,15 +140,15 @@ export default async function PainelRapido({ searchParams }: Props) {
             </Caixa>
           )}
           {verAlunos && (
-            <Caixa titulo="Novos alunos" acao={<LinkVerTudo href="/admin/alunos" />}>
-              {!alunos.length ? (
-                <p className="text-sm text-slate-500">Nenhum aluno ainda.</p>
+            <Caixa titulo="Concluíram sem certificado" acao={<LinkVerTudo href="/admin/alunos/formados" />}>
+              {!semCertificado.length ? (
+                <p className="text-sm text-slate-500">Ninguém nessa situação agora.</p>
               ) : (
                 <ul className="space-y-3 text-sm">
-                  {alunos.slice(0, 5).map((a) => (
-                    <li key={a.email}>
-                      <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(a.email)}`} className="block truncate font-semibold text-marca-900 hover:text-marca-700">{a.nome ?? a.email}</Link>
-                      <span className="text-xs text-slate-500">desde {dataCurta(a.desde)}</span>
+                  {semCertificado.slice(0, 5).map((f) => (
+                    <li key={`${f.email}|${f.cursoId}`}>
+                      <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(f.email)}`} className="block truncate font-semibold text-marca-900 hover:text-marca-700">{f.email}</Link>
+                      <span className="block truncate text-xs text-slate-500">{f.cursoNome}</span>
                     </li>
                   ))}
                 </ul>

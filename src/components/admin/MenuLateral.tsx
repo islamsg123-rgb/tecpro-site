@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
  * Também mostra as abas da seção aberta no topo da página.
  */
 
-type Secao = "painel" | "financeiro" | "vendas" | "alunos" | "cursos" | "loja" | "funcionarios" | "mensagens" | "sistema";
+export type Secao = "painel" | "financeiro" | "vendas" | "alunos" | "cursos" | "loja" | "funcionarios" | "mensagens" | "sistema";
 /** Números de "novas" mostrados ao lado do item do menu, pelo endereço (ex.: mensagens novas). */
 export type Contadores = Record<string, number>;
 
@@ -36,7 +36,8 @@ export const MENU: Item[] = [
     sub: [
       { rotulo: "Resumo", href: "/admin/financeiro" },
       { rotulo: "Matrículas e recebimentos", href: "/admin/financeiro/recebimentos" },
-      { rotulo: "Devedores", href: "/admin/financeiro/devedores" },
+      { rotulo: "Recuperar vendas", href: "/admin/financeiro/devedores" },
+      { rotulo: "De onde vêm as vendas", href: "/admin/financeiro/origem" },
     ],
   },
   {
@@ -45,7 +46,6 @@ export const MENU: Item[] = [
     sub: [
       { rotulo: "Carrinhos abandonados", href: "/admin/carrinhos" },
       { rotulo: "Cupons de desconto", href: "/admin/cupons" },
-      { rotulo: "Pesquisa de satisfação", href: "/admin/pesquisa" },
     ],
   },
   {
@@ -57,6 +57,7 @@ export const MENU: Item[] = [
       { rotulo: "Lembretes de estudo", href: "/admin/lembretes" },
       { rotulo: "Formados", href: "/admin/alunos/formados" },
       { rotulo: "Certificados", href: "/admin/certificados" },
+      { rotulo: "Pesquisa de satisfação", href: "/admin/pesquisa" },
       { rotulo: "Cadastrar aluno", href: "/admin/alunos/novo" },
     ],
   },
@@ -77,6 +78,33 @@ export const MENU: Item[] = [
   { secao: "sistema", rotulo: "Integrações", href: "/admin/integracoes", icone: svg(<><path d="M9 15 15 9" /><path d="M11 6.5 12.5 5a3.5 3.5 0 0 1 5 5L16 11.5M13 17.5 11.5 19a3.5 3.5 0 0 1-5-5L8 12.5" /></>) },
   { secao: "sistema", rotulo: "Conexão (API)", href: "/admin/diagnostico", icone: svg(<><path d="M9 7 4 12l5 5M15 7l5 5-5 5" /></>) },
 ];
+
+/**
+ * O painel tem duas áreas, trocadas pela chave no topo: Gestão (alunos, cursos, equipe) e Financeiro (dinheiro).
+ * O login e o sistema são um só; cada área mostra só os itens dela no menu.
+ */
+export type Area = "gestao" | "financeiro";
+const SECOES_FINANCEIRO: Secao[] = ["financeiro", "vendas"];
+export const areaDaSecao = (s: Secao): Area => (SECOES_FINANCEIRO.includes(s) ? "financeiro" : "gestao");
+export const NOME_AREA: Record<Area, string> = { gestao: "Painel de Gestão", financeiro: "Painel Financeiro" };
+
+/** Área da página aberta (pelo endereço). */
+export function areaDoCaminho(pathname: string): Area {
+  const fin = MENU.filter((m) => areaDaSecao(m.secao) === "financeiro");
+  return ativo(pathname, fin) ? "financeiro" : "gestao";
+}
+
+/** Quem tem acesso às duas áreas vê a chave; o menu mostra só a área aberta. */
+export function temDuasAreas(secoes: Secao[]) {
+  return secoes.some((s) => areaDaSecao(s) === "financeiro") && secoes.some((s) => s !== "painel" && areaDaSecao(s) === "gestao");
+}
+
+function itensDaArea(secoes: Secao[], pathname: string) {
+  const todos = MENU.filter((m) => secoes.includes(m.secao));
+  if (!temDuasAreas(secoes)) return todos;
+  const area = areaDoCaminho(pathname);
+  return todos.filter((m) => areaDaSecao(m.secao) === area);
+}
 
 /** Item (e sub-item) que corresponde à página aberta. */
 function ativo(pathname: string, itens: Item[]) {
@@ -104,8 +132,13 @@ export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: 
     document.addEventListener("keydown", tecla);
     return () => document.removeEventListener("keydown", tecla);
   }, [aberto]);
-  const itens = MENU.filter((m) => secoes.includes(m.secao));
+  const itens = itensDaArea(secoes, pathname);
+  const fin = temDuasAreas(secoes) && areaDoCaminho(pathname) === "financeiro";
+  // Cor da área: laranja na Gestão, verde no Financeiro.
+  const corAtivo = fin ? "bg-emerald-400 text-neutral-950" : "bg-laranja-500 text-marca-900";
+  const corSubAtivo = fin ? "text-emerald-300" : "text-laranja-400";
   const atual = ativo(pathname, itens);
+  const titulo = temDuasAreas(secoes) ? NOME_AREA[areaDoCaminho(pathname)] : secoes.some((s) => areaDaSecao(s) === "gestao" && s !== "painel") ? NOME_AREA.gestao : "Painel Tecpro";
 
   const lista = (expandido: boolean) => (
     <ul className="space-y-1" onClick={(e) => (e.target as HTMLElement).closest("a") && setAberto(false)}>
@@ -117,7 +150,7 @@ export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: 
             <Link
               href={m.href}
               title={m.rotulo}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${eAtual ? "bg-laranja-500 text-marca-900" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${eAtual ? corAtivo : "text-white/80 hover:bg-white/10 hover:text-white"}`}
             >
               <span className="relative">
                 {m.icone}
@@ -134,7 +167,7 @@ export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: 
                   <li key={s.href}>
                     <Link
                       href={s.href}
-                      className={`flex items-center justify-between gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium ${atual?.href === s.href ? "text-laranja-400" : "text-white/60 hover:text-white"}`}
+                      className={`flex items-center justify-between gap-2 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium ${atual?.href === s.href ? corSubAtivo : "text-white/60 hover:text-white"}`}
                     >
                       {s.rotulo}
                       <Bolinha n={contadores[s.href]} />
@@ -152,14 +185,14 @@ export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: 
   return (
     <>
       {/* Computador: barra recolhida que abre ao passar o mouse */}
-      <aside className="sticky top-[72px] z-20 hidden h-[calc(100vh-72px)] w-[72px] shrink-0 md:block print:hidden">
+      <aside className="sticky top-[59px] z-20 hidden h-[calc(100vh-59px)] w-[72px] shrink-0 md:block print:hidden">
         <nav
           aria-label="Menu do painel"
-          className="group absolute inset-y-0 left-0 flex w-[72px] flex-col overflow-y-auto overflow-x-hidden bg-marca-900 px-3 py-4 transition-[width,box-shadow] duration-200 hover:w-72 hover:shadow-2xl focus-within:w-72"
+          className="group absolute inset-y-0 left-0 flex w-[72px] flex-col overflow-y-auto overflow-x-hidden bg-neutral-950 px-3 py-4 transition-[width,box-shadow] duration-200 hover:w-72 hover:shadow-2xl focus-within:w-72"
         >
           <div className="mb-5 flex h-9 items-center gap-3 px-1">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-laranja-500 text-sm font-extrabold text-marca-900">T</span>
-            <span className="whitespace-nowrap text-sm font-bold uppercase tracking-wider text-white opacity-0 transition-opacity group-hover:opacity-100">Painel Tecpro</span>
+            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sm font-extrabold ${fin ? "bg-emerald-400 text-neutral-950" : "bg-laranja-500 text-marca-900"}`}>{fin ? "R$" : "G"}</span>
+            <span className="whitespace-nowrap text-sm font-bold uppercase tracking-wider text-white opacity-0 transition-opacity group-hover:opacity-100">{titulo}</span>
           </div>
           {lista(false)}
           <div className="mt-auto pt-6 opacity-0 transition-opacity group-hover:opacity-100">
@@ -170,16 +203,16 @@ export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: 
       </aside>
 
       {/* Celular: botão que abre o menu */}
-      <div className="sticky top-[72px] z-20 flex items-center justify-between border-t border-white/10 bg-marca-800 px-4 py-3 md:hidden print:hidden">
-        <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-laranja-500">Painel <Bolinha n={Object.values(contadores).reduce((a, b) => a + b, 0)} /></span>
+      <div className="sticky top-[59px] z-20 flex items-center justify-between border-t border-white/10 bg-neutral-900 px-4 py-3 md:hidden print:hidden">
+        <span className={`flex items-center gap-2 text-sm font-bold uppercase tracking-wider ${fin ? "text-emerald-300" : "text-laranja-500"}`}>{titulo} <Bolinha n={Object.values(contadores).reduce((a, b) => a + b, 0)} /></span>
         <button onClick={() => setAberto((v) => !v)} aria-expanded={aberto} className="rounded-lg border border-white/20 px-3 py-1.5 text-sm font-semibold text-white">
           {aberto ? "Fechar" : "Menu"}
         </button>
       </div>
       {aberto && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-marca-900 px-4 py-4 md:hidden">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-950 px-4 py-4 md:hidden">
           <div className="mb-4 flex items-center justify-between">
-            <span className="text-sm font-bold uppercase tracking-wider text-laranja-500">Painel Tecpro</span>
+            <span className={`text-sm font-bold uppercase tracking-wider ${fin ? "text-emerald-300" : "text-laranja-500"}`}>{titulo}</span>
             <button onClick={() => setAberto(false)} className="rounded-lg border border-white/20 px-3 py-1.5 text-sm font-semibold text-white">Fechar</button>
           </div>
           {lista(true)}
@@ -193,18 +226,19 @@ export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: 
   );
 }
 
-/** Abas da seção aberta (ex.: Financeiro > Resumo | Matrículas e recebimentos | Devedores). */
+/** Abas da seção aberta (ex.: Financeiro > Resumo | Matrículas e recebimentos | Recuperar vendas). */
 export function AbasSecao({ secoes, contadores = {} }: { secoes: Secao[]; contadores?: Contadores }) {
   const pathname = usePathname();
   const atual = ativo(pathname, MENU.filter((m) => secoes.includes(m.secao)));
   if (!atual?.item.sub) return null;
+  const sublinhado = temDuasAreas(secoes) && areaDoCaminho(pathname) === "financeiro" ? "border-emerald-500" : "border-laranja-500";
   return (
     <nav aria-label={atual.item.rotulo} className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200 print:hidden">
       {atual.item.sub.map((s) => (
         <Link
           key={s.href}
           href={s.href}
-          className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold ${atual.href === s.href ? "border-laranja-500 text-marca-900" : "border-transparent text-slate-500 hover:text-marca-900"}`}
+          className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-semibold ${atual.href === s.href ? `${sublinhado} text-marca-900` : "border-transparent text-slate-500 hover:text-marca-900"}`}
         >
           {s.rotulo}
           <Bolinha n={contadores[s.href]} />

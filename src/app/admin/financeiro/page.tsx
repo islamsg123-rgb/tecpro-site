@@ -41,7 +41,7 @@ export default async function Financeiro({ searchParams }: Props) {
         <Numero rotulo={`Recebido em ${nomeMes(mes)}`} valor={formatarPreco(r.recebidoMesCentavos)} detalhe={`mês anterior: ${formatarPreco(r.recebidoMesAnteriorCentavos)}`} cor="verde" dica="Total pago pelos clientes no mês escolhido, antes de descontar as taxas." />
         <Numero rotulo="Líquido (após taxas)" valor={formatarPreco(r.liquidoMesCentavos)} detalhe={`taxas: ${formatarPreco(r.recebidoMesCentavos - r.liquidoMesCentavos)}`} dica="O que sobra para a Tecpro depois das taxas do Mercado Pago ou do Asaas." />
         <Numero rotulo="A receber" valor={formatarPreco(r.aReceberCentavos)} detalhe="Pix e boletos ainda no prazo" href="/admin/financeiro/recebimentos?situacao=aguardando" cor="laranja" dica="Pix e boletos já gerados que ainda não venceram." />
-        <Numero rotulo="Em atraso" valor={formatarPreco(r.emAtrasoCentavos)} detalhe="ver devedores" href="/admin/financeiro/devedores" cor="vermelho" dica="Pagamentos que passaram do vencimento sem ser pagos." />
+        <Numero rotulo="Não pagos no prazo" valor={formatarPreco(r.emAtrasoCentavos)} detalhe="Pix e boletos não pagos" href="/admin/financeiro/devedores" cor="vermelho" dica="Pix e boletos que passaram do prazo sem pagamento. Veja em Recuperar vendas." />
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Numero rotulo="Matrículas pagas" valor={String(r.matriculasMes)} detalhe="cursos pagos no mês" href={`/admin/financeiro/recebimentos?mes=${mes}&tipo=curso&situacao=pago`} dica="Quantos cursos foram comprados e pagos neste mês." />
