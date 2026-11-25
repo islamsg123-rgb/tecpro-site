@@ -381,6 +381,30 @@ export async function concluirCursosTesteAcao(f: FormData) {
   redirect(ficha(email, "salvo=teste#teste"));
 }
 
+/**
+ * Modo teste (só o dono): deixa um curso a uma aula do fim. Marca todas as aulas menos a última
+ * como concluídas, para o dono concluir a última de verdade e ver o fim do curso como um aluno
+ * (vídeo de parabéns, quadro do certificado e e-mail de parabéns 1 hora depois).
+ */
+export async function deixarUltimaAulaTesteAcao(f: FormData) {
+  const quem = await exigirAdmin("alunos");
+  const email = String(f.get("email") ?? "").trim().toLowerCase();
+  const cursoId = String(f.get("cursoId") ?? "");
+  if (!quem.dono) redirect(ficha(email, "erro=dono#teste"));
+  let erro = "";
+  try {
+    const c = (await cursosDoAluno(email)).find((x) => x.curso.id === cursoId);
+    if (!c || c.aulas.length < 2) erro = "teste-curso";
+    else if (c.concluidas.has(c.aulas[c.aulas.length - 1].id)) erro = "teste-ultima";
+    else await concluirCursoTeste(email, c.curso.id, c.aulas.slice(0, -1).map((a) => a.id));
+  } catch {
+    erro = "teste";
+  }
+  if (erro) redirect(ficha(email, `erro=${erro}#teste`));
+  revalidatePath("/", "layout");
+  redirect(ficha(email, "salvo=teste-ultima#teste"));
+}
+
 /** Desfaz o modo teste: o progresso volta ao que era antes. */
 export async function desfazerCursosTesteAcao(f: FormData) {
   const quem = await exigirAdmin("alunos");

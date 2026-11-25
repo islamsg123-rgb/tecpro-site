@@ -16,7 +16,7 @@ import { ESTADOS } from "@/lib/estados";
 import { DIAS_PARA_INATIVO } from "@/lib/painel-resumo";
 import { TabelaVendas } from "@/components/admin/TabelaVendas";
 import { EtiquetaAluno } from "@/components/admin/Blocos";
-import { adicionarCursoAluno, concluirCursosTesteAcao, desfazerCursosTesteAcao, removerCursoAluno, salvarDadosAlunoAcao, excluirAlunoAcao } from "../../acoes";
+import { adicionarCursoAluno, concluirCursosTesteAcao, deixarUltimaAulaTesteAcao, desfazerCursosTesteAcao, removerCursoAluno, salvarDadosAlunoAcao, excluirAlunoAcao } from "../../acoes";
 import { IconeChevron } from "@/components/Icones";
 import { Dica } from "@/components/admin/Dica";
 
@@ -36,6 +36,9 @@ const avisos: Record<string, [string, boolean]> = {
   "erro:colunas": ["Falta rodar o SQL novo no Supabase (painel-completo.sql) para salvar isso.", false],
   "salvo:teste": ["Pronto: todos os cursos deste aluno estão como concluídos. Entre no site com a conta dele para testar o certificado.", true],
   "salvo:teste-desfeito": ["Modo teste desfeito: o progresso voltou ao que era antes.", true],
+  "salvo:teste-ultima": ["Pronto: falta só a última aula desse curso. Entre no site com a conta do aluno, abra o curso e conclua a última aula (assistir 80% do vídeo e acertar a prova).", true],
+  "erro:teste-curso": ["Escolha um curso deste aluno que tenha pelo menos 2 aulas.", false],
+  "erro:teste-ultima": ["A última aula desse curso já está concluída. Clique em Desfazer (se foi pelo modo teste) ou escolha outro curso.", false],
   "erro:teste": ["Não foi possível concluir agora (a Escola Avançada ou o banco não respondeu). Tente de novo.", false],
   "erro:dono": ["Só o dono do site pode usar o modo teste.", false],
   "erro:excluir-dono": ["Só o dono do site pode excluir alunos.", false],
@@ -235,7 +238,23 @@ export default async function Ficha({ searchParams }: Props) {
 
       {acesso.dono && cursos && cursos.length > 0 && (
         <div id="teste" className="mt-4 scroll-mt-24 rounded-2xl border-2 border-dashed border-amber-400 bg-amber-50 p-5 text-sm">
-          <p className="font-bold text-marca-900">Modo teste: concluir todos os cursos deste aluno</p>
+          <p className="font-bold text-marca-900">Modo teste</p>
+          <p className="mt-2 font-semibold text-marca-900">Testar o fim de um curso como aluno</p>
+          <p className="mt-1 text-amber-900">
+            Marca todas as aulas do curso escolhido como assistidas, <strong>menos a última</strong>. Aí é só entrar no site com a conta deste aluno e concluir a última aula
+            de verdade para ver o vídeo de parabéns, o quadro do certificado e, se o curso for gratuito e você não comprar, receber o e-mail de parabéns 1 hora depois.
+          </p>
+          <form action={deixarUltimaAulaTesteAcao} className="mt-3 flex flex-wrap items-center gap-3">
+            <input type="hidden" name="email" value={email} />
+            <select name="cursoId" required defaultValue="" className="max-w-full rounded-full border border-amber-400 bg-white px-4 py-2 text-marca-900">
+              <option value="" disabled>Escolha o curso</option>
+              {cursos.map((c) => (
+                <option key={c.curso.id} value={c.curso.id}>{c.curso.nome}{c.curso.gratuito ? " (gratuito)" : ""}</option>
+              ))}
+            </select>
+            <button className="rounded-full bg-amber-500 px-5 py-2 font-bold text-marca-900 hover:bg-amber-400">Deixar só a última aula</button>
+          </form>
+          <p className="mt-5 font-semibold text-marca-900">Concluir todos os cursos deste aluno</p>
           <p className="mt-1 text-amber-900">
             Marca todas as aulas dos {cursos.length} cursos acima como assistidas, para testar o certificado sem assistir às aulas.
             Use só na sua conta de teste. O botão &quot;Desfazer&quot; volta o progresso ao que era antes (certificados já emitidos continuam).
