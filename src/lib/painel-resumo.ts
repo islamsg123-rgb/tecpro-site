@@ -1,4 +1,5 @@
 import "server-only";
+import { financasDaVenda, type TaxasPagamento } from "./taxas";
 import { getCursos, getModulos } from "./cursos";
 import { regraDoCertificado } from "./config-certificados";
 import {
@@ -183,7 +184,7 @@ export interface ResumoFinanceiro {
   ticketMedioCentavos: number;
 }
 
-export function resumoFinanceiro(cobrancas: Cobranca[], mes = hojeISO().slice(0, 7)): ResumoFinanceiro {
+export function resumoFinanceiro(cobrancas: Cobranca[], mes = hojeISO().slice(0, 7), taxas?: TaxasPagamento): ResumoFinanceiro {
   const [a, m] = mes.split("-").map(Number);
   const anterior = new Date(a, m - 2, 15).toLocaleDateString("sv-SE").slice(0, 7);
   const pagas = cobrancas.filter((c) => c.situacao === "pago");
@@ -206,7 +207,7 @@ export function resumoFinanceiro(cobrancas: Cobranca[], mes = hojeISO().slice(0,
   return {
     recebidoMesCentavos: soma(doMes),
     recebidoMesAnteriorCentavos: soma(pagas.filter((c) => mesDoPagamento(c) === anterior)),
-    liquidoMesCentavos: doMes.reduce((s, c) => s + (c.valorLiquidoCentavos ?? c.valorCentavos), 0),
+    liquidoMesCentavos: doMes.reduce((s, c) => s + (taxas ? financasDaVenda(c, taxas).liquidoCentavos : c.valorLiquidoCentavos ?? c.valorCentavos), 0),
     aReceberCentavos: soma(cobrancas.filter((c) => c.situacao === "aguardando" && c.vencimento >= hoje)),
     emAtrasoCentavos: soma(atrasadas),
     estornadoMesCentavos: soma(cobrancas.filter((c) => c.situacao === "estornado" && String(c.criadoEm ?? "").slice(0, 7) === mes)),

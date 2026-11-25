@@ -106,8 +106,12 @@ export interface Cobranca {
   clienteId?: string;
   /** Data em que o dinheiro foi pago (AAAA-MM-DD) */
   pagoEm?: string;
-  /** Valor que fica para a Tecpro depois das taxas do Asaas, em centavos */
+  /** Valor que fica para a Tecpro depois das taxas (Asaas, ou Mercado Pago quando ele informa), em centavos */
   valorLiquidoCentavos?: number;
+  /** true quando o valor líquido veio do sistema de pagamento (não é estimativa) */
+  taxaInformada?: boolean;
+  /** Dia (AAAA-MM-DD) em que o dinheiro fica disponível para saque, quando o sistema de pagamento informa */
+  liberaEm?: string;
   /** Parcela (ex.: 2 de 12) quando o cartão é parcelado */
   parcela?: number;
   /** Dados do comprador quando vêm junto com o pagamento (Mercado Pago) */

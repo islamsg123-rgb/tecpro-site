@@ -6,8 +6,9 @@ import { cobrancasParaRelatorio, mesDoPagamento, nomeMes } from "@/lib/painel-re
 import { TabelaVendas } from "@/components/admin/TabelaVendas";
 import { Titulo, Vazio } from "@/components/admin/Blocos";
 import { BotaoExportar } from "@/components/admin/BotaoExportar";
+import { financasDaVenda, obterTaxas } from "@/lib/taxas";
 
-export const metadata: Metadata = { title: "Matrículas e recebimentos" };
+export const metadata: Metadata = { title: "Extrato de vendas" };
 export const dynamic = "force-dynamic";
 
 type Props = { searchParams: Promise<{ mes?: string; forma?: string; situacao?: string; tipo?: string; busca?: string }> };
@@ -15,7 +16,7 @@ type Props = { searchParams: Promise<{ mes?: string; forma?: string; situacao?: 
 export default async function Recebimentos({ searchParams }: Props) {
   await exigirAdmin("financeiro");
   const { mes = "", forma = "", situacao = "", tipo = "", busca = "" } = await searchParams;
-  const todas = await cobrancasParaRelatorio();
+  const [todas, taxas] = await Promise.all([cobrancasParaRelatorio(), obterTaxas()]);
   const termo = busca.trim().toLowerCase();
   const lista = todas.filter((c) => {
     if (mes && mesDoPagamento(c) !== mes) return false;
@@ -31,8 +32,8 @@ export default async function Recebimentos({ searchParams }: Props) {
 
   return (
     <>
-      <Titulo acao={<BotaoExportar tipo="vendas" />} descricao="Cada matrícula e cada certificado vendido, com a forma de pagamento e a situação. Use os filtros para achar um pagamento.">
-        Matrículas e recebimentos
+      <Titulo acao={<BotaoExportar tipo="vendas" />} descricao="Cada matrícula e cada certificado vendido: forma de pagamento, situação, a taxa do Mercado Pago, quanto fica para a Tecpro e o dia em que o dinheiro cai. Use os filtros para achar um pagamento.">
+        Extrato de vendas
       </Titulo>
       <form className="mb-4 flex flex-wrap items-center gap-2 text-sm">
         <select name="mes" defaultValue={mes} className={sel} aria-label="Mês">
@@ -63,8 +64,9 @@ export default async function Recebimentos({ searchParams }: Props) {
       </form>
       <p className="mb-4 text-sm text-slate-600">
         {lista.length} {lista.length === 1 ? "cobrança" : "cobranças"} · pagas: <strong className="text-marca-900">{formatarPreco(pagas.reduce((s, c) => s + c.valorCentavos, 0))}</strong>
+        {" "}· ficam para a Tecpro: <strong className="text-emerald-700">{pagas.some((c) => financasDaVenda(c, taxas).estimado) ? "≈ " : ""}{formatarPreco(pagas.reduce((s, c) => s + financasDaVenda(c, taxas).liquidoCentavos, 0))}</strong>
       </p>
-      {lista.length ? <TabelaVendas vendas={lista} /> : <Vazio>Nenhuma cobrança com esses filtros.</Vazio>}
+      {lista.length ? <TabelaVendas vendas={lista} taxas={taxas} /> : <Vazio>Nenhuma cobrança com esses filtros.</Vazio>}
     </>
   );
 }

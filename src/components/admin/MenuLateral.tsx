@@ -31,13 +31,15 @@ const svg = (d: React.ReactNode) => (
 export const MENU: Item[] = [
   { secao: "painel", rotulo: "Painel rápido", href: "/admin", icone: svg(<><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></>) },
   {
-    secao: "financeiro", rotulo: "Financeiro", href: "/admin/financeiro",
+    secao: "financeiro", rotulo: "Financeiro", href: "/admin/financeiro/hoje",
     icone: svg(<><rect x="2.5" y="6" width="19" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 9.5v5M18 9.5v5" /></>),
     sub: [
-      { rotulo: "Resumo", href: "/admin/financeiro" },
-      { rotulo: "Matrículas e recebimentos", href: "/admin/financeiro/recebimentos" },
+      { rotulo: "Hoje", href: "/admin/financeiro/hoje" },
+      { rotulo: "Resumo do mês", href: "/admin/financeiro" },
+      { rotulo: "Extrato de vendas", href: "/admin/financeiro/recebimentos" },
       { rotulo: "Recuperar vendas", href: "/admin/financeiro/devedores" },
       { rotulo: "De onde vêm as vendas", href: "/admin/financeiro/origem" },
+      { rotulo: "Taxas e prazos", href: "/admin/financeiro/taxas" },
     ],
   },
   {

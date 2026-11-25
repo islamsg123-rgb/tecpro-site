@@ -71,6 +71,8 @@ export function paraCobranca(p: Json): Cobranca {
     clienteId: (p.customer as string) || undefined,
     pagoEm: (p.clientPaymentDate as string) || (p.paymentDate as string) || (p.confirmedDate as string) || undefined,
     valorLiquidoCentavos: p.netValue != null ? Math.round(Number(p.netValue) * 100) : undefined,
+    taxaInformada: p.netValue != null,
+    liberaEm: typeof (p.creditDate ?? p.estimatedCreditDate) === "string" ? String(p.creditDate ?? p.estimatedCreditDate) : undefined,
     parcela: p.installmentNumber != null ? Number(p.installmentNumber) : undefined,
   };
 }

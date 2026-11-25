@@ -159,7 +159,43 @@ function paraCobranca(p: PedidoMp, o?: Json): Cobranca {
     pagoEm: p.pagoEm ?? (situacao === "pago" ? dia(o?.last_updated_date) ?? dia(new Date().toISOString()) : undefined),
     comprador: p.comprador,
     detalheSituacao: o ? texto(o.status_detail) || undefined : undefined,
+    valorLiquidoCentavos: p.liquidoCentavos,
+    taxaInformada: p.liquidoCentavos != null,
+    liberaEm: p.liberaEm,
   };
+}
+
+/**
+ * Taxa real, valor líquido e data em que o dinheiro cai. A API de pedidos não traz isso; tentamos a busca de
+ * pagamentos pelo external_reference do pedido. Se o Mercado Pago não responder, a tela usa a estimativa
+ * (Financeiro > Taxas e prazos) e tentamos de novo depois de 6 horas.
+ */
+async function buscarTaxaReal(p: PedidoMp): Promise<PedidoMp | null> {
+  if (p.situacao !== "pago" || p.liquidoCentavos != null) return null;
+  if (p.taxaConsultadaEm && Date.now() - Date.parse(p.taxaConsultadaEm) < 6 * 3600_000) return null;
+  const atualizado: PedidoMp = { ...p, taxaConsultadaEm: new Date().toISOString() };
+  try {
+    const o = await pedidoMp(p.id);
+    const ref = texto(o.external_reference);
+    if (ref) {
+      const r = await chamar<{ results?: Json[] }>(`/v1/payments/search?external_reference=${encodeURIComponent(ref)}&sort=date_created&criteria=desc`);
+      const pag = (r.results ?? []).find((x) => texto(x.status) === "approved");
+      if (pag) {
+        const det = (pag.transaction_details ?? {}) as Json;
+        const taxas = ((pag.fee_details as Json[] | undefined) ?? []).filter((f) => texto(f.fee_payer) !== "payer");
+        const taxa = Math.round(taxas.reduce((s, f) => s + Number(f.amount ?? 0), 0) * 100);
+        const liquido = det.net_received_amount != null ? Math.round(Number(det.net_received_amount) * 100) : p.valorCentavos - taxa;
+        // O líquido do Mercado Pago pode incluir juros pagos pelo cliente; ficamos com o valor da venda menos a taxa da Tecpro.
+        atualizado.taxaCentavos = taxa;
+        atualizado.liquidoCentavos = Math.min(liquido, p.valorCentavos - taxa);
+        atualizado.liberaEm = dia(pag.money_release_date);
+      }
+    }
+  } catch {
+    /* o Mercado Pago não respondeu: fica a estimativa */
+  }
+  await salvarPedidoMp(atualizado).catch(() => {});
+  return atualizado;
 }
 
 /** Guarda a nova situação no banco quando ela muda (para o painel abrir rápido). */
@@ -366,10 +402,15 @@ export async function listarCobrancasMp(limite = 50): Promise<Cobranca[]> {
   const pedidos = await listarPedidosMp(limite);
   const limiteData = new Date(Date.now() - 35 * 86_400_000).toISOString();
   const lista: Cobranca[] = [];
+  let buscas = 0; // no máximo 10 buscas de taxa por vez, para o painel não ficar lento
   for (let i = 0; i < pedidos.length; i += 10) {
     lista.push(
       ...(await Promise.all(
         pedidos.slice(i, i + 10).map(async (p) => {
+          if (p.situacao === "pago" && p.liquidoCentavos == null && p.criadoEm >= limiteData && buscas++ < 10) {
+            const comTaxa = await buscarTaxaReal(p);
+            return paraCobranca(comTaxa ?? p);
+          }
           if (p.situacao !== "aguardando" || p.criadoEm < limiteData) return paraCobranca(p);
           const o = await pedidoMp(p.id).catch(() => undefined);
           const c = paraCobranca(p, o);

@@ -3,6 +3,7 @@ import { localidadesDosAlunos } from "@/lib/dados/painel";
 import { getCursos } from "./cursos";
 import { listarCertificados, listarCertificadosPagos, listarAlunos, ultimaAtividadePorAluno } from "./dados";
 import { listarCobrancas } from "./pagamentos";
+import { financasDaVenda, obterTaxas } from "./taxas";
 import { nomeForma } from "@/components/admin/EtiquetaSituacao";
 
 /** Dias desde uma data (null = nunca). */
@@ -47,13 +48,18 @@ export async function tabelaParaExportar(tipo: string): Promise<string[][] | nul
     ];
   }
   if (tipo === "vendas") {
-    const vendas = await listarCobrancas();
+    const [vendas, taxas] = await Promise.all([listarCobrancas(1000), obterTaxas()]);
+    const r = (c: number) => (c / 100).toFixed(2).replace(".", ",");
     return [
-      ["Data", "Descrição", "Cliente", "Forma", "Valor (R$)", "Situação", "Código do pagamento"],
-      ...vendas.map((v) => [
-        dataBR(v.criadoEm), v.descricao ?? "", v.cliente ?? "", nomeForma[v.forma] ?? v.forma,
-        (v.valorCentavos / 100).toFixed(2).replace(".", ","), v.situacao, v.id,
-      ]),
+      ["Data", "Pago em", "Descrição", "Cliente", "Forma", "Valor (R$)", "Taxa (R$)", "Fica para a Tecpro (R$)", "Taxa estimada?", "Dinheiro disponível em", "Situação", "Código do pagamento"],
+      ...vendas.map((v) => {
+        const f = v.situacao === "pago" ? financasDaVenda(v, taxas) : null;
+        return [
+          dataBR(v.criadoEm), v.situacao === "pago" ? dataBR(v.pagoEm) : "", v.descricao ?? "", v.cliente ?? "", nomeForma[v.forma] ?? v.forma,
+          r(v.valorCentavos), f ? r(f.taxaCentavos) : "", f ? r(f.liquidoCentavos) : "", f ? (f.estimado ? "sim" : "não") : "",
+          f?.liberaEm ? dataBR(f.liberaEm) : "", v.situacao, v.id,
+        ];
+      }),
     ];
   }
   if (tipo === "certificados") {
