@@ -6,6 +6,9 @@ import { Rodape } from "@/components/Rodape";
 import { AvisoDadosExemplo } from "@/components/AvisoDadosExemplo";
 import { BarraCarregamento } from "@/components/carregando/BarraCarregamento";
 import { BotaoAjuda } from "@/components/ajuda/BotaoAjuda";
+import { ForaDoPainel } from "@/components/ForaDoPainel";
+import { VoltarAoPainel } from "@/components/VoltarAoPainel";
+import { RegistraOrigem } from "@/components/RegistraOrigem";
 
 const titulo = Poppins({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--fonte-titulo" });
 const texto = Inter({ subsets: ["latin"], variable: "--fonte-texto" });
@@ -21,11 +24,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="pt-BR" className={`${titulo.variable} ${texto.variable}`}>
       <body className="flex min-h-screen flex-col font-sans antialiased">
         <BarraCarregamento />
-        <AvisoDadosExemplo />
-        <Cabecalho />
+        {/* No painel (/admin) o site some: lá tem a barra preta própria do painel. */}
+        <ForaDoPainel>
+          <AvisoDadosExemplo />
+          <Cabecalho />
+        </ForaDoPainel>
         <main className="flex-1">{children}</main>
-        <Rodape />
+        <ForaDoPainel>
+          <Rodape />
+        </ForaDoPainel>
         <BotaoAjuda />
+        <VoltarAoPainel />
+        <RegistraOrigem />
       </body>
     </html>
   );

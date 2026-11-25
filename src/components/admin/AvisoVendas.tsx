@@ -187,24 +187,26 @@ export function AvisoVendas() {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <button
-          type="button"
-          onClick={alternar}
-          aria-pressed={som}
-          title={som ? "Toca um som quando entra uma venda. Clique para desligar." : "Clique para ligar o som de nova venda."}
-          className={`flex items-center gap-2 rounded-full border px-4 py-2 font-semibold transition-colors ${som ? "border-laranja-500 bg-laranja-300/30 text-marca-900" : "border-slate-300 bg-white text-slate-500"}`}
-        >
-          <span aria-hidden>{som ? "🔔" : "🔕"}</span>
-          Som de venda: {som ? "ligado" : "desligado"}
-        </button>
+      <button
+        type="button"
+        onClick={alternar}
+        aria-pressed={som}
+        title={
+          !som ? "Som de nova venda desligado. Clique para ligar."
+          : liberado ? "Toca um som quando entra uma venda. Clique para desligar."
+          : "O navegador só libera o som depois do primeiro clique na página. Clique em qualquer lugar."
+        }
+        className={`relative flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition-colors ${som ? "border-white/25 text-white hover:bg-white/10" : "border-white/15 text-white/50 hover:text-white"}`}
+      >
+        <span aria-hidden>{som ? "🔔" : "🔕"}</span>
+        <span className="hidden lg:inline">Som de venda: {som ? "ligado" : "desligado"}</span>
         {som && !liberado && (
-          <span className="text-xs text-slate-500">Clique em qualquer lugar da página para o navegador liberar o som.</span>
+          <span className="absolute -right-0.5 -top-0.5 h-3 w-3 animate-pulse rounded-full bg-amber-400 ring-2 ring-neutral-950" aria-label="clique na página para liberar o som" />
         )}
-      </div>
+      </button>
 
       {/* Avisos de venda, no canto da tela */}
-      <div aria-live="polite" className="pointer-events-none fixed right-4 top-24 z-50 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3 print:hidden">
+      <div aria-live="polite" className="pointer-events-none fixed right-4 top-20 z-50 flex w-[calc(100%-2rem)] max-w-sm flex-col gap-3 print:hidden">
         {avisos.map((v) => (
           <div key={v.cobrancaId} role="status" className="aviso-venda pointer-events-auto overflow-hidden rounded-2xl border-l-8 border-laranja-500 bg-white p-4 shadow-2xl ring-1 ring-slate-200">
             <div className="flex items-start gap-3">

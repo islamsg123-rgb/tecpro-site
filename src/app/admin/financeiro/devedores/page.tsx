@@ -11,7 +11,7 @@ import { BotaoWhatsCertificado } from "@/components/admin/BotaoWhatsCertificado"
 import { nomeForma } from "@/components/admin/EtiquetaSituacao";
 import { Caixa, dataCurta, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 
-export const metadata: Metadata = { title: "Devedores" };
+export const metadata: Metadata = { title: "Recuperar vendas" };
 export const dynamic = "force-dynamic";
 
 function linkWhats(telefone: string, texto: string) {
@@ -34,26 +34,26 @@ export default async function Devedores() {
 
   return (
     <>
-      <Titulo descricao="Quem gerou Pix ou boleto e deixou vencer. Abaixo, quem concluiu um curso com certificado pago e ainda não pagou a emissão.">
-        Devedores
+      <Titulo descricao="Vendas quase feitas: quem gerou Pix ou boleto e não pagou, e quem concluiu um curso grátis e ainda não pagou o certificado. Um WhatsApp costuma resolver. Quem desistiu no meio do checkout está em Vendas > Carrinhos abandonados.">
+        Recuperar vendas
       </Titulo>
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <Numero rotulo="Total em atraso" valor={formatarPreco(total)} cor="vermelho" dica="Soma dos pagamentos que venceram e não foram pagos." />
-        <Numero rotulo="Pessoas devendo" valor={String(devedores.length)} cor="laranja" dica="Quantas pessoas têm pelo menos um pagamento vencido." />
+        <Numero rotulo="Pix e boletos não pagos" valor={formatarPreco(total)} cor="vermelho" dica="Soma dos Pix e boletos gerados que passaram do prazo sem pagamento. Não é dívida: a pessoa só não concluiu a compra." />
+        <Numero rotulo="Pessoas para chamar" valor={String(devedores.length)} cor="laranja" dica="Quantas pessoas geraram Pix ou boleto e não pagaram." />
         <Numero rotulo="Certificados a pagar" valor={String(pendentesCert.length)} detalhe="concluíram e ainda não pagaram" dica="Alunos que concluíram um curso grátis e ainda não pagaram o certificado. Não é dívida vencida: é uma venda que pode acontecer." />
       </div>
 
-      <Caixa titulo="Pagamentos vencidos">
+      <Caixa titulo="Pix e boletos não pagos">
         {!devedores.length ? (
-          <Vazio>Ninguém com pagamento vencido.</Vazio>
+          <Vazio>Nenhum Pix ou boleto esquecido.</Vazio>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="py-2 pr-4 font-semibold">Pessoa</th>
-                  <th className="py-2 pr-4 font-semibold">O que deve</th>
-                  <th className="py-2 pr-4 font-semibold">Venceu em</th>
+                  <th className="py-2 pr-4 font-semibold">O que ia comprar</th>
+                  <th className="py-2 pr-4 font-semibold">Prazo era</th>
                   <th className="py-2 pr-4 text-right font-semibold">Valor</th>
                   <th className="py-2 font-semibold"><span className="sr-only">Ações</span></th>
                 </tr>

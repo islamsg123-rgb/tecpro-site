@@ -1,6 +1,7 @@
 "use server";
 
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { COOKIE_ORIGEM, origemDoCookie } from "@/lib/origem";
 import { redirect } from "next/navigation";
 import { getCursos } from "@/lib/cursos";
 import { opcoesParcelas } from "@/lib/config-loja";
@@ -136,6 +137,8 @@ export async function pagar(_anterior: EstadoCheckout, f: FormData): Promise<Est
     valorCentavos: item.valorCentavos,
     forma,
     comprador,
+    // Por onde a pessoa chegou ao site (cookie gravado na chegada), para "De onde veio a venda".
+    origem: origemDoCookie((await cookies()).get(COOKIE_ORIGEM)?.value),
   };
 
   const gateway = await gatewayAtivo();

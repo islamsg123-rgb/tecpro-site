@@ -1,6 +1,7 @@
 import "server-only";
 import { bancoEmDemonstracao, db } from "./index";
 import type { Produto } from "../pagamentos/tipos";
+import type { Origem } from "../origem";
 
 /**
  * Aviso de nova venda no painel (o "plim").
@@ -16,6 +17,8 @@ export interface AvisoVenda {
   /** O que foi vendido, ex.: "Excel Avançado" ou "Certificado (pacote com 3)" */
   item: string;
   em: string; // data/hora ISO
+  /** Por onde a pessoa chegou ao site (null = direto ou não identificado) */
+  origem?: Origem | null;
 }
 
 /** O que a liberação sabe da cobrança (nem todo caminho tem tudo). */
@@ -26,6 +29,31 @@ export interface DadosVenda {
 }
 
 const PREFIXO = "venda:";
+const PREFIXO_ORIGEM = "origem:";
+const demoOrigem = ((globalThis as unknown as { __origemDemo?: Map<string, Origem> }).__origemDemo ??= new Map());
+
+/** Guarda a origem junto com a cobrança no momento em que ela é criada (antes de ser paga). Nunca derruba o checkout. */
+export async function guardarOrigemDaCobranca(cobrancaId: string, origem: Origem | null | undefined): Promise<void> {
+  if (!origem) return;
+  try {
+    if (bancoEmDemonstracao) {
+      demoOrigem.set(cobrancaId, origem);
+      return;
+    }
+    const { error } = await db()
+      .from("configuracoes_loja")
+      .upsert({ chave: PREFIXO_ORIGEM + cobrancaId, valor: origem, atualizado_em: new Date().toISOString() }, { onConflict: "chave" });
+    if (error) throw error;
+  } catch (e) {
+    console.error(`[origem] não consegui guardar a origem da cobrança ${cobrancaId}`, e);
+  }
+}
+
+async function origemDaCobranca(cobrancaId: string): Promise<Origem | null> {
+  if (bancoEmDemonstracao) return demoOrigem.get(cobrancaId) ?? null;
+  const { data } = await db().from("configuracoes_loja").select("valor").eq("chave", PREFIXO_ORIGEM + cobrancaId).maybeSingle();
+  return (data?.valor as Origem | undefined) ?? null;
+}
 const g = globalThis as unknown as { __avisosVendaDemo?: AvisoVenda[] };
 const demo = (g.__avisosVendaDemo ??= []);
 
@@ -42,8 +70,9 @@ export async function registrarAvisoVenda(
     produto.tipo === "certificado"
       ? (produto.quantidade ?? 1) > 1 ? `Certificado (pacote com ${produto.quantidade})` : `Certificado${nomeCurso ? ` de ${nomeCurso}` : ""}`
       : nomeCurso ?? `Curso ${produto.cursoId}`;
-  const aviso: AvisoVenda = { cobrancaId, valorCentavos: valorCentavos ?? null, nome: primeiroNome(nome), item, em: new Date().toISOString() };
   try {
+    const origem = await origemDaCobranca(cobrancaId).catch(() => null);
+    const aviso: AvisoVenda = { cobrancaId, valorCentavos: valorCentavos ?? null, nome: primeiroNome(nome), item, em: new Date().toISOString(), origem };
     if (bancoEmDemonstracao) {
       if (!demo.some((a) => a.cobrancaId === cobrancaId)) demo.push(aviso);
       return;
@@ -67,6 +96,20 @@ export async function vendasDepoisDe(desde: string): Promise<AvisoVenda[]> {
     .gt("atualizado_em", desde)
     .order("atualizado_em", { ascending: true })
     .limit(20);
+  if (error) throw error;
+  return (data ?? []).map((r) => r.valor as AvisoVenda);
+}
+
+/** Todas as vendas registradas a partir de `desde` (para o relatório "De onde veio a venda"), mais novas primeiro. */
+export async function listarVendasRegistradas(desde: string): Promise<AvisoVenda[]> {
+  if (bancoEmDemonstracao) return demo.filter((a) => a.em >= desde).sort((a, b) => b.em.localeCompare(a.em));
+  const { data, error } = await db()
+    .from("configuracoes_loja")
+    .select("valor")
+    .like("chave", `${PREFIXO}%`)
+    .gte("atualizado_em", desde)
+    .order("atualizado_em", { ascending: false })
+    .limit(5000);
   if (error) throw error;
   return (data ?? []).map((r) => r.valor as AvisoVenda);
 }

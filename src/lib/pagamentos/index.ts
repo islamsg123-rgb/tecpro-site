@@ -13,6 +13,7 @@ import {
   boletoSimulado, consultarCobrancaSimulada, criarCobrancaSimulada, listarCobrancasSimuladas, pixSimulado,
 } from "./simulador";
 import { processarPagamento } from "./liberacao";
+import { guardarOrigemDaCobranca } from "../dados/avisos-venda";
 
 /**
  * Porta de entrada dos pagamentos. As páginas só usam estas funções; elas decidem sozinhas
@@ -55,17 +56,21 @@ export async function criarCobranca(n: NovaCobranca): Promise<Cobranca> {
   const gateway = await gatewayAtivo();
   if (gateway === "simulador") {
     const { cobranca, comprador } = await criarCobrancaSimulada(n);
+    await guardarOrigemDaCobranca(cobranca.id, n.origem);
     if (cobranca.situacao === "pago") await processarPagamento(cobranca.id, comprador, n.produto, cobranca);
     return cobranca;
   }
   if (gateway === "mercadopago") {
     const c = await criarCobrancaMp(n);
+    await guardarOrigemDaCobranca(c.id, n.origem);
     // Cartão aprovado na hora: libera já (o aviso automático pode chegar depois; a liberação não repete).
     if (c.situacao === "pago") await garantirLiberacao(c);
     return c;
   }
   // No Asaas, a liberação acontece quando o aviso (webhook) de pagamento chega.
-  return criarCobrancaAsaas(n);
+  const c = await criarCobrancaAsaas(n);
+  await guardarOrigemDaCobranca(c.id, n.origem);
+  return c;
 }
 
 export async function consultarCobranca(id: string): Promise<Cobranca | null> {

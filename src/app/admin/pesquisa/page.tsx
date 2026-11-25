@@ -14,7 +14,7 @@ type Props = { searchParams: Promise<{ curso?: string; nota?: string }> };
 const estrelas = (n: number) => "★".repeat(n) + "☆".repeat(5 - n);
 
 export default async function Pesquisa({ searchParams }: Props) {
-  await exigirAdmin("vendas");
+  await exigirAdmin("alunos");
   const [{ lista: todas, tabelaFaltando }, loja, { curso = "", nota = "" }] = await Promise.all([listarPesquisas(), obterConfigLoja(), searchParams]);
   const lista = todas.filter((p) => (!curso || p.cursoNome === curso) && (!nota || p.nota === Number(nota)));
   const media = lista.length ? lista.reduce((s, p) => s + p.nota, 0) / lista.length : 0;

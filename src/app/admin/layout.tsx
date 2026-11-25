@@ -6,8 +6,7 @@ import { pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { usandoDadosDeExemplo } from "@/lib/escola-avancada/client";
 import { AbasSecao, MenuLateral, type Contadores } from "@/components/admin/MenuLateral";
 import { contarNovas } from "@/lib/dados/mensagens";
-import { ChavePaineis } from "@/components/admin/ChavePaineis";
-import { AvisoVendas } from "@/components/admin/AvisoVendas";
+import { BarraPainel } from "@/components/admin/BarraPainel";
 import { sair } from "../entrar/acoes";
 
 export const metadata: Metadata = { title: { default: "Painel", template: "%s | Painel Tecpro" }, robots: { index: false } };
@@ -30,7 +29,9 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
   ].filter(Boolean);
 
   return (
-    <div className="min-h-[calc(100vh-72px)] bg-[#f3f6fb] md:flex">
+    <>
+    <BarraPainel secoes={secoes} contadores={contadores} veFinanceiro={veFinanceiro} />
+    <div className="min-h-[calc(100vh-56px)] bg-[#f3f6fb] md:flex">
       <MenuLateral
         secoes={secoes}
         contadores={contadores}
@@ -53,15 +54,11 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
           </div>
         )}
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-          {/* Topo: chave Gestão | Financeiro e o som de nova venda (só para quem vê o dinheiro) */}
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden empty:hidden">
-            <ChavePaineis secoes={secoes} contadores={contadores} />
-            {veFinanceiro && <AvisoVendas />}
-          </div>
           <AbasSecao secoes={secoes} contadores={contadores} />
           {children}
         </div>
       </div>
     </div>
+    </>
   );
 }

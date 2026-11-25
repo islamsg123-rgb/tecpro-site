@@ -23,7 +23,9 @@ export function ChavePaineis({ secoes, contadores = {} }: { secoes: Secao[]; con
       <Link
         href={inicio(a)}
         aria-current={area === a ? "page" : undefined}
-        className={`flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold transition-colors ${area === a ? "bg-marca-900 text-white shadow" : "text-marca-900 hover:bg-white"}`}
+        className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-bold transition-colors sm:px-5 ${
+          area === a ? (a === "financeiro" ? "bg-emerald-400 text-neutral-950" : "bg-laranja-500 text-neutral-950") : "text-white/70 hover:bg-white/10 hover:text-white"
+        }`}
       >
         {rotulo}
         {n > 0 && area !== a && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-red-600 px-1.5 text-[11px] leading-none text-white">{n > 99 ? "99+" : n}</span>}
@@ -32,7 +34,7 @@ export function ChavePaineis({ secoes, contadores = {} }: { secoes: Secao[]; con
   };
 
   return (
-    <nav aria-label="Trocar de painel" className="inline-flex rounded-full border border-slate-300 bg-slate-100 p-1">
+    <nav aria-label="Trocar de painel" className="inline-flex rounded-full bg-white/10 p-1 ring-1 ring-white/15">
       {botao("gestao", "Gestão")}
       {botao("financeiro", "Financeiro")}
     </nav>

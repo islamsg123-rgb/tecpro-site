@@ -62,6 +62,8 @@ export interface NovaCobranca {
   /** Mercado Pago: o boleto exige endereço completo (montado pelo CEP). */
   endereco?: Endereco;
   ipComprador?: string;
+  /** Por onde a pessoa chegou ao site (Instagram, Google...), para o relatório "De onde veio a venda" */
+  origem?: import("../origem").Origem | null;
 }
 
 export interface CartaoMercadoPago {
