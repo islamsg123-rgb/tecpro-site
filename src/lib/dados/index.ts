@@ -674,7 +674,7 @@ export interface LinhaProgresso {
   quando: string;
 }
 
-/** Todas as linhas de progresso (aulas e etapas), com data. Usado no ranking dos alunos. */
+/** Todas as linhas de progresso (aulas e etapas), com data. Usado no progresso dos alunos (painel). */
 export async function todasAsLinhasDeProgresso(): Promise<LinhaProgresso[]> {
   if (bancoEmDemonstracao) {
     const out: LinhaProgresso[] = [];

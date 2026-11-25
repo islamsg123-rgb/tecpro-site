@@ -47,7 +47,7 @@ export default async function Alunos({ searchParams }: Props) {
   return (
     <>
       <Titulo
-        acao={<div className="flex flex-wrap gap-2"><Link href="/admin/alunos/ranking" className="rounded-full border border-marca-900 bg-white px-4 py-2 text-sm font-bold text-marca-900 hover:bg-marca-50">Ranking dos mais dedicados</Link><Link href="/admin/alunos/novo" className="rounded-full bg-laranja-500 px-4 py-2 text-sm font-bold text-marca-900 hover:bg-laranja-400">+ Cadastrar aluno</Link><BotaoExportar tipo="alunos" /></div>}
+        acao={<div className="flex flex-wrap gap-2"><Link href="/admin/alunos/ranking" className="rounded-full border border-marca-900 bg-white px-4 py-2 text-sm font-bold text-marca-900 hover:bg-marca-50">Progresso dos alunos</Link><Link href="/admin/alunos/novo" className="rounded-full bg-laranja-500 px-4 py-2 text-sm font-bold text-marca-900 hover:bg-laranja-400">+ Cadastrar aluno</Link><BotaoExportar tipo="alunos" /></div>}
         descricao={<>Clique no nome para abrir a ficha completa: dados, pagamentos, cursos (adicionar ou remover), progresso e certificados. <strong>Ativo</strong> = estudou nos últimos {DIAS_PARA_INATIVO} dias; <strong>inativo</strong> = parou há mais tempo; <strong>interessado</strong> = se cadastrou, mas ainda não viu nenhuma aula.</>}
       >
         Alunos

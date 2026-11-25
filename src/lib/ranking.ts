@@ -1,67 +1,91 @@
 import "server-only";
-import { getModulos } from "./cursos";
-import { listarAlunos, todasAsLinhasDeProgresso, type LinhaProgresso } from "./dados";
+import { getCursos, getModulos } from "./cursos";
+import { listarAlunos, listarCertificados, todasAsLinhasDeProgresso, type LinhaProgresso } from "./dados";
 
 /**
- * Ranking dos alunos mais dedicados.
+ * Progresso dos alunos (antes era "ranking por pontos").
  *
  * Usa só o que o site já registra quando o aluno estuda (tabela "progresso"):
- *  - aula concluída (só conclui com 80% do vídeo assistido e a prova toda certa);
- *  - prova aprovada (linha "aula#prova");
- *  - curso concluído (todas as aulas do curso concluídas);
- *  - dias diferentes em que o aluno estudou (constância).
- * O site NÃO mede o tempo que a pessoa fica com a página aberta, então isso não entra.
+ * cada aula concluída de cada curso. A porcentagem de um curso é
+ * aulas concluídas ÷ total de aulas do curso.
+ * Um curso entra na lista do aluno quando ele abriu pelo menos uma aula.
  * O que foi marcado pelo "Modo teste" do painel é ignorado.
  */
 
-export const PONTOS = { aula: 10, prova: 5, curso: 50, dia: 15 } as const;
+/** A partir de quanto o curso conta como "quase terminando". */
+export const QUASE = 80;
+/** Dias sem estudar para contar como "parado". */
+export const DIAS_PARADO = 7;
 
-export type Periodo = "7" | "30" | "geral";
-export const PERIODOS: { id: Periodo; rotulo: string }[] = [
-  { id: "7", rotulo: "Últimos 7 dias" },
-  { id: "30", rotulo: "Últimos 30 dias" },
-  { id: "geral", rotulo: "Desde o início" },
-];
+export type SituacaoCurso = "concluido_com_certificado" | "concluido_sem_certificado" | "quase" | "andamento";
 
-export interface PosicaoRanking {
-  posicao: number;
-  email: string;
+export interface CursoDoAluno {
+  cursoId: string;
   nome: string;
-  pontos: number;
-  aulas: number;
-  provas: number;
-  cursos: number;
-  dias: number;
+  feitas: number;
+  total: number;
+  pct: number;
+  situacao: SituacaoCurso;
   ultimaAtividade: string;
 }
 
-const diaSP = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+export interface ProgressoAluno {
+  email: string;
+  nome: string;
+  cursos: CursoDoAluno[];
+  /** Maior porcentagem entre os cursos que ainda não têm certificado (o curso mais adiantado). */
+  maiorPct: number;
+  aulas: number;
+  ultimaAtividade: string;
+  diasSemEstudar: number;
+  quase: boolean;
+  semCertificado: boolean;
+  andamento: boolean;
+  parado: boolean;
+}
+
+export type Filtro = "todos" | "quase" | "andamento" | "sem-certificado" | "parados";
+export const FILTROS: { id: Filtro; rotulo: string; dica: string }[] = [
+  { id: "todos", rotulo: "Todos", dica: "Todos os alunos que já abriram pelo menos uma aula." },
+  { id: "quase", rotulo: "Quase terminando", dica: `Alunos com algum curso entre ${QUASE}% e 99%. Estão perto do fim: bom momento para incentivar e lembrar do certificado.` },
+  { id: "andamento", rotulo: "Em andamento", dica: `Alunos com algum curso começado e abaixo de ${QUASE}%.` },
+  { id: "sem-certificado", rotulo: "Concluíram sem certificado", dica: "Terminaram pelo menos um curso e ainda não emitiram o certificado dele. São os mais prontos para comprar o certificado." },
+  { id: "parados", rotulo: `Parados (${DIAS_PARADO}+ dias)`, dica: `Têm curso não terminado e não estudam há ${DIAS_PARADO} dias ou mais. Precisam de um empurrão.` },
+];
 
 /** Tira as linhas gravadas pelo "Modo teste" (mesmo horário da linha "#teste" do curso). */
 function semModoTeste(linhas: LinhaProgresso[]): LinhaProgresso[] {
   const teste = new Set(linhas.filter((l) => l.aulaId === "#teste").map((l) => `${l.email}|${l.cursoId}|${l.quando}`));
-  if (!teste.size) return linhas;
-  return linhas.filter((l) => !teste.has(`${l.email}|${l.cursoId}|${l.quando}`));
+  if (!teste.size) return linhas.filter((l) => l.aulaId !== "#teste");
+  return linhas.filter((l) => l.aulaId !== "#teste" && !teste.has(`${l.email}|${l.cursoId}|${l.quando}`));
 }
 
-export async function calcularRanking(periodo: Periodo): Promise<PosicaoRanking[]> {
-  const [brutas, alunos] = await Promise.all([todasAsLinhasDeProgresso(), listarAlunos(5000)]);
+const PESO: Record<SituacaoCurso, number> = { quase: 0, concluido_sem_certificado: 1, andamento: 2, concluido_com_certificado: 3 };
+
+export async function calcularProgresso(): Promise<ProgressoAluno[]> {
+  const [brutas, alunos, certificados, catalogo] = await Promise.all([
+    todasAsLinhasDeProgresso(),
+    listarAlunos(5000),
+    listarCertificados(20000).catch(() => []),
+    getCursos().catch(() => []),
+  ]);
   const linhas = semModoTeste(brutas);
   const nomes = new Map(alunos.map((a) => [a.email, a.nome]));
-  const desde = periodo === "geral" ? 0 : Date.now() - Number(periodo) * 86_400_000;
-  const noPeriodo = (iso: string) => new Date(iso).getTime() >= desde;
+  const nomesCursos = new Map(catalogo.map((c) => [c.id, c.nome]));
+  const comCertificado = new Set(certificados.map((c) => `${c.email}|${c.cursoId}`));
 
-  // Aulas reais de cada aluno em cada curso (de todo o tempo), para saber quando o curso foi concluído.
-  const aulasPorCurso = new Map<string, LinhaProgresso[]>();
+  // Por aluno e curso: aulas concluídas (sem "#") e última atividade (qualquer linha).
+  const porCurso = new Map<string, { feitas: Set<string>; ultima: string }>();
   for (const l of linhas) {
-    if (l.aulaId.includes("#")) continue;
     const k = `${l.email}|${l.cursoId}`;
-    const lista = aulasPorCurso.get(k) ?? [];
-    lista.push(l);
-    aulasPorCurso.set(k, lista);
+    let c = porCurso.get(k);
+    if (!c) porCurso.set(k, (c = { feitas: new Set(), ultima: "" }));
+    if (!l.aulaId.includes("#")) c.feitas.add(l.aulaId);
+    if (l.quando > c.ultima) c.ultima = l.quando;
   }
-  // Total de aulas dos cursos que aparecem no progresso.
-  const idsCursos = Array.from(new Set(Array.from(aulasPorCurso.keys()).map((k) => k.split("|")[1])));
+
+  // Total de aulas de cada curso que aparece no progresso.
+  const idsCursos = Array.from(new Set(Array.from(porCurso.keys(), (k) => k.split("|")[1])));
   const totais = new Map<string, number>();
   for (let i = 0; i < idsCursos.length; i += 8) {
     await Promise.all(
@@ -72,46 +96,54 @@ export async function calcularRanking(periodo: Periodo): Promise<PosicaoRanking[
     );
   }
 
-  const porAluno = new Map<string, { aulas: number; provas: number; cursos: number; dias: Set<string>; ultima: string }>();
-  const doAluno = (email: string) => {
-    let a = porAluno.get(email);
-    if (!a) porAluno.set(email, (a = { aulas: 0, provas: 0, cursos: 0, dias: new Set(), ultima: "" }));
-    return a;
-  };
-
-  for (const l of linhas) {
-    if (l.aulaId === "#teste" || !noPeriodo(l.quando)) continue;
-    const a = doAluno(l.email);
-    if (!l.aulaId.includes("#")) a.aulas++;
-    else if (l.aulaId.endsWith("#prova")) a.provas++;
-    a.dias.add(diaSP(l.quando));
-    if (l.quando > a.ultima) a.ultima = l.quando;
-  }
-
-  // Curso concluído conta no período em que a última aula foi concluída.
-  for (const [k, lista] of aulasPorCurso) {
+  const porAluno = new Map<string, CursoDoAluno[]>();
+  for (const [k, c] of porCurso) {
     const [email, cursoId] = k.split("|");
     const total = totais.get(cursoId) ?? 0;
-    if (!total || lista.length < total) continue;
-    const terminou = lista.reduce((m, l) => (l.quando > m ? l.quando : m), "");
-    if (noPeriodo(terminou)) doAluno(email).cursos++;
+    if (!total) continue; // curso que não existe mais na Escola Avançada
+    const feitas = Math.min(c.feitas.size, total);
+    const pct = Math.floor((feitas / total) * 100);
+    const situacao: SituacaoCurso =
+      feitas >= total
+        ? comCertificado.has(k) ? "concluido_com_certificado" : "concluido_sem_certificado"
+        : pct >= QUASE ? "quase" : "andamento";
+    const lista = porAluno.get(email) ?? [];
+    lista.push({ cursoId, nome: nomesCursos.get(cursoId) ?? `Curso ${cursoId}`, feitas, total, pct: feitas >= total ? 100 : pct, situacao, ultimaAtividade: c.ultima });
+    porAluno.set(email, lista);
   }
 
-  const out = Array.from(porAluno, ([email, a]) => ({
-    posicao: 0,
-    email,
-    nome: nomes.get(email) || email,
-    aulas: a.aulas,
-    provas: a.provas,
-    cursos: a.cursos,
-    dias: a.dias.size,
-    ultimaAtividade: a.ultima,
-    pontos: a.aulas * PONTOS.aula + a.provas * PONTOS.prova + a.cursos * PONTOS.curso + a.dias.size * PONTOS.dia,
-  }))
-    .filter((a) => a.pontos > 0)
-    // Empate: quem estudou mais recentemente fica na frente.
-    .sort((a, b) => b.pontos - a.pontos || b.ultimaAtividade.localeCompare(a.ultimaAtividade));
+  const agora = Date.now();
+  const out: ProgressoAluno[] = Array.from(porAluno, ([email, cursos]) => {
+    // Dentro do aluno: mais perto de terminar primeiro (os já certificados vão para o fim).
+    cursos.sort((a, b) => PESO[a.situacao] - PESO[b.situacao] || b.pct - a.pct);
+    const ultima = cursos.reduce((m, c) => (c.ultimaAtividade > m ? c.ultimaAtividade : m), "");
+    const diasSemEstudar = ultima ? Math.floor((agora - new Date(ultima).getTime()) / 86_400_000) : 9999;
+    const temAberto = cursos.some((c) => c.pct < 100);
+    return {
+      email,
+      nome: nomes.get(email) || email,
+      cursos,
+      // Curso com certificado já emitido não puxa o aluno para cima: ali não há mais nada a fazer.
+      // Se tudo dele já tem certificado, vai para o fim da lista (-1).
+      maiorPct: Math.max(-1, ...cursos.filter((c) => c.situacao !== "concluido_com_certificado").map((c) => c.pct)),
+      aulas: cursos.reduce((s, c) => s + c.feitas, 0),
+      ultimaAtividade: ultima,
+      diasSemEstudar,
+      quase: cursos.some((c) => c.situacao === "quase"),
+      semCertificado: cursos.some((c) => c.situacao === "concluido_sem_certificado"),
+      andamento: cursos.some((c) => c.situacao === "andamento"),
+      parado: temAberto && diasSemEstudar >= DIAS_PARADO,
+    };
+  });
 
-  out.forEach((a, i) => (a.posicao = i + 1));
-  return out;
+  // Mais adiantado em cima: maior % de um curso; empate: mais aulas feitas; depois quem estudou mais recente.
+  return out.sort((a, b) => b.maiorPct - a.maiorPct || b.aulas - a.aulas || b.ultimaAtividade.localeCompare(a.ultimaAtividade));
+}
+
+export function filtrar(lista: ProgressoAluno[], f: Filtro): ProgressoAluno[] {
+  if (f === "quase") return lista.filter((a) => a.quase);
+  if (f === "andamento") return lista.filter((a) => a.andamento);
+  if (f === "sem-certificado") return lista.filter((a) => a.semCertificado);
+  if (f === "parados") return lista.filter((a) => a.parado);
+  return lista;
 }
