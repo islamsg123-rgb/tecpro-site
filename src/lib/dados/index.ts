@@ -363,11 +363,14 @@ export interface ConfigLoja {
   precoCertProfissional: number;
   /** Onde os pagamentos são processados. Se o escolhido não tiver chave na Vercel, usa o outro. */
   gateway: "mercadopago" | "asaas";
+  /** Vídeo de parabéns mostrado na última aula de todos os cursos (link do Panda ou do YouTube). Vazio = sem vídeo. */
+  videoParabens?: string;
 }
 const CONFIG_LOJA_PADRAO: ConfigLoja = {
   gateway: "mercadopago",
   mesesDeAcesso: null, pesquisaNasAulas: true, mostrarDepoimentos: true, whatsapp: "", emailContato: "", instagram: "",
   precoCertIndividual: 3790, precoCertEssencial: 8990, precoCertProfissional: 12990,
+  videoParabens: "",
 };
 
 const gLoja = globalThis as unknown as { __configLojaDemo?: ConfigLoja };

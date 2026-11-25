@@ -103,6 +103,13 @@ export default async function Configuracoes({ searchParams }: Props) {
             ))}
           </div>
           {erro === "precos" && <p className="mt-3 text-sm text-red-700">Confira os três valores (mínimo R$ 5,00 cada).</p>}
+          <label className="mt-6 block text-sm font-semibold text-marca-900">Vídeo de parabéns no fim do curso
+            <input name="videoParabens" defaultValue={loja.videoParabens ?? ""} placeholder="Link do vídeo no Panda ou no YouTube" className={`mt-1 ${campo}`} />
+            <span className="mt-1 block text-xs font-normal text-slate-500">
+              Aparece na última aula de todos os cursos, quando o aluno conclui, logo acima do quadro &quot;Emitir certificado&quot;. Deixe em branco para não mostrar vídeo.
+            </span>
+          </label>
+          {erro === "video" && <p className="mt-3 text-sm text-red-700">Não reconheci esse link. Cole o link do vídeo do Panda (o de &quot;embed&quot;) ou do YouTube.</p>}
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
