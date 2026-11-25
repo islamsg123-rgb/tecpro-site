@@ -44,7 +44,7 @@ export function VideoParabens({ src, capa, chave }: { src: string; capa?: string
 
   return (
     <div ref={caixa} className="relative mt-4 aspect-video overflow-hidden rounded-3xl bg-marca-950">
-      <video ref={ref} src={src} poster={capa} controls playsInline preload="metadata" className="h-full w-full" onVolumeChange={(e) => !e.currentTarget.muted && setMudo(false)} />
+      <video ref={ref} src={src} onPlay={() => window.dispatchEvent(new Event("tecpro:parar-aula"))} poster={capa} controls playsInline preload="metadata" className="h-full w-full" onVolumeChange={(e) => !e.currentTarget.muted && setMudo(false)} />
       {mudo && (
         <button
           type="button"
