@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { exigirAluno } from "@/lib/area-aluno";
-import { loginEmDemonstracao } from "@/lib/auth";
+import { loginEmDemonstracao, mostrarAvisoSenha } from "@/lib/auth";
+import { AvisoCriarSenha } from "@/components/aluno/AvisoCriarSenha";
 import { eAdmin } from "@/lib/admin";
 import { sair } from "../entrar/acoes";
 
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function LayoutAluno({ children }: { children: React.ReactNode }) {
   const aluno = await exigirAluno();
   const temPainel = await eAdmin().catch(() => false);
+  const avisoSenha = await mostrarAvisoSenha(aluno);
   return (
     <div className="min-h-[calc(100vh-72px)] bg-[#f3f6fb]">
       <div className="border-b border-slate-200 bg-white">
@@ -28,6 +30,7 @@ export default async function LayoutAluno({ children }: { children: React.ReactN
           </div>
         </div>
       </div>
+      {avisoSenha && <AvisoCriarSenha />}
       {children}
     </div>
   );

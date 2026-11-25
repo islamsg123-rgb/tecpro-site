@@ -68,7 +68,7 @@ export function emailBoasVindas(nome: string, curso: string, siteUrl: string, pa
     ``,
     `${abertura} ${curso} já está liberado.`,
     ``,
-    `Para assistir às aulas, entre em ${link} com este mesmo e-mail. Você vai receber um link de acesso, sem precisar de senha.`,
+    `Para assistir às aulas, entre em ${link} com este mesmo e-mail. No primeiro acesso, clique em "Criar minha senha": você recebe um código neste e-mail e cria a sua senha. Depois é só entrar com e-mail e senha.`,
     ``,
     `Bons estudos!`,
     `Tecpro Multi Ensino`,
@@ -80,7 +80,7 @@ export function emailBoasVindas(nome: string, curso: string, siteUrl: string, pa
 <tr><td style="padding:28px">
 <p style="font-size:18px;font-weight:bold;margin:0 0 12px">Olá, ${escapar(primeiro)}!</p>
 <p style="font-size:15px;line-height:1.6;margin:0 0 12px">${abertura} <strong>${escapar(curso)}</strong> já está liberado.</p>
-<p style="font-size:15px;line-height:1.6;margin:0 0 24px">Para assistir às aulas, entre na Área do aluno com este mesmo e-mail. Você recebe um link de acesso, sem precisar de senha.</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 24px">Para assistir às aulas, entre na Área do aluno com este mesmo e-mail. No primeiro acesso, clique em <strong>Criar minha senha</strong>: você recebe um código neste e-mail e cria a sua senha. Depois é só entrar com e-mail e senha.</p>
 <p style="margin:0 0 24px"><a href="${escapar(link)}" style="display:inline-block;background:#FFA500;color:#011749;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:999px">Acessar meu curso</a></p>
 <p style="font-size:13px;color:#64748b;margin:0">Bons estudos!<br>Tecpro Multi Ensino</p>
 </td></tr></table></td></tr></table></body></html>`;
