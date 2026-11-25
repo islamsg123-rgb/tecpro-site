@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { COOKIE_DEPOIS_DO_LINK, entrarDemonstracao, loginEmDemonstracao, sairDemonstracao, supabaseDoServidor } from "@/lib/auth";
 import { emailValido } from "@/lib/validacao";
 import { enviarLinkDeAcesso, origemDoLink } from "@/lib/link-acesso";
+import { contaTemSenha, podeConsultar } from "@/lib/conta-senha";
 
 export interface EstadoEntrar {
   erro?: string;
@@ -13,6 +14,31 @@ export interface EstadoEntrar {
   paraSenha?: boolean;
   /** true quando o e-mail traz também um código para digitar no site. */
   comCodigo?: boolean;
+}
+
+export interface EstadoAvancar extends EstadoEntrar {
+  /** A conta já tem senha: a tela pede a senha. */
+  pedirSenha?: boolean;
+  email?: string;
+}
+
+/**
+ * 1º passo da tela de entrar: a pessoa digita só o e-mail.
+ * Tem senha: pede a senha. Não tem (ou é aluno novo): manda um código e, depois dele, a pessoa cria a senha.
+ */
+export async function avancar(_: EstadoAvancar, f: FormData): Promise<EstadoAvancar> {
+  const email = String(f.get("email") ?? "").trim().toLowerCase();
+  if (!emailValido(email)) return { erro: "Digite um e-mail válido." };
+  const h = await headers();
+  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || "?";
+  if (!podeConsultar(ip)) return { erro: "Muitas tentativas. Aguarde alguns minutos e tente de novo." };
+
+  if (await contaTemSenha(email)) return { pedirSenha: true, email };
+  if (loginEmDemonstracao) return { email, enviadoPara: email, paraSenha: true, comCodigo: true };
+  const r = await enviarLink(f, true);
+  // Apertou Avançar duas vezes seguidas: o código já foi enviado há pouco, então só mostra a tela do código.
+  if (r.erro?.startsWith("Acabamos de enviar")) return { email, enviadoPara: email, paraSenha: true, comCodigo: true };
+  return { email, ...r };
 }
 
 /** Link de acesso por e-mail (sem senha). */
