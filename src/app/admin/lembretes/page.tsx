@@ -401,18 +401,16 @@ function ConfigCertificado({ cfg, erro }: { cfg: ConfigLembretes; erro?: string 
         <span>{c.horas === 1 ? "hora" : "horas"} depois que a pessoa viu a tela do certificado.</span>
         {erro === "horas" && <span className="w-full text-red-700">Informe de 1 a 72 horas.</span>}
       </div>
-      {caixa("cEmitir", c.avisoEmitir, "Pagou e não emitiu",
-        <>O pagamento foi confirmado, mas a pessoa não clicou em emitir. Sai no mesmo tempo acima, lembrando de conferir o nome e emitir. Cancelado se ela emitir antes.</>)}
       {caixa("cEntrega", c.entrega, "Mandar o certificado por e-mail quando for emitido",
         <>Na hora em que o certificado é emitido, a pessoa recebe o PDF anexo, o link para baixar de novo e o link de validação. Vale para todos os certificados (pagos e grátis).</>)}
       <div className="flex flex-wrap gap-2">
-        {(["comprar", "emitir", "entrega"] as TipoEmailCertificado[]).map((t) => (
+        {(["comprar", "entrega"] as TipoEmailCertificado[]).map((t) => (
           <a key={t} href={`/admin/lembretes/previa?certificado=${t}`} target="_blank" rel="noopener" className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-marca-900 hover:border-marca-900">
             Ver e-mail: {NOME_EMAIL_CERTIFICADO[t]}
           </a>
         ))}
         <button formAction={testeCertificado} formNoValidate className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-marca-900 hover:border-marca-900">
-          Mandar os 3 para o meu e-mail
+          Mandar os 2 para o meu e-mail
         </button>
       </div>
     </div>
@@ -422,7 +420,7 @@ function ConfigCertificado({ cfg, erro }: { cfg: ConfigLembretes; erro?: string 
 const ROTULO_STATUS: Record<RegistroEmailCertificado["status"], { texto: string; cor: string; dica: string }> = {
   reservado: { texto: "preparando", cor: "bg-slate-100 text-slate-600", dica: "O site está preparando este e-mail." },
   agendado: { texto: "agendado", cor: "bg-blue-100 text-blue-800", dica: "Guardado no Resend: sai sozinho no horário mostrado." },
-  cancelado: { texto: "cancelado ✓", cor: "bg-green-100 text-green-800", dica: "Não precisou: a pessoa comprou ou emitiu antes do horário." },
+  cancelado: { texto: "cancelado ✓", cor: "bg-green-100 text-green-800", dica: "Não precisou: a pessoa comprou antes do horário." },
   enviado: { texto: "enviado", cor: "bg-slate-100 text-slate-600", dica: "E-mail entregue ao Resend." },
   erro: { texto: "não enviado", cor: "bg-red-100 text-red-700", dica: "Deu erro ao enviar." },
 };
@@ -431,7 +429,7 @@ function EmailsCertificado({ lista }: { lista: RegistroEmailCertificado[] }) {
   return (
     <>
       <h2 id="emails-certificado" className="mt-12 scroll-mt-24 text-xl font-bold text-marca-900">E-mails do certificado</h2>
-      <p className="mt-1 text-sm text-slate-500">Os últimos 200: parabéns para quem não comprou, aviso para quem pagou e não emitiu, e certificados mandados em PDF.</p>
+      <p className="mt-1 text-sm text-slate-500">Os últimos 200: parabéns para quem não comprou e certificados mandados em PDF.</p>
       {!lista.length ? (
         <div className="mt-4"><Vazio>Nenhum e-mail do certificado ainda.</Vazio></div>
       ) : (

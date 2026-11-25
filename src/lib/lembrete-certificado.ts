@@ -2,7 +2,7 @@ import "server-only";
 import { bancoEmDemonstracao, db, EMAIL_DEMO, obterAluno, registrarEventoMatricula, type Certificado } from "./dados";
 import { getCursos } from "./cursos";
 import {
-  cancelarEmailAgendado, emailCertificadoEmitido, emailCertificadoLiberado, emailConfigurado, emailParabensCertificado, enviarEmail,
+  cancelarEmailAgendado, emailCertificadoEmitido, emailConfigurado, emailParabensCertificado, enviarEmail,
 } from "./email";
 import { linkPdfCertificado, linkValidarCertificado, nomeArquivoCertificado, pdfDoCertificado } from "./certificado-arquivo";
 import { linkDescadastro, obterConfigLembretes } from "./lembretes";
@@ -12,16 +12,15 @@ import { linkEmitirCertificado } from "./whatsapp-certificado";
  * E-mails do certificado:
  *  - "comprar": concluiu um curso de certificado pago, viu a tela do certificado e não comprou.
  *     Sai X horas depois (padrão 1). Se comprar antes, o e-mail é cancelado.
- *  - "emitir":  pagou o certificado e ainda não clicou em emitir. Sai X horas depois; cancelado ao emitir.
  *  - "entrega": certificado emitido, vai em PDF anexo (na hora).
  * O atraso usa o agendamento do próprio Resend (o e-mail fica guardado lá e sai no horário),
  * então não depende do envio diário das 10h. Cada tipo sai no máximo 1 vez por aluno e curso.
  * Tabela: supabase/migrations/0012_lembretes_certificado.sql.
  */
 
-export type TipoEmailCertificado = "comprar" | "emitir" | "entrega";
+export type TipoEmailCertificado = "comprar" | "entrega";
 export const NOME_EMAIL_CERTIFICADO: Record<TipoEmailCertificado, string> = {
-  comprar: "Parabéns (não comprou)", emitir: "Pagou e não emitiu", entrega: "Certificado em PDF",
+  comprar: "Parabéns (não comprou)", entrega: "Certificado em PDF",
 };
 
 export interface RegistroEmailCertificado {
@@ -105,15 +104,15 @@ async function descadastrado(email: string): Promise<boolean> {
 
 /** Guarda o e-mail no Resend para sair daqui a `horas` horas e registra. Nunca lança erro. */
 async function agendar(
-  tipo: "comprar" | "emitir", emailAluno: string, cursoId: string,
+  tipo: "comprar", emailAluno: string, cursoId: string,
   montar: (d: { nome: string; curso: string; horas: number; slug: string; email: string }) => { assunto: string; html: string; texto: string; cabecalhos?: Record<string, string> },
 ) {
   try {
     const cfg = (await obterConfigLembretes()).certificado;
-    if (!(tipo === "comprar" ? cfg.ligado : cfg.avisoEmitir) || !emailConfigurado) return;
+    if (!cfg.ligado || !emailConfigurado) return;
     const email = norm(emailAluno);
     if (email === EMAIL_DEMO && !bancoEmDemonstracao) return;
-    if (tipo === "comprar" && (await descadastrado(email))) return;
+    if (await descadastrado(email)) return;
     const [cursos, aluno] = await Promise.all([getCursos(), obterAluno(email)]);
     const curso = cursos.find((c) => c.id === cursoId);
     if (!curso) return;
@@ -143,8 +142,8 @@ export function lembrarDeComprar(email: string, cursoId: string) {
   });
 }
 
-/** Cancela um e-mail agendado que ainda não saiu (comprou, ou emitiu). Nunca lança erro. */
-async function cancelar(tipo: "comprar" | "emitir", emailAluno: string, cursoId: string) {
+/** Cancela um e-mail agendado que ainda não saiu (a pessoa comprou). Nunca lança erro. */
+async function cancelar(tipo: "comprar", emailAluno: string, cursoId: string) {
   try {
     const email = norm(emailAluno);
     let linhas: RegistroEmailCertificado[];
@@ -168,11 +167,9 @@ async function cancelar(tipo: "comprar" | "emitir", emailAluno: string, cursoId:
   }
 }
 
-/** Certificado pago (ou crédito do pacote usado): cancela o "parabéns" e agenda o aviso para emitir. */
+/** Certificado pago (ou crédito do pacote usado): cancela o "parabéns" se ainda não saiu. */
 export async function certificadoLiberado(email: string, cursoId: string) {
   await cancelar("comprar", email, cursoId);
-  await agendar("emitir", email, cursoId, (d) =>
-    emailCertificadoLiberado({ nome: d.nome, curso: d.curso, horas: d.horas, link: linkEmitirCertificado(d.slug) }));
 }
 
 /** Manda o certificado em PDF por e-mail. `forcar` = reenvio pelo painel (manda mesmo se já foi). */
@@ -197,9 +194,8 @@ export async function enviarCertificadoPorEmail(cert: Certificado, forcar = fals
   }
 }
 
-/** Certificado acabou de ser emitido: cancela o aviso "emita" e manda o PDF (se ligado). Nunca lança erro. */
+/** Certificado acabou de ser emitido: manda o PDF (se ligado). Nunca lança erro. */
 export async function certificadoEmitido(cert: Certificado) {
-  await cancelar("emitir", cert.email, cert.cursoId);
   try {
     const cfg = (await obterConfigLembretes()).certificado;
     if (!cfg.entrega || !emailConfigurado) return;
@@ -214,7 +210,6 @@ export async function certificadoEmitido(cert: Certificado) {
 export function exemploEmailCertificado(tipo: TipoEmailCertificado, nome: string, emailSair: string) {
   const base = { nome, curso: "Excel Avançado", horas: 40 };
   if (tipo === "comprar") return emailParabensCertificado({ ...base, link: linkEmitirCertificado("excel-avancado"), linkSair: linkDescadastro(emailSair) });
-  if (tipo === "emitir") return emailCertificadoLiberado({ ...base, link: linkEmitirCertificado("excel-avancado") });
   return emailCertificadoEmitido({
     ...base, codigo: "TP-AB2C-D3EF", emitidoEm: new Date().toISOString(),
     linkPdf: linkPdfCertificado("TP-AB2C-D3EF"), linkValidar: linkValidarCertificado("TP-AB2C-D3EF"),

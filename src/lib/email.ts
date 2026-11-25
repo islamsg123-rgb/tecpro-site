@@ -332,32 +332,6 @@ ${beneficios.map(([t, s]) => `<tr><td width="28" valign="top" style="padding:5px
   return { assunto, html, texto };
 }
 
-/** Pagamento do certificado confirmado, mas o aluno ainda não clicou em emitir. */
-export function emailCertificadoLiberado(d: { nome: string; curso: string; horas: number; link: string }) {
-  const nomeCompleto = d.nome.trim().replace(/\s+/g, " ");
-  const primeiro = nomeCompleto.split(" ")[0] || "";
-  const assunto = `Pagamento confirmado: emita seu certificado de ${d.curso}`;
-  const html = `${topo}
-<tr><td style="padding:28px">
-<p style="font-size:20px;font-weight:bold;margin:0 0 12px">Olá${primeiro ? `, ${escapar(primeiro)}` : ""}!</p>
-<p style="font-size:15px;line-height:1.6;margin:0 0 12px">O pagamento do seu certificado de <strong>${escapar(d.curso)}</strong> foi confirmado. 🎉</p>
-<p style="font-size:15px;line-height:1.6;margin:0 0 4px">Falta só você conferir o seu nome e clicar em <strong>emitir</strong>. Na hora você baixa o PDF e também recebe uma cópia por e-mail.</p>
-${miniCertificado(nomeCompleto || "Seu nome aqui", d.curso, d.horas, "Pronto para emitir")}
-<p style="margin:8px 0 22px;text-align:center">${botaoLaranja(d.link, "Emitir meu certificado")}</p>
-<p style="font-size:14px;line-height:1.6;margin:0 0 16px;color:#475569">Se o seu nome estiver errado, fale com a gente antes de emitir, pelo botão de ajuda no site ou pelo WhatsApp que aparece na tela do certificado.</p>
-<p style="font-size:13px;color:#64748b;margin:0">Equipe Tecpro Multi Ensino</p>
-</td></tr>${fim()}`;
-  const texto = [
-    `Olá${primeiro ? `, ${primeiro}` : ""}!`, ``,
-    `O pagamento do seu certificado de ${d.curso} foi confirmado.`, ``,
-    `Falta só conferir o seu nome e clicar em emitir. Na hora você baixa o PDF e também recebe uma cópia por e-mail.`, ``,
-    `Emitir meu certificado: ${d.link}`, ``,
-    `Se o seu nome estiver errado, fale com a gente antes de emitir, pelo botão de ajuda no site ou pelo WhatsApp que aparece na tela do certificado.`, ``,
-    `Equipe Tecpro Multi Ensino`,
-  ].join("\n");
-  return { assunto, html, texto };
-}
-
 /** Certificado emitido: vai em PDF anexo, com link permanente para baixar de novo e para validar. */
 export function emailCertificadoEmitido(d: {
   nome: string; curso: string; horas: number; codigo: string; emitidoEm: string; linkPdf: string; linkValidar: string;

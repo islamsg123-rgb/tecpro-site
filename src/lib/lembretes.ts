@@ -60,8 +60,6 @@ export interface ConfigCertificado {
   ligado: boolean;
   /** Quantas horas depois de ver a tela do certificado sem comprar */
   horas: number;
-  /** Pagou e não clicou em emitir: aviso "pagamento confirmado, emita" (mesmas horas depois) */
-  avisoEmitir: boolean;
   /** Manda o certificado em PDF por e-mail assim que é emitido */
   entrega: boolean;
 }
@@ -91,7 +89,7 @@ export const MENSAGEM_WHATSAPP_NUNCA =
 export const CONFIG_LEMBRETES_PADRAO: ConfigLembretes = {
   ligado: false, dias: [3, 7, 14], limiteDias: 45, maximoPorDia: 90, mensagemWhatsapp: MENSAGEM_WHATSAPP_PADRAO,
   nuncaComecou: { ligado: false, dias: [1, 3, 7], mensagemWhatsapp: MENSAGEM_WHATSAPP_NUNCA },
-  certificado: { ligado: true, horas: 1, avisoEmitir: true, entrega: true },
+  certificado: { ligado: true, horas: 1, entrega: true },
 };
 
 /** Junta o que está salvo com o padrão (configurações antigas não têm os grupos novos). */

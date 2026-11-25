@@ -1,11 +1,11 @@
--- E-mails do certificado: parabéns para quem concluiu e não comprou, aviso "pagamento confirmado, emita"
+-- E-mails do certificado: parabéns para quem concluiu e não comprou
 -- e o certificado em PDF quando é emitido.
 -- Rodar no Supabase: SQL Editor > New query > colar tudo e clicar em Run.
 -- Pode rodar mais de uma vez sem problema.
 
 create table if not exists public.lembretes_certificado (
   id             bigserial primary key,
-  tipo           text not null check (tipo in ('comprar', 'emitir', 'entrega')),
+  tipo           text not null check (tipo in ('comprar', 'entrega')),
   email          text not null,
   curso_id       text not null,
   curso_nome     text,

@@ -42,7 +42,7 @@ export async function salvarLembretes(f: FormData) {
     maximoPorDia: maximo,
     mensagemWhatsapp: texto(f, "mensagemWhatsapp", MENSAGEM_WHATSAPP_PADRAO),
     nuncaComecou: { ligado: f.get("nLigado") === "on", dias: diasN, mensagemWhatsapp: texto(f, "nMensagem", MENSAGEM_WHATSAPP_NUNCA) },
-    certificado: { ligado: f.get("cLigado") === "on", horas, avisoEmitir: f.get("cEmitir") === "on", entrega: f.get("cEntrega") === "on" },
+    certificado: { ligado: f.get("cLigado") === "on", horas, entrega: f.get("cEntrega") === "on" },
   });
   redirect("/admin/lembretes?salvo=1");
 }
@@ -76,11 +76,11 @@ export async function testeNunca() {
   await enviarTeste("nunca");
 }
 
-/** Manda os 3 e-mails do certificado (com dados de exemplo) para quem está no painel. */
+/** Manda os 2 e-mails do certificado (com dados de exemplo) para quem está no painel. */
 export async function testeCertificado() {
   const a = await exigirAdmin("alunos");
   try {
-    for (const tipo of ["comprar", "emitir", "entrega"] as TipoEmailCertificado[]) {
+    for (const tipo of ["comprar", "entrega"] as TipoEmailCertificado[]) {
       const e = exemploEmailCertificado(tipo, a.nome ?? "Maria Souza", a.email);
       await enviarEmail({ para: a.email, ...e, assunto: `[TESTE ${NOME_EMAIL_CERTIFICADO[tipo]}] ${e.assunto}` });
       await new Promise((ok) => setTimeout(ok, 600));
