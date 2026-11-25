@@ -1,10 +1,12 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
+import { after } from "next/server";
 import { regraDoCertificado, type RegraCertificado } from "./config-certificados";
 import {
   certificadoDoAluno, certificadoFoiPago, gravarCertificado, registrarCertificadoPago, registrarCreditos, type Certificado,
 } from "./dados";
 import type { CursoDoAluno } from "./area-aluno";
+import { certificadoEmitido, certificadoLiberado } from "./lembrete-certificado";
 
 /**
  * Situação do certificado de um curso para um aluno:
@@ -50,8 +52,9 @@ export async function emitirCertificado(email: string, c: CursoDoAluno, nome: st
   const s = await situacaoCertificado(email, c);
   if (s.certificado) return s.certificado;
   if (s.estado !== "disponivel") throw new Error(`certificado não disponível (${s.estado})`);
-  return gravarCertificado({
-    codigo: novoCodigo(),
+  const codigo = novoCodigo();
+  const cert = await gravarCertificado({
+    codigo,
     email,
     cursoId: c.curso.id,
     nomeAluno: limparNome(nome),
@@ -59,6 +62,9 @@ export async function emitirCertificado(email: string, c: CursoDoAluno, nome: st
     cargaHoraria: c.curso.cargaHoraria,
     emitidoEm: new Date().toISOString(),
   });
+  // Só o certificado novo vai por e-mail (se outra aba emitiu antes, o código é outro).
+  if (cert.codigo === codigo) after(() => certificadoEmitido(cert));
+  return cert;
 }
 
 /** Chamado quando o pagamento de um certificado é confirmado. */
@@ -67,4 +73,6 @@ export async function liberarCertificadoPago(email: string, cursoId: string, cob
   // Pacote: um certificado vai para este curso e o resto fica como crédito para os próximos.
   if (quantidade > 1) await registrarCreditos(email, cobrancaId, quantidade - 1);
   console.info(`[certificado] cobrança ${cobrancaId}: certificado do curso ${cursoId} liberado para ${email}`);
+  // Cancela o e-mail de "parabéns" (se estava agendado) e agenda o aviso "pagamento confirmado, emita".
+  if (!(await certificadoDoAluno(email, cursoId))) await certificadoLiberado(email, cursoId);
 }

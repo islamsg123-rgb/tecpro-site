@@ -11,15 +11,44 @@ const REMETENTE = process.env.EMAIL_REMETENTE || "Tecpro Multi Ensino <onboardin
 
 export const emailConfigurado = Boolean(CHAVE);
 
-export async function enviarEmail(e: { para: string; assunto: string; html: string; texto: string; cabecalhos?: Record<string, string> }): Promise<void> {
+export interface Anexo {
+  /** Nome do arquivo, ex.: "certificado.pdf" */
+  nome: string;
+  /** Conteúdo do arquivo */
+  conteudo: Uint8Array;
+}
+
+/**
+ * Manda um e-mail pelo Resend e devolve o id dele no Resend.
+ * `agendarPara` (data ISO): o Resend guarda o e-mail e só entrega nesse horário (dá para cancelar antes).
+ */
+export async function enviarEmail(e: {
+  para: string; assunto: string; html: string; texto: string; cabecalhos?: Record<string, string>; agendarPara?: string; anexos?: Anexo[];
+}): Promise<string | null> {
   if (!CHAVE) throw new Error("RESEND_API_KEY não configurada na Vercel: e-mail não enviado");
   const resp = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${CHAVE}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: REMETENTE, to: [e.para], subject: e.assunto, html: e.html, text: e.texto, ...(e.cabecalhos ? { headers: e.cabecalhos } : {}) }),
+    body: JSON.stringify({
+      from: REMETENTE, to: [e.para], subject: e.assunto, html: e.html, text: e.texto,
+      ...(e.cabecalhos ? { headers: e.cabecalhos } : {}),
+      ...(e.agendarPara ? { scheduled_at: e.agendarPara } : {}),
+      ...(e.anexos?.length ? { attachments: e.anexos.map((a) => ({ filename: a.nome, content: Buffer.from(a.conteudo).toString("base64") })) } : {}),
+    }),
     cache: "no-store",
   });
   if (!resp.ok) throw new Error(`Resend recusou o e-mail (HTTP ${resp.status}): ${(await resp.text()).slice(0, 300)}`);
+  const r = (await resp.json().catch(() => null)) as { id?: string } | null;
+  return r?.id ?? null;
+}
+
+/** Cancela um e-mail agendado no Resend (que ainda não saiu). */
+export async function cancelarEmailAgendado(id: string): Promise<void> {
+  if (!CHAVE) return;
+  const resp = await fetch(`https://api.resend.com/emails/${encodeURIComponent(id)}/cancel`, {
+    method: "POST", headers: { Authorization: `Bearer ${CHAVE}` }, cache: "no-store",
+  });
+  if (!resp.ok) throw new Error(`Resend não cancelou o e-mail (HTTP ${resp.status}): ${(await resp.text()).slice(0, 300)}`);
 }
 
 const escapar = (t: string) =>
@@ -228,4 +257,118 @@ export function emailNuncaComecou(d: { nome: string; curso: string; dias: number
       motivo: "Você recebeu este e-mail porque está matriculado em um curso da Tecpro Multi Ensino.",
     }),
   };
+}
+
+/* ---------- Certificado ---------- */
+
+const topo = `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#f4f7fe;font-family:Arial,Helvetica,sans-serif;color:#011749">
+<table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px"><tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden">
+<tr><td style="background:#011749;padding:20px 28px;color:#ffffff;font-size:20px;font-weight:bold">TECPRO <span style="color:#FFA500">Multi Ensino</span></td></tr>`;
+
+const botaoLaranja = (link: string, rotulo: string) =>
+  `<a href="${escapar(link)}" style="display:inline-block;background:#FFA500;color:#011749;text-decoration:none;font-weight:bold;padding:15px 32px;border-radius:999px;font-size:17px">${escapar(rotulo)}</a>`;
+
+/** Desenho de um certificado com o nome do aluno (só HTML, funciona em qualquer leitor de e-mail). */
+function miniCertificado(nome: string, curso: string, horas: number, selo: string) {
+  return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;border:3px solid #011749;border-radius:12px;background:#fffdf7"><tr><td style="padding:6px">
+<table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #FFA500;border-radius:8px"><tr><td align="center" style="padding:22px 18px">
+<p style="margin:0;font-size:11px;letter-spacing:3px;color:#FFA500;font-weight:bold">CERTIFICADO DE CONCLUSÃO</p>
+<p style="margin:12px 0 4px;font-size:12px;color:#64748b">Certificamos que</p>
+<p style="margin:0;font-size:22px;font-weight:bold;color:#011749;font-family:Georgia,'Times New Roman',serif">${escapar(nome)}</p>
+<p style="margin:10px 0 0;font-size:13px;line-height:1.5;color:#475569">concluiu com êxito o curso online<br><strong style="color:#011749;font-size:15px">${escapar(curso)}</strong>${horas ? `<br>Carga horária: ${horas} horas` : ""}</p>
+<p style="margin:14px 0 0"><span style="display:inline-block;background:#011749;color:#ffffff;font-size:11px;font-weight:bold;padding:5px 12px;border-radius:999px">${escapar(selo)}</span></p>
+</td></tr></table></td></tr></table>`;
+}
+
+const rodapeSair = (linkSair: string) =>
+  `<p style="max-width:560px;font-size:12px;line-height:1.5;color:#94a3b8;margin:16px auto 0;text-align:center">Você recebeu este e-mail porque concluiu um curso na Tecpro Multi Ensino.<br><a href="${escapar(linkSair)}" style="color:#94a3b8">Não quero mais receber lembretes</a></p>`;
+
+const fim = (extra = "") => `</td></tr></table>${extra}</td></tr></table></body></html>`;
+
+/**
+ * Concluiu um curso com certificado pago e não emitiu: parabéns + por que o certificado é importante.
+ * Não fala de preço. Técnicas: reconhecimento da conquista, certificado já com o nome da pessoa
+ * (sensação de que ele já é dela), o que ela perde sem ele e como é rápido.
+ */
+export function emailParabensCertificado(d: { nome: string; curso: string; horas: number; link: string; linkSair: string }) {
+  const nomeCompleto = d.nome.trim().replace(/\s+/g, " ");
+  const primeiro = nomeCompleto.split(" ")[0] || "";
+  const assunto = `${primeiro ? `${primeiro}, p` : "P"}arabéns! Seu certificado de ${d.curso} está quase pronto`;
+  const beneficios = [
+    ["Comprova o que você aprendeu", "no currículo, no LinkedIn e em entrevistas de emprego."],
+    ["Faz você se destacar", "na hora em que a empresa compara candidatos parecidos."],
+    ["Tem validade fácil de conferir", "com código e QR Code que qualquer empresa confere no nosso site."],
+    ["Fica com você para sempre", "em PDF, para imprimir ou mandar quando precisar."],
+  ];
+  const html = `${topo}
+<tr><td style="padding:28px">
+<p style="font-size:26px;margin:0 0 6px">🎉</p>
+<p style="font-size:20px;font-weight:bold;margin:0 0 12px">Parabéns${primeiro ? `, ${escapar(primeiro)}` : ""}!</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 12px">Você concluiu o curso <strong>${escapar(d.curso)}</strong>. Assistiu às aulas, fez as atividades e chegou até o fim. Muita gente começa um curso e para no meio; <strong>você terminou</strong>. Isso mostra dedicação e vontade de crescer.</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 4px">Agora falta só um passo para transformar esse esforço em algo que você pode mostrar para o mundo: <strong>o seu certificado</strong>.</p>
+${miniCertificado(nomeCompleto || "Seu nome aqui", d.curso, d.horas, "Falta só emitir")}
+<p style="font-size:15px;font-weight:bold;margin:0 0 10px">Com o certificado em mãos, você:</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px">
+${beneficios.map(([t, s]) => `<tr><td width="28" valign="top" style="padding:5px 0;font-size:16px;color:#16a34a">✔</td><td style="padding:5px 0;font-size:14px;line-height:1.5"><strong>${t}</strong> ${s}</td></tr>`).join("\n")}
+</table>
+<p style="font-size:15px;line-height:1.6;margin:0 0 4px">Sem o certificado, todo o tempo que você dedicou fica sem comprovação. Com ele, o seu esforço vira <strong>oportunidade</strong>.</p>
+<p style="margin:24px 0 10px;text-align:center">${botaoLaranja(d.link, "Emitir meu certificado")}</p>
+<p style="font-size:13px;line-height:1.5;margin:0 0 22px;color:#64748b;text-align:center">Leva menos de 2 minutos. Você baixa o PDF na hora e recebe uma cópia por e-mail.</p>
+<p style="font-size:14px;line-height:1.6;margin:0 0 16px;color:#475569">Tem alguma dúvida? Fale com a gente pelo botão de ajuda no site.</p>
+<p style="font-size:13px;color:#64748b;margin:0">Um abraço e parabéns de novo!<br>Equipe Tecpro Multi Ensino</p>
+</td></tr>${fim(rodapeSair(d.linkSair))}`;
+  const texto = [
+    `Parabéns${primeiro ? `, ${primeiro}` : ""}!`, ``,
+    `Você concluiu o curso ${d.curso}. Muita gente começa um curso e para no meio; você terminou. Isso mostra dedicação e vontade de crescer.`, ``,
+    `Agora falta só um passo: emitir o seu certificado. Com ele você:`,
+    ...beneficios.map(([t, s]) => `- ${t} ${s}`), ``,
+    `Sem o certificado, o tempo que você dedicou fica sem comprovação. Com ele, o seu esforço vira oportunidade.`, ``,
+    `Emitir meu certificado: ${d.link}`, ``,
+    `Leva menos de 2 minutos. Você baixa o PDF na hora e recebe uma cópia por e-mail.`, ``,
+    `Equipe Tecpro Multi Ensino`, ``,
+    `Não quer mais receber lembretes? ${d.linkSair}`,
+  ].join("\n");
+  return { assunto, html, texto };
+}
+
+/** Certificado emitido: vai em PDF anexo, com link permanente para baixar de novo e para validar. */
+export function emailCertificadoEmitido(d: {
+  nome: string; curso: string; horas: number; codigo: string; emitidoEm: string; linkPdf: string; linkValidar: string;
+}) {
+  const nomeCompleto = d.nome.trim().replace(/\s+/g, " ");
+  const primeiro = nomeCompleto.split(" ")[0] || "";
+  const data = new Date(d.emitidoEm).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const assunto = `Seu certificado de ${d.curso} chegou 🎓`;
+  const linha = (rotulo: string, valor: string) =>
+    `<tr><td style="padding:6px 0;font-size:13px;color:#64748b;width:130px">${rotulo}</td><td style="padding:6px 0;font-size:14px;font-weight:bold;color:#011749">${valor}</td></tr>`;
+  const html = `${topo}
+<tr><td style="padding:28px">
+<p style="font-size:26px;margin:0 0 6px">🎓</p>
+<p style="font-size:20px;font-weight:bold;margin:0 0 12px">Parabéns${primeiro ? `, ${escapar(primeiro)}` : ""}! Seu certificado está aqui.</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 4px">O seu certificado de <strong>${escapar(d.curso)}</strong> foi emitido. <strong>O PDF está anexado a este e-mail</strong>: guarde esta mensagem, assim ele fica sempre com você.</p>
+${miniCertificado(nomeCompleto, d.curso, d.horas, "Emitido ✓")}
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;background:#f4f7fe;border-radius:12px"><tr><td style="padding:12px 18px">
+<table width="100%" cellpadding="0" cellspacing="0">
+${linha("Código", `<span style="font-family:'Courier New',monospace">${escapar(d.codigo)}</span>`)}
+${linha("Emitido em", data)}
+${d.horas ? linha("Carga horária", `${d.horas} horas`) : ""}
+</table></td></tr></table>
+<p style="margin:0 0 12px;text-align:center">${botaoLaranja(d.linkPdf, "Baixar certificado (PDF)")}</p>
+<p style="margin:0 0 24px;text-align:center;font-size:14px"><a href="${escapar(d.linkValidar)}" style="color:#1d4ed8;font-weight:bold">Ver página de validação</a></p>
+<p style="font-size:15px;font-weight:bold;margin:0 0 8px">Dica: coloque no LinkedIn</p>
+<p style="font-size:14px;line-height:1.6;margin:0 0 20px;color:#475569">No seu perfil, vá em <em>Adicionar seção &gt; Licenças e certificados</em>. Em organização, escreva <strong>Tecpro Multi Ensino</strong>; em código da credencial, <strong>${escapar(d.codigo)}</strong>; e em URL da credencial, cole o link de validação: <span style="word-break:break-all">${escapar(d.linkValidar)}</span></p>
+<p style="font-size:14px;line-height:1.6;margin:0 0 16px;color:#475569">Qualquer empresa pode conferir que o certificado é verdadeiro pelo QR Code ou pelo link de validação.</p>
+<p style="font-size:13px;color:#64748b;margin:0">Sucesso na sua caminhada!<br>Equipe Tecpro Multi Ensino</p>
+</td></tr>${fim()}`;
+  const texto = [
+    `Parabéns${primeiro ? `, ${primeiro}` : ""}! Seu certificado está aqui.`, ``,
+    `O seu certificado de ${d.curso} foi emitido. O PDF está anexado a este e-mail: guarde esta mensagem.`, ``,
+    `Código: ${d.codigo}`, `Emitido em: ${data}`, ...(d.horas ? [`Carga horária: ${d.horas} horas`] : []), ``,
+    `Baixar certificado (PDF): ${d.linkPdf}`,
+    `Página de validação: ${d.linkValidar}`, ``,
+    `Dica: no LinkedIn, vá em Licenças e certificados, use a organização Tecpro Multi Ensino, o código ${d.codigo} e o link de validação acima.`, ``,
+    `Equipe Tecpro Multi Ensino`,
+  ].join("\n");
+  return { assunto, html, texto };
 }

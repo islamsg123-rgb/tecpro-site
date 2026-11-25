@@ -9,7 +9,10 @@ import {
 } from "@/lib/lembretes";
 import { AvisoSql, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { Dica } from "@/components/admin/Dica";
-import { rodarAgora, salvarLembretes, testeNunca, testeParado } from "./acoes";
+import { rodarAgora, salvarLembretes, testeCertificado, testeNunca, testeParado } from "./acoes";
+import {
+  listarEmailsCertificado, NOME_EMAIL_CERTIFICADO, situacaoReal, type RegistroEmailCertificado, type TipoEmailCertificado,
+} from "@/lib/lembrete-certificado";
 
 export const metadata: Metadata = { title: "Lembretes de estudo" };
 export const dynamic = "force-dynamic";
@@ -37,6 +40,7 @@ export default async function Lembretes({ searchParams }: Props) {
     ultimaRodada().catch(() => null),
     faltaSqlTipos(),
   ]);
+  const emailsCert = await listarEmailsCertificado(200);
   const { parados, nunca } = listas;
   const cronOk = Boolean(process.env.CRON_SECRET);
   const algumLigado = cfg.ligado || cfg.nuncaComecou.ligado;
@@ -66,6 +70,7 @@ export default async function Lembretes({ searchParams }: Props) {
 
       {historico.tabelaFaltando && <AvisoSql arquivo="lembretes-estudo.sql" />}
       {!historico.tabelaFaltando && faltaTipo && <AvisoSql arquivo="lembretes-novos-alunos.sql" />}
+      {emailsCert.tabelaFaltando && <AvisoSql arquivo="emails-certificado.sql" />}
       {q.salvo && <Aviso cor="verde">Configuração salva.</Aviso>}
       {q.teste && <Aviso cor="verde">Mandamos os 3 modelos para <strong>{q.teste}</strong>. Confira a caixa de entrada (e o spam).</Aviso>}
       {q.erroTeste && <Aviso cor="vermelho">Não deu para mandar o teste: {q.erroTeste}</Aviso>}
@@ -132,6 +137,8 @@ export default async function Lembretes({ searchParams }: Props) {
           />
         ))}
       </Secao>
+
+      <EmailsCertificado lista={emailsCert.lista} />
 
       <h2 id="enviados" className="mt-12 scroll-mt-24 text-xl font-bold text-marca-900">Lembretes enviados</h2>
       <p className="mt-1 text-sm text-slate-500">Os últimos 200 e-mails de lembrete, mais recentes primeiro.</p>
@@ -351,6 +358,7 @@ function Config({ cfg, erro }: { cfg: ConfigLembretes; erro?: string }) {
         ligado={cfg.nuncaComecou.ligado} nomeLigado="nLigado" prefixo="n" dias={cfg.nuncaComecou.dias} rotuloDias="depois da matrícula"
         nomeMensagem="nMensagem" mensagem={cfg.nuncaComecou.mensagemWhatsapp} variaveis="{nome}, {curso}, {dias} e {link}"
       />
+      <ConfigCertificado cfg={cfg} erro={erro} />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm text-slate-600">
           <span className="font-semibold text-marca-900">Não mandar para quem está assim há mais de</span>
@@ -367,5 +375,96 @@ function Config({ cfg, erro }: { cfg: ConfigLembretes; erro?: string }) {
       </div>
       <button className="rounded-full bg-marca-900 px-6 py-3 font-bold text-white hover:bg-marca-700">Salvar</button>
     </form>
+  );
+}
+
+/** Bloco da configuração: e-mails do certificado (saem pelo agendamento do Resend, não pela rodada das 10h). */
+function ConfigCertificado({ cfg, erro }: { cfg: ConfigLembretes; erro?: string }) {
+  const c = cfg.certificado;
+  const caixa = (nome: string, ligado: boolean, titulo: string, explica: React.ReactNode) => (
+    <label className="flex cursor-pointer items-start gap-3">
+      <input type="checkbox" name={nome} defaultChecked={ligado} className="mt-1 h-4 w-4 accent-marca-900" />
+      <span>
+        <span className="block font-semibold text-marca-900">{titulo}</span>
+        <span className="block text-sm text-slate-500">{explica}</span>
+      </span>
+    </label>
+  );
+  return (
+    <div id="certificado" className="scroll-mt-24 space-y-4 rounded-2xl border border-slate-200 p-5">
+      <p className="font-bold text-marca-900">E-mails do certificado</p>
+      <p className="-mt-2 text-sm text-slate-500">Estes não esperam as 10h: saem sozinhos no horário certo. Cada um vai no máximo 1 vez por aluno e curso.</p>
+      {caixa("cLigado", c.ligado, "Parabéns para quem concluiu e não comprou o certificado",
+        <>Curso gratuito concluído, a pessoa viu a tela do certificado e não comprou. O e-mail dá os parabéns, fala da importância do certificado (sem preço) e tem o botão <strong>Emitir meu certificado</strong>. Se ela comprar antes, o e-mail é cancelado.</>)}
+      <div className="flex flex-wrap items-center gap-2 pl-7 text-sm text-slate-600">
+        <span>Mandar</span><input name="cHoras" type="number" min={1} max={72} defaultValue={c.horas} className={campoNum} />
+        <span>{c.horas === 1 ? "hora" : "horas"} depois que a pessoa viu a tela do certificado.</span>
+        {erro === "horas" && <span className="w-full text-red-700">Informe de 1 a 72 horas.</span>}
+      </div>
+      {caixa("cEntrega", c.entrega, "Mandar o certificado por e-mail quando for emitido",
+        <>Na hora em que o certificado é emitido, a pessoa recebe o PDF anexo, o link para baixar de novo e o link de validação. Vale para todos os certificados (pagos e grátis).</>)}
+      <div className="flex flex-wrap gap-2">
+        {(["comprar", "entrega"] as TipoEmailCertificado[]).map((t) => (
+          <a key={t} href={`/admin/lembretes/previa?certificado=${t}`} target="_blank" rel="noopener" className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-marca-900 hover:border-marca-900">
+            Ver e-mail: {NOME_EMAIL_CERTIFICADO[t]}
+          </a>
+        ))}
+        <button formAction={testeCertificado} formNoValidate className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-marca-900 hover:border-marca-900">
+          Mandar os 2 para o meu e-mail
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const ROTULO_STATUS: Record<RegistroEmailCertificado["status"], { texto: string; cor: string; dica: string }> = {
+  reservado: { texto: "preparando", cor: "bg-slate-100 text-slate-600", dica: "O site está preparando este e-mail." },
+  agendado: { texto: "agendado", cor: "bg-blue-100 text-blue-800", dica: "Guardado no Resend: sai sozinho no horário mostrado." },
+  cancelado: { texto: "cancelado ✓", cor: "bg-green-100 text-green-800", dica: "Não precisou: a pessoa comprou antes do horário." },
+  enviado: { texto: "enviado", cor: "bg-slate-100 text-slate-600", dica: "E-mail entregue ao Resend." },
+  erro: { texto: "não enviado", cor: "bg-red-100 text-red-700", dica: "Deu erro ao enviar." },
+};
+
+function EmailsCertificado({ lista }: { lista: RegistroEmailCertificado[] }) {
+  return (
+    <>
+      <h2 id="emails-certificado" className="mt-12 scroll-mt-24 text-xl font-bold text-marca-900">E-mails do certificado</h2>
+      <p className="mt-1 text-sm text-slate-500">Os últimos 200: parabéns para quem não comprou e certificados mandados em PDF.</p>
+      {!lista.length ? (
+        <div className="mt-4"><Vazio>Nenhum e-mail do certificado ainda.</Vazio></div>
+      ) : (
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+          <table className="w-full min-w-[820px] text-left text-sm">
+            <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
+              <tr>
+                <th className="px-5 py-3 font-semibold">Sai / saiu em</th>
+                <th className="px-5 py-3 font-semibold">Pessoa</th>
+                <th className="px-5 py-3 font-semibold">Curso</th>
+                <th className="px-5 py-3 font-semibold">E-mail</th>
+                <th className="px-5 py-3 font-semibold">Resultado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {lista.map((r) => {
+                const st = ROTULO_STATUS[situacaoReal(r)];
+                return (
+                  <tr key={r.id}>
+                    <td className="whitespace-nowrap px-5 py-3 text-slate-500">{dataHora(r.agendadoPara ?? r.criadoEm)}</td>
+                    <td className="px-5 py-3">
+                      <Link href={ficha(r.email)} className="text-marca-900 underline decoration-laranja-500 underline-offset-4">{r.nome ?? r.email}</Link>
+                    </td>
+                    <td className="px-5 py-3 text-slate-600">{r.cursoNome ?? r.cursoId}</td>
+                    <td className="px-5 py-3 text-slate-600">{NOME_EMAIL_CERTIFICADO[r.tipo]}</td>
+                    <td className="px-5 py-3">
+                      <Dica texto={r.detalhe ?? st.dica}><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${st.cor}`}>{st.texto}</span></Dica>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 }

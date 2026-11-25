@@ -51,6 +51,17 @@ export interface ConfigLembretes {
   mensagemWhatsapp: string;
   /** Matriculados que nunca abriram uma aula (dias contados da matrícula) */
   nuncaComecou: GrupoExtra;
+  /** E-mails do certificado (não dependem da rodada das 10h) */
+  certificado: ConfigCertificado;
+}
+
+export interface ConfigCertificado {
+  /** Parabéns + importância do certificado para quem concluiu e não comprou */
+  ligado: boolean;
+  /** Quantas horas depois de ver a tela do certificado sem comprar */
+  horas: number;
+  /** Manda o certificado em PDF por e-mail assim que é emitido */
+  entrega: boolean;
 }
 
 export interface GrupoExtra {
@@ -78,6 +89,7 @@ export const MENSAGEM_WHATSAPP_NUNCA =
 export const CONFIG_LEMBRETES_PADRAO: ConfigLembretes = {
   ligado: false, dias: [3, 7, 14], limiteDias: 45, maximoPorDia: 90, mensagemWhatsapp: MENSAGEM_WHATSAPP_PADRAO,
   nuncaComecou: { ligado: false, dias: [1, 3, 7], mensagemWhatsapp: MENSAGEM_WHATSAPP_NUNCA },
+  certificado: { ligado: true, horas: 1, entrega: true },
 };
 
 /** Junta o que está salvo com o padrão (configurações antigas não têm os grupos novos). */
@@ -86,6 +98,7 @@ function completar(c: Partial<ConfigLembretes> | undefined): ConfigLembretes {
   return {
     ...p, ...c,
     nuncaComecou: { ...p.nuncaComecou, ...c?.nuncaComecou },
+    certificado: { ...p.certificado, ...c?.certificado },
   };
 }
 

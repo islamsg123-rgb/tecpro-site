@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { after } from "next/server";
+import { lembrarDeComprar } from "@/lib/lembrete-certificado";
 import { redirect } from "next/navigation";
 import { cursoDoAluno, exigirAluno } from "@/lib/area-aluno";
 import { situacaoCertificado } from "@/lib/certificados";
@@ -26,6 +28,8 @@ export default async function EmitirCertificado({ params, searchParams }: Props)
   const [pacotes, registro, creditos] = await Promise.all([pacotesCertificado(), obterAluno(aluno.email), saldoCreditos(aluno.email)]);
   const pacote = pacotes.find((p) => p.id === escolhido);
   const pagamento = await infoCheckout();
+  // Viu a tela do certificado e ainda não comprou: e-mail de parabéns daqui a 1 hora (cancelado se comprar antes).
+  if (s.estado === "aguardando_pagamento") after(() => lembrarDeComprar(aluno.email, c.curso.id));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
