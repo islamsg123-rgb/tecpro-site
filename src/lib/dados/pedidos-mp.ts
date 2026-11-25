@@ -22,6 +22,12 @@ export interface PedidoMp {
   situacao: Situacao;
   pagoEm?: string;
   parcelas?: number;
+  /** Taxa, líquido e data de liberação informados pelo Mercado Pago (consultados depois do pagamento) */
+  taxaCentavos?: number;
+  liquidoCentavos?: number;
+  liberaEm?: string;
+  /** Última tentativa de buscar a taxa real (ISO); evita perguntar toda hora quando o Mercado Pago não responde */
+  taxaConsultadaEm?: string;
 }
 
 const PREFIXO = "mppedido:";

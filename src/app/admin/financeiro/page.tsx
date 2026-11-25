@@ -5,8 +5,9 @@ import { saldoDisponivel } from "@/lib/pagamentos";
 import { cobrancasParaRelatorio, nomeMes, resumoFinanceiro } from "@/lib/painel-resumo";
 import { Caixa, GraficoMensal, Numero, PorForma, Titulo } from "@/components/admin/Blocos";
 import { BotaoExportar } from "@/components/admin/BotaoExportar";
+import { obterTaxas } from "@/lib/taxas";
 
-export const metadata: Metadata = { title: "Financeiro" };
+export const metadata: Metadata = { title: "Resumo do mês" };
 export const dynamic = "force-dynamic";
 
 type Props = { searchParams: Promise<{ mes?: string }> };
@@ -16,8 +17,8 @@ export default async function Financeiro({ searchParams }: Props) {
   const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).slice(0, 7);
   const pedido = (await searchParams).mes ?? "";
   const mes = /^\d{4}-\d{2}$/.test(pedido) ? pedido : hoje;
-  const [cobrancas, saldo] = await Promise.all([cobrancasParaRelatorio(), saldoDisponivel()]);
-  const r = resumoFinanceiro(cobrancas, mes);
+  const [cobrancas, saldo, taxas] = await Promise.all([cobrancasParaRelatorio(), saldoDisponivel(), obterTaxas()]);
+  const r = resumoFinanceiro(cobrancas, mes, taxas);
   const meses = resumoFinanceiro(cobrancas, hoje).mensal.map((m) => m.mes).reverse();
 
   return (
@@ -26,7 +27,7 @@ export default async function Financeiro({ searchParams }: Props) {
         acao={<BotaoExportar tipo="vendas" />}
         descricao="Tudo o que entrou e o que está para entrar, direto do sistema de pagamento (Mercado Pago e/ou Asaas). Os valores contam a data em que o aluno pagou."
       >
-        Financeiro
+        Resumo do mês
       </Titulo>
 
       <form className="mb-6 flex flex-wrap items-center gap-2 text-sm">
