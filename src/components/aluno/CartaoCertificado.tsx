@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { emitir, usarCreditoCertificado } from "@/app/minha-conta/acoes";
-import { formatarPreco } from "@/lib/formatar";
 import type { SituacaoCertificado } from "@/lib/certificados";
 import { IconeCadeado, IconeCertificado, IconeCheck } from "../Icones";
 
@@ -37,7 +36,7 @@ export function CartaoCertificado({
           {!pago
             ? "Grátis ao concluir o curso"
             : s.estado === "aguardando_pagamento" && s.regra.modo === "pago"
-              ? creditos > 0 ? "Use um certificado do seu pacote" : `A partir de ${formatarPreco(s.regra.precoCentavos)}`
+              ? creditos > 0 ? "Use um certificado do seu pacote" : "Você estudou até o fim. Agora é hora de comprovar!"
               : s.estado === "disponivel"
                 ? "Pagamento confirmado, pronto para emitir"
                 : s.estado === "emitido"
@@ -55,7 +54,10 @@ export function CartaoCertificado({
 
         {s.estado === "aguardando_pagamento" && s.regra.modo === "pago" && (
           <>
-            <p className="text-sm text-slate-600">Parabéns, você concluiu o curso!</p>
+            <p className="text-sm text-slate-600">
+              <strong className="text-marca-900">Parabéns, você concluiu o curso!</strong> Com o certificado você comprova o que aprendeu no currículo,
+              no LinkedIn e em entrevistas de emprego.
+            </p>
             {creditos > 0 ? (
               <form action={usarCreditoCertificado} className="mt-4">
                 <input type="hidden" name="slug" value={slug} />

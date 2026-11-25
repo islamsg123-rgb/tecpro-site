@@ -1,5 +1,7 @@
 "use server";
 
+import { fonteVideo } from "@/lib/video";
+
 import { estadoValido } from "@/lib/estados";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -82,6 +84,8 @@ export async function salvarConfiguracoes(f: FormData) {
   }
   const precos = ["precoCertIndividual", "precoCertEssencial", "precoCertProfissional"].map((k) => lerPreco(f.get(k)));
   if (precos.some((p) => p === null || p === "invalido")) redirect("/admin/configuracoes?erro=precos#certificados");
+  const video = String(f.get("videoParabens") ?? "").trim();
+  if (video && !fonteVideo(video)) redirect("/admin/configuracoes?erro=video#certificados");
   await salvarConfigLoja({
     mesesDeAcesso: meses,
     pesquisaNasAulas: f.get("pesquisaNasAulas") === "on",
@@ -91,6 +95,7 @@ export async function salvarConfiguracoes(f: FormData) {
     precoCertEssencial: precos[1] as number,
     precoCertProfissional: precos[2] as number,
     gateway: String(f.get("gateway")) === "asaas" ? "asaas" : "mercadopago",
+    videoParabens: String(f.get("videoParabens") ?? "").trim().slice(0, 500),
   });
   revalidatePath("/", "layout");
   redirect("/admin/configuracoes?salvo=1");

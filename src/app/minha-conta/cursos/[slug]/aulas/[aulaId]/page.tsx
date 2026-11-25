@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { after } from "next/server";
+import { situacaoCertificado } from "@/lib/certificados";
+import { lembrarDeComprar } from "@/lib/lembrete-certificado";
+import { fonteVideo, VIDEO_PARABENS_PADRAO } from "@/lib/video";
+import { VideoParabens } from "@/components/aluno/VideoParabens";
 import { notFound, redirect } from "next/navigation";
 import { cursoDoAluno, exigirAluno } from "@/lib/area-aluno";
 import { BarraProgresso } from "@/components/aluno/Progresso";
@@ -32,7 +37,16 @@ export default async function Aula({ params }: Props) {
   const apostila = apostilaDoCurso(c.curso.id);
   const prova = provaDaAula(c.curso.nome, i, aula.titulo);
   const [sit, loja] = await Promise.all([situacaoDaAula(aluno.email, c, i), obterConfigLoja()]);
+  // Vídeo de parabéns (Configurações da loja): só na última aula, depois de concluir o curso.
+  const videoParabens = loja.videoParabens ? fonteVideo(loja.videoParabens) : null;
   const link = (id: string) => `/minha-conta/cursos/${slug}/aulas/${encodeURIComponent(id)}`;
+  // Curso concluído: esta tela mostra o quadro "Emitir certificado". Se o certificado é pago e não foi comprado,
+  // agenda o e-mail de parabéns (sai 1 hora depois; cancelado se comprar antes).
+  if (c.total > 0 && c.feitas === c.total) {
+    after(async () => {
+      if ((await situacaoCertificado(aluno.email, c)).estado === "aguardando_pagamento") await lembrarDeComprar(aluno.email, c.curso.id);
+    });
+  }
 
   return (
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_360px]">
@@ -58,6 +72,27 @@ export default async function Aula({ params }: Props) {
           perguntas={prova}
           apostila={apostila}
         />
+
+        {c.total > 0 && c.feitas === c.total && !proxima && videoParabens && (
+          <div className="mt-8">
+            <p className="text-sm font-bold uppercase tracking-widest text-laranja-600">Uma mensagem para você</p>
+            <h2 className="mt-1 text-2xl font-extrabold text-marca-900">Parabéns por chegar até o fim! 🎉</h2>
+            {videoParabens.tipo === "arquivo" ? (
+              <VideoParabens src={videoParabens.src} capa={videoParabens.src === VIDEO_PARABENS_PADRAO ? "/video/parabens-capa.jpg" : undefined} chave={c.curso.id} />
+            ) : (
+            <div className="mt-4 aspect-video overflow-hidden rounded-3xl bg-marca-950">
+              <iframe
+                src={videoParabens.src}
+                title="Parabéns por concluir o curso"
+                className="h-full w-full border-0"
+                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            </div>
+            )}
+          </div>
+        )}
 
         {c.total > 0 && c.feitas === c.total && (
           <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-marca-900 p-6 text-white">
