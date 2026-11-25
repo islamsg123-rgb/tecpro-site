@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
   const corpo = (await req.json().catch(() => null)) as {
     event?: string;
-    payment?: { id: string; customer: string; externalReference?: string };
+    payment?: { id: string; customer: string; externalReference?: string; value?: number; paymentDate?: string; clientPaymentDate?: string };
   } | null;
   if (!corpo?.event || !corpo.payment) return NextResponse.json({ ok: true });
   if (!EVENTOS_PAGO.has(corpo.event)) return NextResponse.json({ ok: true, ignorado: corpo.event });
@@ -51,7 +51,11 @@ export async function POST(req: Request) {
 
   try {
     const comprador = await compradorDoClienteAsaas(corpo.payment.customer);
-    await processarPagamento(corpo.payment.id, comprador, produto);
+    const p = corpo.payment;
+    await processarPagamento(p.id, comprador, produto, {
+      valorCentavos: typeof p.value === "number" ? Math.round(p.value * 100) : undefined,
+      pagoEm: p.paymentDate ?? p.clientPaymentDate,
+    });
   } catch (e) {
     await registrarEventoMatricula("aviso do Asaas", false, `Falha ao processar ${corpo.payment.id}: ${e instanceof Error ? e.message : String(e)}`);
     // Responder erro faz o Asaas tentar de novo mais tarde.

@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
  * Também mostra as abas da seção aberta no topo da página.
  */
 
-type Secao = "painel" | "financeiro" | "vendas" | "alunos" | "cursos" | "loja" | "funcionarios" | "mensagens" | "sistema";
+export type Secao = "painel" | "financeiro" | "vendas" | "alunos" | "cursos" | "loja" | "funcionarios" | "mensagens" | "sistema";
 /** Números de "novas" mostrados ao lado do item do menu, pelo endereço (ex.: mensagens novas). */
 export type Contadores = Record<string, number>;
 
@@ -78,6 +78,33 @@ export const MENU: Item[] = [
   { secao: "sistema", rotulo: "Conexão (API)", href: "/admin/diagnostico", icone: svg(<><path d="M9 7 4 12l5 5M15 7l5 5-5 5" /></>) },
 ];
 
+/**
+ * O painel tem duas áreas, trocadas pela chave no topo: Gestão (alunos, cursos, equipe) e Financeiro (dinheiro).
+ * O login e o sistema são um só; cada área mostra só os itens dela no menu.
+ */
+export type Area = "gestao" | "financeiro";
+const SECOES_FINANCEIRO: Secao[] = ["financeiro", "vendas"];
+export const areaDaSecao = (s: Secao): Area => (SECOES_FINANCEIRO.includes(s) ? "financeiro" : "gestao");
+export const NOME_AREA: Record<Area, string> = { gestao: "Painel de Gestão", financeiro: "Painel Financeiro" };
+
+/** Área da página aberta (pelo endereço). */
+export function areaDoCaminho(pathname: string): Area {
+  const fin = MENU.filter((m) => areaDaSecao(m.secao) === "financeiro");
+  return ativo(pathname, fin) ? "financeiro" : "gestao";
+}
+
+/** Quem tem acesso às duas áreas vê a chave; o menu mostra só a área aberta. */
+export function temDuasAreas(secoes: Secao[]) {
+  return secoes.some((s) => areaDaSecao(s) === "financeiro") && secoes.some((s) => s !== "painel" && areaDaSecao(s) === "gestao");
+}
+
+function itensDaArea(secoes: Secao[], pathname: string) {
+  const todos = MENU.filter((m) => secoes.includes(m.secao));
+  if (!temDuasAreas(secoes)) return todos;
+  const area = areaDoCaminho(pathname);
+  return todos.filter((m) => areaDaSecao(m.secao) === area);
+}
+
 /** Item (e sub-item) que corresponde à página aberta. */
 function ativo(pathname: string, itens: Item[]) {
   let melhor: { item: Item; href: string } | null = null;
@@ -104,8 +131,9 @@ export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: 
     document.addEventListener("keydown", tecla);
     return () => document.removeEventListener("keydown", tecla);
   }, [aberto]);
-  const itens = MENU.filter((m) => secoes.includes(m.secao));
+  const itens = itensDaArea(secoes, pathname);
   const atual = ativo(pathname, itens);
+  const titulo = temDuasAreas(secoes) ? NOME_AREA[areaDoCaminho(pathname)] : secoes.some((s) => areaDaSecao(s) === "gestao" && s !== "painel") ? NOME_AREA.gestao : "Painel Tecpro";
 
   const lista = (expandido: boolean) => (
     <ul className="space-y-1" onClick={(e) => (e.target as HTMLElement).closest("a") && setAberto(false)}>
@@ -159,7 +187,7 @@ export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: 
         >
           <div className="mb-5 flex h-9 items-center gap-3 px-1">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-laranja-500 text-sm font-extrabold text-marca-900">T</span>
-            <span className="whitespace-nowrap text-sm font-bold uppercase tracking-wider text-white opacity-0 transition-opacity group-hover:opacity-100">Painel Tecpro</span>
+            <span className="whitespace-nowrap text-sm font-bold uppercase tracking-wider text-white opacity-0 transition-opacity group-hover:opacity-100">{titulo}</span>
           </div>
           {lista(false)}
           <div className="mt-auto pt-6 opacity-0 transition-opacity group-hover:opacity-100">
@@ -171,7 +199,7 @@ export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: 
 
       {/* Celular: botão que abre o menu */}
       <div className="sticky top-[72px] z-20 flex items-center justify-between border-t border-white/10 bg-marca-800 px-4 py-3 md:hidden print:hidden">
-        <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-laranja-500">Painel <Bolinha n={Object.values(contadores).reduce((a, b) => a + b, 0)} /></span>
+        <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-laranja-500">{titulo} <Bolinha n={Object.values(contadores).reduce((a, b) => a + b, 0)} /></span>
         <button onClick={() => setAberto((v) => !v)} aria-expanded={aberto} className="rounded-lg border border-white/20 px-3 py-1.5 text-sm font-semibold text-white">
           {aberto ? "Fechar" : "Menu"}
         </button>
@@ -179,7 +207,7 @@ export function MenuLateral({ secoes, email, sair, contadores = {} }: { secoes: 
       {aberto && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-marca-900 px-4 py-4 md:hidden">
           <div className="mb-4 flex items-center justify-between">
-            <span className="text-sm font-bold uppercase tracking-wider text-laranja-500">Painel Tecpro</span>
+            <span className="text-sm font-bold uppercase tracking-wider text-laranja-500">{titulo}</span>
             <button onClick={() => setAberto(false)} className="rounded-lg border border-white/20 px-3 py-1.5 text-sm font-semibold text-white">Fechar</button>
           </div>
           {lista(true)}

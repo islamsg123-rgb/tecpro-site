@@ -6,6 +6,8 @@ import { pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { usandoDadosDeExemplo } from "@/lib/escola-avancada/client";
 import { AbasSecao, MenuLateral, type Contadores } from "@/components/admin/MenuLateral";
 import { contarNovas } from "@/lib/dados/mensagens";
+import { ChavePaineis } from "@/components/admin/ChavePaineis";
+import { AvisoVendas } from "@/components/admin/AvisoVendas";
 import { sair } from "../entrar/acoes";
 
 export const metadata: Metadata = { title: { default: "Painel", template: "%s | Painel Tecpro" }, robots: { index: false } };
@@ -15,6 +17,7 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
   await exigirAdmin();
   const acesso = (await acessoPainel())!;
   const secoes = ["painel", ...acesso.permissoes, ...(acesso.dono ? ["sistema"] : [])] as Parameters<typeof MenuLateral>[0]["secoes"];
+  const veFinanceiro = acesso.permissoes.includes("financeiro");
   // Mensagens novas do botão de ajuda (número vermelho no menu).
   const contadores: Contadores = {};
   if (acesso.permissoes.includes("mensagens")) {
@@ -50,6 +53,11 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
           </div>
         )}
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+          {/* Topo: chave Gestão | Financeiro e o som de nova venda (só para quem vê o dinheiro) */}
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden empty:hidden">
+            <ChavePaineis secoes={secoes} contadores={contadores} />
+            {veFinanceiro && <AvisoVendas />}
+          </div>
           <AbasSecao secoes={secoes} contadores={contadores} />
           {children}
         </div>
