@@ -86,6 +86,21 @@ export function AulaInterativa(p: Props) {
   const [provaOk, setProvaOk] = useState(p.provaOk);
   const [faltam, setFaltam] = useState(p.faltamSegundos);
   const [aviso, setAviso] = useState<string | null>(null);
+  // O vídeo de parabéns (fim do curso) pede para parar o vídeo da aula, para os dois não tocarem juntos.
+  const [parado, setParado] = useState(false);
+  const player = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    const parar = () => {
+      try {
+        player.current?.contentWindow?.postMessage({ type: "pause" }, "*");
+      } catch {
+        /* sem acesso ao player: basta tirar ele da tela */
+      }
+      setParado(true);
+    };
+    window.addEventListener("tecpro:parar-aula", parar);
+    return () => window.removeEventListener("tecpro:parar-aula", parar);
+  }, []);
 
   useEffect(() => { iniciarAula(p.slug, p.aulaId).catch(() => {}); }, [p.slug, p.aulaId]);
 
@@ -116,9 +131,21 @@ export function AulaInterativa(p: Props) {
 
   return (
     <>
-      {p.embed ? (
+      {p.embed && parado ? (
+        <div className="relative mt-4 flex aspect-video items-center justify-center overflow-hidden rounded-3xl bg-marca-950 text-center text-white">
+          <div className="fundo-grade absolute inset-0" />
+          <div className="relative px-6">
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-500/20 text-green-400"><IconeCheck className="h-7 w-7" /></span>
+            <p className="mt-3 font-semibold">Aula concluída</p>
+            <button type="button" onClick={() => setParado(false)} className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold hover:bg-white/20">
+              <IconePlay className="h-4 w-4" /> Rever esta aula
+            </button>
+          </div>
+        </div>
+      ) : p.embed ? (
         <div className="mt-4 aspect-video overflow-hidden rounded-3xl bg-marca-950">
           <iframe
+            ref={player}
             src={p.embed}
             title={p.titulo}
             className="h-full w-full border-0"
