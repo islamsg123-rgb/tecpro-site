@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { after } from "next/server";
+import { situacaoCertificado } from "@/lib/certificados";
+import { lembrarDeComprar } from "@/lib/lembrete-certificado";
 import { notFound, redirect } from "next/navigation";
 import { cursoDoAluno, exigirAluno } from "@/lib/area-aluno";
 import { BarraProgresso } from "@/components/aluno/Progresso";
@@ -33,6 +36,13 @@ export default async function Aula({ params }: Props) {
   const prova = provaDaAula(c.curso.nome, i, aula.titulo);
   const [sit, loja] = await Promise.all([situacaoDaAula(aluno.email, c, i), obterConfigLoja()]);
   const link = (id: string) => `/minha-conta/cursos/${slug}/aulas/${encodeURIComponent(id)}`;
+  // Curso concluído: esta tela mostra o quadro "Emitir certificado". Se o certificado é pago e não foi comprado,
+  // agenda o e-mail de parabéns (sai 1 hora depois; cancelado se comprar antes).
+  if (c.total > 0 && c.feitas === c.total) {
+    after(async () => {
+      if ((await situacaoCertificado(aluno.email, c)).estado === "aguardando_pagamento") await lembrarDeComprar(aluno.email, c.curso.id);
+    });
+  }
 
   return (
     <div className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_360px]">
