@@ -11,8 +11,7 @@ import {
   salvarDepoimento, salvarFuncionario, type Secao, dadosExtrasAluno, definirCursoRemovido, salvarDadosAluno, obterFuncionario,
 } from "@/lib/dados/painel";
 import { excluirAluno } from "@/lib/dados/excluir-aluno";
-import { concluirCursoTeste, desfazerConclusaoTeste, obterAluno } from "@/lib/dados";
-import { cursosDoAluno } from "@/lib/area-aluno";
+import { obterAluno } from "@/lib/dados";
 import { clientePorEmail, cobrancaParaLiberacao, pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { liberarAcesso } from "@/lib/pagamentos/liberacao";
 import { cpfValido, emailValido, soDigitos, telefoneValido } from "@/lib/validacao";
@@ -361,62 +360,6 @@ export async function cadastrarAlunoAcao(f: FormData) {
   }
   revalidatePath("/admin/alunos");
   redirect(ficha(email, "salvo=novo"));
-}
-
-/**
- * Modo teste (só o dono): marca todas as aulas de todos os cursos liberados para este aluno
- * como concluídas, para testar a emissão do certificado sem assistir às aulas.
- */
-export async function concluirCursosTesteAcao(f: FormData) {
-  const quem = await exigirAdmin("alunos");
-  const email = String(f.get("email") ?? "").trim().toLowerCase();
-  if (!quem.dono) redirect(ficha(email, "erro=dono#teste"));
-  try {
-    const cursos = await cursosDoAluno(email);
-    for (const c of cursos) await concluirCursoTeste(email, c.curso.id, c.aulas.map((a) => a.id));
-  } catch {
-    redirect(ficha(email, "erro=teste#teste"));
-  }
-  revalidatePath("/", "layout");
-  redirect(ficha(email, "salvo=teste#teste"));
-}
-
-/**
- * Modo teste (só o dono): deixa um curso a uma aula do fim. Marca todas as aulas menos a última
- * como concluídas, para o dono concluir a última de verdade e ver o fim do curso como um aluno
- * (vídeo de parabéns, quadro do certificado e e-mail de parabéns 1 hora depois).
- */
-export async function deixarUltimaAulaTesteAcao(f: FormData) {
-  const quem = await exigirAdmin("alunos");
-  const email = String(f.get("email") ?? "").trim().toLowerCase();
-  const cursoId = String(f.get("cursoId") ?? "");
-  if (!quem.dono) redirect(ficha(email, "erro=dono#teste"));
-  let erro = "";
-  try {
-    const c = (await cursosDoAluno(email)).find((x) => x.curso.id === cursoId);
-    if (!c || c.aulas.length < 2) erro = "teste-curso";
-    else if (c.concluidas.has(c.aulas[c.aulas.length - 1].id)) erro = "teste-ultima";
-    else await concluirCursoTeste(email, c.curso.id, c.aulas.slice(0, -1).map((a) => a.id));
-  } catch {
-    erro = "teste";
-  }
-  if (erro) redirect(ficha(email, `erro=${erro}#teste`));
-  revalidatePath("/", "layout");
-  redirect(ficha(email, "salvo=teste-ultima#teste"));
-}
-
-/** Desfaz o modo teste: o progresso volta ao que era antes. */
-export async function desfazerCursosTesteAcao(f: FormData) {
-  const quem = await exigirAdmin("alunos");
-  const email = String(f.get("email") ?? "").trim().toLowerCase();
-  if (!quem.dono) redirect(ficha(email, "erro=dono#teste"));
-  try {
-    await desfazerConclusaoTeste(email);
-  } catch {
-    redirect(ficha(email, "erro=teste#teste"));
-  }
-  revalidatePath("/", "layout");
-  redirect(ficha(email, "salvo=teste-desfeito#teste"));
 }
 
 /**

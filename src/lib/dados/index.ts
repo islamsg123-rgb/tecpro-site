@@ -32,7 +32,6 @@ interface Memoria {
   alunos: Map<string, { eaUsuarioId: string; nome: string | null }>;
   progresso: Map<string, Set<string>>; // "email|curso" -> aulas concluídas
   etapas?: Map<string, Date>; // "email|curso|aula#etapa" -> quando
-  teste?: Map<string, string[]>; // "email|curso" -> aulas marcadas pelo modo teste
 }
 const g = globalThis as unknown as { __bancoDemo?: Memoria };
 const mem: Memoria = (g.__bancoDemo ??= {
@@ -99,56 +98,6 @@ export async function definirAulaConcluida(emailAluno: string, cursoId: string, 
     ? await t.upsert({ email, curso_id: cursoId, aula_id: aulaId }, { onConflict: "email,curso_id,aula_id", ignoreDuplicates: true })
     : await t.delete().eq("email", email).eq("curso_id", cursoId).eq("aula_id", aulaId);
   if (error) throw error;
-}
-
-/* ---------- Modo teste do painel: concluir cursos sem assistir ----------
- * Grava todas as aulas como concluídas com o mesmo horário e uma linha "#teste"
- * com esse horário. Para desfazer, apagamos só as linhas com esse horário
- * (o que o aluno já tinha feito antes continua). */
-
-export async function concluirCursoTeste(emailAluno: string, cursoId: string, aulaIds: string[]): Promise<void> {
-  const email = norm(emailAluno);
-  if (bancoEmDemonstracao) {
-    const chave = `${email}|${cursoId}`;
-    const s = mem.progresso.get(chave) ?? new Set<string>();
-    const novas = aulaIds.filter((id) => !s.has(id));
-    for (const id of novas) s.add(id);
-    mem.progresso.set(chave, s);
-    mem.teste ??= new Map();
-    mem.teste.set(chave, [...(mem.teste.get(chave) ?? []), ...novas]);
-    return;
-  }
-  const quando = new Date().toISOString();
-  const linhas = [...aulaIds, "#teste"].map((aula_id) => ({ email, curso_id: cursoId, aula_id, concluida_em: quando }));
-  for (let k = 0; k < linhas.length; k += 500) {
-    const { error } = await db()
-      .from("progresso")
-      .upsert(linhas.slice(k, k + 500), { onConflict: "email,curso_id,aula_id", ignoreDuplicates: true });
-    if (error) throw error;
-  }
-}
-
-/** Apaga o que o modo teste marcou para o aluno. Devolve quantos cursos voltaram ao que eram. */
-export async function desfazerConclusaoTeste(emailAluno: string): Promise<number> {
-  const email = norm(emailAluno);
-  if (bancoEmDemonstracao) {
-    let n = 0;
-    for (const [chave, ids] of mem.teste ?? []) {
-      if (!chave.startsWith(`${email}|`)) continue;
-      const s = mem.progresso.get(chave);
-      for (const id of ids) s?.delete(id);
-      mem.teste?.delete(chave);
-      n++;
-    }
-    return n;
-  }
-  const { data, error } = await db().from("progresso").select("curso_id, concluida_em").eq("email", email).eq("aula_id", "#teste");
-  if (error) throw error;
-  for (const m of data ?? []) {
-    const r = await db().from("progresso").delete().eq("email", email).eq("curso_id", m.curso_id).eq("concluida_em", m.concluida_em);
-    if (r.error) throw r.error;
-  }
-  return data?.length ?? 0;
 }
 
 /* ---------- Etapas da aula (vídeo assistido, prova aprovada) ----------
