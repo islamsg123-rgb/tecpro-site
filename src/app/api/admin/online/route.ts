@@ -33,9 +33,18 @@ function contarPor<T>(lista: T[], chave: (x: T) => string | null): { nome: strin
   return Array.from(m, ([nome, n]) => ({ nome, n })).sort((a, b) => b.n - a.n || a.nome.localeCompare(b.nome));
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const acesso = await acessoPainel();
   if (!acesso) return NextResponse.json({ erro: "sem acesso" }, { status: 403 });
+  // Plaquinha do canto do painel: só os dois números, sem consultas extras.
+  if (new URL(req.url).searchParams.has("resumo")) {
+    const [resumo, equipe] = await Promise.all([resumoPresenca(), emailsDaEquipe()]);
+    const on = resumo.online.filter((p) => !p.email || !equipe.has(p.email));
+    return NextResponse.json(
+      { loja: on.filter((p) => p.area === "loja").length, aluno: on.filter((p) => p.area === "aluno").length, tabelaFaltando: resumo.tabelaFaltando },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const verPessoas = acesso.permissoes.includes("alunos") || acesso.permissoes.includes("vendas");
   const verVendas = acesso.permissoes.includes("financeiro");
 

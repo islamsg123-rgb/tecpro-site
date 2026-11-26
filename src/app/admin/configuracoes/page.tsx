@@ -112,12 +112,19 @@ export default async function Configuracoes({ searchParams }: Props) {
           {erro === "video" && <p className="mt-3 text-sm text-red-700">Não reconheci esse link. Use /video/parabens.mp4, um link .mp4, do Panda (o de &quot;embed&quot;) ou do YouTube.</p>}
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+        <section id="site" className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
           <h2 className="text-lg font-bold text-marca-900">O que aparece no site</h2>
           <div className="mt-5 space-y-3">
             <Chave nome="pesquisaNasAulas" ligado={loja.pesquisaNasAulas} titulo="Botão de pesquisa de satisfação nas aulas" texto="O aluno pode, se quiser, dar uma nota e deixar um comentário. As respostas aparecem em Vendas > Pesquisa de satisfação." />
             <Chave nome="mostrarDepoimentos" ligado={loja.mostrarDepoimentos} titulo="Depoimentos na página inicial" texto="Mostra os depoimentos ativos cadastrados em Loja virtual > Depoimentos." />
+            <Chave nome="avisosNaLoja" ligado={loja.avisosNaLoja !== false} titulo="Avisos de alunos na loja" texto="De tempos em tempos aparece no canto da loja um aviso de algo que aconteceu de verdade, como &quot;Maria, de Belém (PA), se inscreveu em Excel&quot;. Só o primeiro nome. Não aparece no pagamento nem na área do aluno." />
           </div>
+          <label className="mt-5 block">
+            <span className="text-sm font-semibold text-marca-900">Código do Google Analytics</span>
+            <span className="block text-sm text-slate-500">Começa com G- (no Google Analytics: Administrador &gt; Fluxos de dados &gt; seu site &gt; ID da métrica). Deixe em branco para desligar.</span>
+            <input name="googleAnalyticsId" defaultValue={loja.googleAnalyticsId ?? ""} placeholder="G-XXXXXXXXXX" className={`${campo} mt-2 max-w-xs uppercase`} />
+          </label>
+          {erro === "ga" && <p className="mt-3 text-sm text-red-700">Esse código não parece do Google Analytics. Ele começa com G- e tem letras e números, por exemplo G-AB12CD34EF.</p>}
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">

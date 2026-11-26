@@ -7,6 +7,7 @@ import { usandoDadosDeExemplo } from "@/lib/escola-avancada/client";
 import { AbasSecao, MenuLateral, type Contadores } from "@/components/admin/MenuLateral";
 import { contarNovas } from "@/lib/dados/mensagens";
 import { BarraPainel } from "@/components/admin/BarraPainel";
+import { OnlinePlaquinha } from "@/components/admin/OnlinePlaquinha";
 import { sair } from "../entrar/acoes";
 
 export const metadata: Metadata = { title: { default: "Painel", template: "%s | Painel Tecpro" }, robots: { index: false } };
@@ -31,6 +32,7 @@ export default async function LayoutAdmin({ children }: { children: React.ReactN
   return (
     <>
     <BarraPainel secoes={secoes} contadores={contadores} veFinanceiro={veFinanceiro} />
+    <OnlinePlaquinha />
     <div className="min-h-[calc(100vh-56px)] bg-[#f3f6fb] md:flex">
       <MenuLateral
         secoes={secoes}

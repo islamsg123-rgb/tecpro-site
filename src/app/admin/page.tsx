@@ -7,7 +7,6 @@ import {
 import { Caixa, dataCurta, LinkVerTudo, Numero, Vazio } from "@/components/admin/Blocos";
 import { contarNovas } from "@/lib/dados/mensagens";
 import { Dica } from "@/components/admin/Dica";
-import { OnlineAgora } from "@/components/admin/OnlineAgora";
 
 export const dynamic = "force-dynamic";
 
@@ -81,8 +80,6 @@ export default async function PainelRapido({ searchParams }: Props) {
           <span className="font-semibold underline">Ver mensagens</span>
         </Link>
       )}
-
-      <OnlineAgora />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Numero rotulo="Alunos novos hoje" valor={String(novosHoje)} detalhe={`${novos7} nos últimos 7 dias`} href={verAlunos ? "/admin/alunos" : undefined} cor="laranja" dica="Pessoas que se matricularam hoje (curso grátis ou pago). Embaixo, quantas nos últimos 7 dias." />
