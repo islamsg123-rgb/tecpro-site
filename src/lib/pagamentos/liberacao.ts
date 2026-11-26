@@ -78,7 +78,7 @@ export async function liberarAcesso(cobrancaId: string, comprador: Comprador, cu
 async function enviarBoasVindas(comprador: Comprador, cursoNome: string, pago: boolean): Promise<void> {
   // Sempre o endereço oficial: o aluno pede o link de login no mesmo endereço em que vai abri-lo.
   try {
-    await enviarEmail({ para: comprador.email, ...emailBoasVindas(comprador.nome, cursoNome, SITE_OFICIAL, pago) });
+    await enviarEmail({ para: comprador.email, ...emailBoasVindas(comprador.nome, cursoNome, SITE_OFICIAL, pago), tipo: "boas_vindas", curso: cursoNome });
     await registrarEventoMatricula("e-mail de boas-vindas", true, `Enviado para ${comprador.email}`);
   } catch (e) {
     await registrarEventoMatricula("e-mail de boas-vindas", false, e instanceof Error ? e.message : String(e));

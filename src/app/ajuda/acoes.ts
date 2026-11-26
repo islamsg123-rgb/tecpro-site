@@ -117,7 +117,7 @@ export async function enviarMensagemAjuda(_: EstadoAjuda, f: FormData): Promise<
 <p><a href="${esc(site)}/admin/mensagens" style="color:#011749;font-weight:bold">Abrir no painel</a></p></div>`;
     await Promise.all(
       emailsDono().map((para) =>
-        enviarEmail({ para, assunto: `[Ajuda] ${TIPOS_AJUDA[tipo]} · ${onde}`, html, texto: linhas.join("\n") }).catch((e) =>
+        enviarEmail({ para, assunto: `[Ajuda] ${TIPOS_AJUDA[tipo]} · ${onde}`, html, texto: linhas.join("\n"), tipo: "equipe" }).catch((e) =>
           console.error("[ajuda] aviso por e-mail", e instanceof Error ? e.message : e),
         ),
       ),
