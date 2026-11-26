@@ -1,4 +1,5 @@
 import "server-only";
+import { anotarEmail, marcarEmailCancelado, type TipoEmail } from "./dados/emails";
 
 /**
  * E-mails do próprio site, enviados pelo Resend (resend.com).
@@ -24,21 +25,36 @@ export interface Anexo {
  */
 export async function enviarEmail(e: {
   para: string; assunto: string; html: string; texto: string; cabecalhos?: Record<string, string>; agendarPara?: string; anexos?: Anexo[];
+  /** Para o histórico na ficha do aluno. */
+  tipo?: TipoEmail; curso?: string | null;
 }): Promise<string | null> {
+  const anotar = (resendId: string | null, status: "enviado" | "agendado" | "erro", detalhe?: string) =>
+    anotarEmail({ resendId, para: e.para, tipo: e.tipo ?? "outro", assunto: e.assunto, curso: e.curso, status, detalhe, agendadoPara: e.agendarPara ?? null });
   if (!CHAVE) throw new Error("RESEND_API_KEY não configurada na Vercel: e-mail não enviado");
-  const resp = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${CHAVE}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: REMETENTE, to: [e.para], subject: e.assunto, html: e.html, text: e.texto,
-      ...(e.cabecalhos ? { headers: e.cabecalhos } : {}),
-      ...(e.agendarPara ? { scheduled_at: e.agendarPara } : {}),
-      ...(e.anexos?.length ? { attachments: e.anexos.map((a) => ({ filename: a.nome, content: Buffer.from(a.conteudo).toString("base64") })) } : {}),
-    }),
-    cache: "no-store",
-  });
-  if (!resp.ok) throw new Error(`Resend recusou o e-mail (HTTP ${resp.status}): ${(await resp.text()).slice(0, 300)}`);
+  let resp: Response;
+  try {
+    resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${CHAVE}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: REMETENTE, to: [e.para], subject: e.assunto, html: e.html, text: e.texto,
+        ...(e.cabecalhos ? { headers: e.cabecalhos } : {}),
+        ...(e.agendarPara ? { scheduled_at: e.agendarPara } : {}),
+        ...(e.anexos?.length ? { attachments: e.anexos.map((a) => ({ filename: a.nome, content: Buffer.from(a.conteudo).toString("base64") })) } : {}),
+      }),
+      cache: "no-store",
+    });
+  } catch (err) {
+    await anotar(null, "erro", `Sem conexão com o Resend: ${(err as Error).message}`);
+    throw err;
+  }
+  if (!resp.ok) {
+    const msg = `Resend recusou o e-mail (HTTP ${resp.status}): ${(await resp.text()).slice(0, 300)}`;
+    await anotar(null, "erro", msg);
+    throw new Error(msg);
+  }
   const r = (await resp.json().catch(() => null)) as { id?: string } | null;
+  await anotar(r?.id ?? null, e.agendarPara ? "agendado" : "enviado");
   return r?.id ?? null;
 }
 
@@ -48,6 +64,7 @@ export async function cancelarEmailAgendado(id: string): Promise<void> {
   const resp = await fetch(`https://api.resend.com/emails/${encodeURIComponent(id)}/cancel`, {
     method: "POST", headers: { Authorization: `Bearer ${CHAVE}` }, cache: "no-store",
   });
+  if (resp.ok) await marcarEmailCancelado(id);
   if (!resp.ok) throw new Error(`Resend não cancelou o e-mail (HTTP ${resp.status}): ${(await resp.text()).slice(0, 300)}`);
 }
 

@@ -54,7 +54,7 @@ async function enviarTeste(tipo: TipoLembrete) {
   try {
     for (const etapa of [1, 2, 3]) {
       const e = emailDeExemplo(tipo, etapa, cfg, a.nome ?? "Maria", a.email);
-      await enviarEmail({ para: a.email, ...e, assunto: `[TESTE ${NOME_TIPO[tipo]} ${etapa}º] ${e.assunto}` });
+      await enviarEmail({ para: a.email, ...e, assunto: `[TESTE ${NOME_TIPO[tipo]} ${etapa}º] ${e.assunto}`, tipo: "teste" });
       await new Promise((ok) => setTimeout(ok, 600));
     }
   } catch (e) {
@@ -82,7 +82,7 @@ export async function testeCertificado() {
   try {
     for (const tipo of ["comprar", "entrega"] as TipoEmailCertificado[]) {
       const e = exemploEmailCertificado(tipo, a.nome ?? "Maria Souza", a.email);
-      await enviarEmail({ para: a.email, ...e, assunto: `[TESTE ${NOME_EMAIL_CERTIFICADO[tipo]}] ${e.assunto}` });
+      await enviarEmail({ para: a.email, ...e, assunto: `[TESTE ${NOME_EMAIL_CERTIFICADO[tipo]}] ${e.assunto}`, tipo: "teste" });
       await new Promise((ok) => setTimeout(ok, 600));
     }
   } catch (e) {

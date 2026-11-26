@@ -121,7 +121,7 @@ async function agendar(
     const quando = new Date(Date.now() + Math.max(cfg.horas, 0.1) * HORA).toISOString();
     try {
       const e = montar({ nome: aluno?.nome ?? "", curso: curso.nome, horas: curso.cargaHoraria, slug: curso.slug, email });
-      const resendId = await enviarEmail({ para: email, ...e, agendarPara: quando });
+      const resendId = await enviarEmail({ para: email, ...e, agendarPara: quando, tipo: tipo === "comprar" ? "cert_parabens" : "cert_pdf", curso: curso.nome });
       await atualizar(id, { status: "agendado", resend_id: resendId, agendado_para: quando });
     } catch (err) {
       await atualizar(id, { status: "erro", detalhe: (err instanceof Error ? err.message : String(err)).slice(0, 500) });
@@ -183,7 +183,7 @@ export async function enviarCertificadoPorEmail(cert: Certificado, forcar = fals
   const id = await reservar("entrega", email, cert.cursoId, cert.cursoNome, cert.nomeAluno);
   if (id === null && !forcar) return;
   try {
-    const resendId = await enviarEmail({ para: email, ...e, anexos: [{ nome: nomeArquivoCertificado(cert), conteudo: pdf }] });
+    const resendId = await enviarEmail({ para: email, ...e, tipo: "cert_pdf", curso: cert.cursoNome, anexos: [{ nome: nomeArquivoCertificado(cert), conteudo: pdf }] });
     if (id !== null) await atualizar(id, { status: "enviado", resend_id: resendId, agendado_para: new Date().toISOString() });
     await registrarEventoMatricula("e-mail do certificado", true, `Certificado ${cert.codigo} enviado para ${email}${forcar ? " (reenvio pelo painel)" : ""}`);
   } catch (err) {

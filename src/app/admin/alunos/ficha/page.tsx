@@ -24,6 +24,8 @@ import { Dica } from "@/components/admin/Dica";
 import { SenhaDoAluno } from "@/components/admin/SenhaDoAluno";
 import { situacaoSenha } from "@/lib/dados/senha-aluno";
 import { SITE_OFICIAL } from "@/lib/site";
+import { HistoricoEmails } from "@/components/admin/HistoricoEmails";
+import { emailsDoAluno, semearEmailsDemo } from "@/lib/dados/emails";
 
 export const metadata: Metadata = { title: "Ficha do aluno" };
 export const dynamic = "force-dynamic";
@@ -107,6 +109,8 @@ export default async function Ficha({ searchParams }: Props) {
   const campo = "mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal";
   const funcionario = await obterFuncionario(email).catch(() => null);
   const senha = await situacaoSenha(email).catch(() => null);
+  semearEmailsDemo(email);
+  const emails = await emailsDoAluno(email).catch(() => null);
   const nomeMudanca = { criada: "Senha criada pelo painel", trocada: "Senha trocada pelo painel", email: "E-mail para criar a senha enviado pelo painel" } as const;
   const senhaProtegida = eDono(email)
     ? "Este e-mail é do dono do site. A senha dele só pode ser trocada em Minha senha, pela própria pessoa."
@@ -336,6 +340,9 @@ export default async function Ficha({ searchParams }: Props) {
           </ul>
         </>
       )}
+
+      <h2 id="emails" className="mt-10 scroll-mt-24 text-xl font-bold text-marca-900">E-mails enviados</h2>
+      <HistoricoEmails emails={emails} endereco={email} />
 
       <h2 className="mt-10 text-xl font-bold text-marca-900">Histórico nas aulas</h2>
       {!atividades.length ? (

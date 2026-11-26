@@ -74,7 +74,7 @@ export async function enviarLinkDeAcesso(email: string, origem: string, destino:
 
   const link = `${origem}/auth/confirmar?token_hash=${encodeURIComponent(hash)}&type=${encodeURIComponent(tipo)}&para=${destino}`;
   try {
-    await enviarEmail({ para: email, ...emailLinkAcesso(link, codigo, destino === "senha") });
+    await enviarEmail({ para: email, ...emailLinkAcesso(link, codigo, destino === "senha"), tipo: destino === "senha" ? "senha" : "acesso" });
   } catch (e) {
     console.error("[link-acesso] enviar e-mail:", (e as Error).message);
     ultimoEnvio.delete(email);
