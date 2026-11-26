@@ -8,7 +8,7 @@ import {
   obterConfigLembretes, rodarLembretes, salvarConfigLembretes, type TipoLembrete,
 } from "@/lib/lembretes";
 import { SITE_OFICIAL } from "@/lib/site";
-import { exemploEmailCertificado, NOME_EMAIL_CERTIFICADO, type TipoEmailCertificado } from "@/lib/lembrete-certificado";
+import { rodadaEmailsCertificado } from "@/lib/lembrete-certificado";
 
 const inteiro = (v: FormDataEntryValue | null, min: number, max: number) => {
   const n = Number(String(v ?? "").trim());
@@ -32,8 +32,6 @@ export async function salvarLembretes(f: FormData) {
   if (!dias || !diasN) redirect("/admin/lembretes?erro=dias#config");
   if (!limite || limite < Math.max(dias[2], diasN[2])) redirect("/admin/lembretes?erro=limite#config");
   if (!maximo) redirect("/admin/lembretes?erro=maximo#config");
-  const horas = inteiro(f.get("cHoras"), 1, 72);
-  if (!horas) redirect("/admin/lembretes?erro=horas#certificado");
   await salvarConfigLembretes({
     ...CONFIG_LEMBRETES_PADRAO,
     ligado: f.get("ligado") === "on",
@@ -42,7 +40,8 @@ export async function salvarLembretes(f: FormData) {
     maximoPorDia: maximo,
     mensagemWhatsapp: texto(f, "mensagemWhatsapp", MENSAGEM_WHATSAPP_PADRAO),
     nuncaComecou: { ligado: f.get("nLigado") === "on", dias: diasN, mensagemWhatsapp: texto(f, "nMensagem", MENSAGEM_WHATSAPP_NUNCA) },
-    certificado: { ligado: f.get("cLigado") === "on", horas, entrega: f.get("cEntrega") === "on" },
+    // Os e-mails do certificado ficam em Mensagens > E-mails (não mexe neles aqui)
+    certificado: (await obterConfigLembretes()).certificado,
   });
   redirect("/admin/lembretes?salvo=1");
 }
@@ -66,6 +65,7 @@ async function enviarTeste(tipo: TipoLembrete) {
 export async function rodarAgora() {
   await exigirAdmin("alunos");
   await rodarLembretes("painel", SITE_OFICIAL);
+  await rodadaEmailsCertificado();
   redirect("/admin/lembretes?rodou=1#rodada");
 }
 
@@ -74,19 +74,4 @@ export async function testeParado() {
 }
 export async function testeNunca() {
   await enviarTeste("nunca");
-}
-
-/** Manda os 2 e-mails do certificado (com dados de exemplo) para quem está no painel. */
-export async function testeCertificado() {
-  const a = await exigirAdmin("alunos");
-  try {
-    for (const tipo of ["comprar", "entrega"] as TipoEmailCertificado[]) {
-      const e = exemploEmailCertificado(tipo, a.nome ?? "Maria Souza", a.email);
-      await enviarEmail({ para: a.email, ...e, assunto: `[TESTE ${NOME_EMAIL_CERTIFICADO[tipo]}] ${e.assunto}`, tipo: "teste" });
-      await new Promise((ok) => setTimeout(ok, 600));
-    }
-  } catch (e) {
-    redirect(`/admin/lembretes?erroTeste=${encodeURIComponent(e instanceof Error ? e.message.slice(0, 200) : "erro")}#certificado`);
-  }
-  redirect(`/admin/lembretes?teste=${encodeURIComponent(a.email)}#certificado`);
 }
