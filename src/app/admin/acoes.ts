@@ -97,7 +97,6 @@ export async function salvarConfiguracoes(f: FormData) {
     precoCertProfissional: precos[2] as number,
     gateway: String(f.get("gateway")) === "asaas" ? "asaas" : "mercadopago",
     videoParabens: String(f.get("videoParabens") ?? "").trim().slice(0, 500),
-    avisosNaLoja: f.get("avisosNaLoja") === "on",
     googleAnalyticsId: ga,
   });
   revalidatePath("/", "layout");

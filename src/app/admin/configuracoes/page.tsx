@@ -117,7 +117,6 @@ export default async function Configuracoes({ searchParams }: Props) {
           <div className="mt-5 space-y-3">
             <Chave nome="pesquisaNasAulas" ligado={loja.pesquisaNasAulas} titulo="Botão de pesquisa de satisfação nas aulas" texto="O aluno pode, se quiser, dar uma nota e deixar um comentário. As respostas aparecem em Vendas > Pesquisa de satisfação." />
             <Chave nome="mostrarDepoimentos" ligado={loja.mostrarDepoimentos} titulo="Depoimentos na página inicial" texto="Mostra os depoimentos ativos cadastrados em Loja virtual > Depoimentos." />
-            <Chave nome="avisosNaLoja" ligado={loja.avisosNaLoja !== false} titulo="Avisos de alunos na loja" texto="De tempos em tempos aparece no canto da loja um aviso de algo que aconteceu de verdade, como &quot;Maria, de Belém (PA), se inscreveu em Excel&quot;. Só o primeiro nome. Não aparece no pagamento nem na área do aluno." />
           </div>
           <label className="mt-5 block">
             <span className="text-sm font-semibold text-marca-900">Código do Google Analytics</span>

@@ -11,7 +11,6 @@ import { VoltarAoPainel } from "@/components/VoltarAoPainel";
 import { RegistraOrigem } from "@/components/RegistraOrigem";
 import { SinalOnline } from "@/components/SinalOnline";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
-import { AvisosLoja } from "@/components/loja/AvisosLoja";
 
 const titulo = Poppins({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--fonte-titulo" });
 const texto = Inter({ subsets: ["latin"], variable: "--fonte-texto" });
@@ -41,7 +40,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <RegistraOrigem />
         <SinalOnline />
         <GoogleAnalytics />
-        <AvisosLoja />
       </body>
     </html>
   );
