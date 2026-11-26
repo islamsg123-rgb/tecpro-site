@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Logo } from "./Logo";
+import { LogoComParceiro } from "./LogoComParceiro";
 import { MenuCelular } from "./MenuCelular";
 
 const links = [
@@ -13,11 +13,11 @@ export function Cabecalho() {
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-marca-900/95 backdrop-blur-md">
       <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between gap-6 px-4 sm:px-6">
-        <Link href="/" aria-label="Tecpro Multi Ensino, página inicial" className="shrink-0">
-          <Logo altura={40} />
+        <Link href="/" aria-label="Tecpro Multi Ensino e Programa Forma Brasil, página inicial" className="shrink-0">
+          <LogoComParceiro />
         </Link>
 
-        <nav className="hidden items-center gap-8 text-sm font-medium text-slate-300 md:flex">
+        <nav className="hidden items-center gap-6 text-sm font-medium text-slate-300 lg:flex xl:gap-8">
           {links.map((l) => (
             <Link key={l.href} href={l.href} className="transition hover:text-white">
               {l.rotulo}
@@ -25,7 +25,7 @@ export function Cabecalho() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-3 lg:flex">
           <Link
             href="/minha-conta"
             className="rounded-full px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
