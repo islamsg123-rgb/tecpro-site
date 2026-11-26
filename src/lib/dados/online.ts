@@ -77,6 +77,13 @@ export async function resumoPresenca(): Promise<ResumoPresenca> {
   return { online: (on.data ?? []).map(daLinha), visitasHoje: vis.count ?? 0, tabelaFaltando: false };
 }
 
+/** Quais (e-mail|curso_id) já têm certificado emitido: quem já tem não está "pagando o certificado". */
+export async function certificadosEmitidos(emails: string[]): Promise<Set<string>> {
+  if (!emails.length || bancoEmDemonstracao) return new Set();
+  const { data } = await db().from("certificados").select("email, curso_id").in("email", emails);
+  return new Set((data ?? []).map((r) => `${r.email}|${r.curso_id}`));
+}
+
 /** Quantas pessoas se cadastraram hoje no site (primeira matrícula, grátis ou paga). */
 export async function cadastrosHoje(): Promise<number> {
   const hoje = inicioDeHoje();

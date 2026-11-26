@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { PaginaOnline, RespostaOnline } from "@/lib/online";
+import type { PaginaOnline, PessoaNoCheckout, RespostaOnline } from "@/lib/online";
 
 /**
  * Quadro "Online agora" do Painel rápido: quantas pessoas estão no site neste momento e onde.
@@ -16,7 +16,8 @@ const PAGINAS_LOJA: { k: PaginaOnline; rotulo: string }[] = [
   { k: "inicio", rotulo: "Página inicial" },
   { k: "catalogo", rotulo: "Catálogo de cursos" },
   { k: "curso", rotulo: "Página de um curso" },
-  { k: "checkout", rotulo: "Preenchendo o pagamento" },
+  { k: "cadastro", rotulo: "Cadastro em curso grátis" },
+  { k: "checkout", rotulo: "Pagamento de curso pago" },
   { k: "pagando", rotulo: "Esperando Pix ou boleto" },
   { k: "outra", rotulo: "Outras páginas (entrar, ajuda...)" },
 ];
@@ -99,8 +100,9 @@ export function OnlineAgora() {
                 <ul className="mt-3 space-y-1.5 text-sm">
                   {PAGINAS_LOJA.filter((p) => dados.loja.paginas[p.k]).map((p) => {
                     const destaque = p.k === "checkout" || p.k === "pagando";
+                    const gratis = p.k === "cadastro";
                     return (
-                      <li key={p.k} className={`flex justify-between gap-3 ${destaque ? "font-semibold text-laranja-600" : "text-slate-600"}`}>
+                      <li key={p.k} className={`flex justify-between gap-3 ${destaque ? "font-semibold text-laranja-600" : gratis ? "font-semibold text-marca-700" : "text-slate-600"}`}>
                         <span>{p.rotulo}</span>
                         <span>{dados.loja.paginas[p.k]}</span>
                       </li>
@@ -114,30 +116,18 @@ export function OnlineAgora() {
                   {dados.loja.cursosVistos.map((c) => `${c.nome}${c.n > 1 ? ` (${c.n})` : ""}`).join(" · ")}
                 </p>
               )}
-              {dados.loja.noCheckout.length > 0 && (
-                <div className="mt-4 rounded-xl border border-laranja-500/40 bg-white p-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-laranja-600">No pagamento agora</p>
-                  <ul className="mt-2 divide-y divide-slate-100">
-                    {dados.loja.noCheckout.map((p, i) => (
-                      <li key={i} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold text-marca-900">
-                            {p.ficha ? <Link href={p.ficha} className="hover:text-marca-700">{p.nome ?? p.email}</Link> : p.nome ?? p.email ?? "Visitante (ainda não digitou os dados)"}
-                          </span>
-                          <span className="block text-xs text-slate-500">
-                            {p.curso ?? "Curso"} · {p.pagina === "pagando" ? "esperando Pix ou boleto" : p.email ? "na tela de pagamento" : "preenchendo nome e e-mail"}
-                          </span>
-                        </span>
-                        {p.whatsapp && (
-                          <a href={p.whatsapp} target="_blank" rel="noreferrer" className="shrink-0 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">
-                            WhatsApp
-                          </a>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <ListaPessoas
+                titulo="No pagamento agora"
+                explica="Curso pago, Pix ou boleto, ou aluno pagando o certificado."
+                pessoas={dados.loja.noCheckout}
+                cor="laranja"
+              />
+              <ListaPessoas
+                titulo="Se cadastrando em curso grátis"
+                explica="Não pagam nada agora: só preenchem os dados para começar."
+                pessoas={dados.loja.cadastroGratis}
+                cor="azul"
+              />
             </div>
 
             {/* Área do aluno */}
@@ -194,5 +184,43 @@ export function OnlineAgora() {
         </>
       )}
     </section>
+  );
+}
+
+const SITUACAO: Record<PessoaNoCheckout["pagina"], [string, string]> = {
+  checkout: ["na tela de pagamento", "preenchendo nome e e-mail"],
+  pagando: ["esperando Pix ou boleto", "esperando Pix ou boleto"],
+  certificado: ["pagando o certificado", "pagando o certificado"],
+  cadastro: ["no cadastro grátis", "no cadastro grátis"],
+};
+
+function ListaPessoas({ titulo, explica, pessoas, cor }: { titulo: string; explica: string; pessoas: PessoaNoCheckout[]; cor: "laranja" | "azul" }) {
+  if (!pessoas.length) return null;
+  const borda = cor === "laranja" ? "border-laranja-500/40" : "border-marca-700/30";
+  const texto = cor === "laranja" ? "text-laranja-600" : "text-marca-700";
+  return (
+    <div className={`mt-4 rounded-xl border ${borda} bg-white p-3`}>
+      <p className={`text-xs font-bold uppercase tracking-wide ${texto}`}>{titulo} ({pessoas.length})</p>
+      <p className="text-xs text-slate-400">{explica}</p>
+      <ul className="mt-2 divide-y divide-slate-100">
+        {pessoas.map((p, i) => (
+          <li key={i} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold text-marca-900">
+                {p.ficha ? <Link href={p.ficha} className="hover:text-marca-700">{p.nome ?? p.email}</Link> : p.nome ?? p.email ?? "Visitante (ainda não digitou os dados)"}
+              </span>
+              <span className="block text-xs text-slate-500">
+                {p.curso ?? "Curso"} · {SITUACAO[p.pagina][p.email ? 0 : 1]}
+              </span>
+            </span>
+            {p.whatsapp && (
+              <a href={p.whatsapp} target="_blank" rel="noreferrer" className="shrink-0 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700">
+                WhatsApp
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

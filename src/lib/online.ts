@@ -6,7 +6,9 @@
 export type AreaOnline = "loja" | "aluno";
 export type PaginaOnline =
   | "inicio" | "catalogo" | "curso" | "checkout" | "pagando" | "outra"
-  | "aula" | "certificado" | "conta";
+  | "aula" | "certificado" | "conta"
+  /** Só no painel: /checkout de um curso GRATUITO é cadastro, não pagamento. */
+  | "cadastro";
 
 export interface LugarOnline {
   area: AreaOnline;
@@ -43,7 +45,8 @@ export interface PessoaNoCheckout {
   nome: string | null;
   email: string | null;
   curso: string | null;
-  pagina: "checkout" | "pagando";
+  /** checkout = curso pago; pagando = tela do Pix/boleto; certificado = pagando o certificado na área do aluno; cadastro = curso grátis */
+  pagina: "checkout" | "pagando" | "certificado" | "cadastro";
   ficha: string | null;
   whatsapp: string | null;
 }
@@ -51,7 +54,7 @@ export interface PessoaNoCheckout {
 export interface RespostaOnline {
   tabelaFaltando: boolean;
   atualizadoEm: string;
-  loja: { total: number; paginas: Partial<Record<PaginaOnline, number>>; cursosVistos: { nome: string; n: number }[]; noCheckout: PessoaNoCheckout[] };
+  loja: { total: number; paginas: Partial<Record<PaginaOnline, number>>; cursosVistos: { nome: string; n: number }[]; noCheckout: PessoaNoCheckout[]; cadastroGratis: PessoaNoCheckout[] };
   aluno: { total: number; assistindo: number; porCurso: { nome: string; n: number }[] };
   hoje: { visitas: number; cadastros: number | null; vendas: number | null };
 }
