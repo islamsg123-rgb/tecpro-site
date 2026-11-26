@@ -63,7 +63,14 @@ export const MENU: Item[] = [
       { rotulo: "Cadastrar aluno", href: "/admin/alunos/novo" },
     ],
   },
-  { secao: "cursos", rotulo: "Cursos", href: "/admin/cursos", icone: svg(<><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" /><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" /><path d="M9 7.5h7" /></>) },
+  {
+    secao: "cursos", rotulo: "Cursos", href: "/admin/cursos/alunos",
+    icone: svg(<><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z" /><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5" /><path d="M9 7.5h7" /></>),
+    sub: [
+      { rotulo: "Alunos por curso", href: "/admin/cursos/alunos" },
+      { rotulo: "Preço e vitrine", href: "/admin/cursos" },
+    ],
+  },
   {
     secao: "loja", rotulo: "Loja virtual", href: "/admin/loja/depoimentos",
     icone: svg(<><path d="M3 9.5 4.5 4h15L21 9.5" /><path d="M3 9.5c0 1.4 1.1 2.5 2.5 2.5S8 10.9 8 9.5c0 1.4 1.1 2.5 2.5 2.5h3c1.4 0 2.5-1.1 2.5-2.5 0 1.4 1.1 2.5 2.5 2.5S21 10.9 21 9.5" /><path d="M5 12v8h14v-8M10 20v-4h4v4" /></>),

@@ -25,7 +25,7 @@ export default async function CursosAdmin({ searchParams }: Props) {
 
   return (
     <>
-      <h1 className="text-3xl font-extrabold text-marca-900">Cursos</h1>
+      <h1 className="text-3xl font-extrabold text-marca-900">Preço e vitrine</h1>
       <p className="mt-2 max-w-3xl text-sm text-slate-500">
         Nome, descrição e aulas vêm da Escola Avançada. Aqui você ajusta o que é da Tecpro: preço de venda, se o curso aparece no site,
         se fica em destaque e se é gratuito.
@@ -69,6 +69,7 @@ export default async function CursosAdmin({ searchParams }: Props) {
                   <div className="lg:mt-3">
                     <p className="font-bold leading-snug text-marca-900">{c.nome}</p>
                     <p className="text-xs text-slate-500">{c.categoria} · {c.cargaHoraria}h · código {c.id}</p>
+                    <a href={`/admin/cursos/alunos/${encodeURIComponent(c.id)}`} className="mt-1 inline-block text-xs font-semibold text-marca-700 underline hover:text-laranja-600">Ver alunos deste curso →</a>
                   </div>
                 </div>
 
