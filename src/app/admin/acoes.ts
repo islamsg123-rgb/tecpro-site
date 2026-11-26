@@ -86,7 +86,7 @@ export async function salvarConfiguracoes(f: FormData) {
   const video = String(f.get("videoParabens") ?? "").trim();
   if (video && !fonteVideo(video)) redirect("/admin/configuracoes?erro=video#certificados");
   const ga = String(f.get("googleAnalyticsId") ?? "").trim().toUpperCase();
-  if (ga && !/^G-[A-Z0-9]{4,20}$/.test(ga)) redirect("/admin/configuracoes?erro=ga#site");
+  if (ga && !/^(G|GTM)-[A-Z0-9]{4,20}$/.test(ga)) redirect("/admin/configuracoes?erro=ga#site");
   await salvarConfigLoja({
     mesesDeAcesso: meses,
     pesquisaNasAulas: f.get("pesquisaNasAulas") === "on",

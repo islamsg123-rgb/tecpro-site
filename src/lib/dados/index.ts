@@ -314,7 +314,7 @@ export interface ConfigLoja {
   gateway: "mercadopago" | "asaas";
   /** Vídeo de parabéns na última aula de todos os cursos: arquivo do site (/video/parabens.mp4), .mp4, Panda ou YouTube. Vazio = sem vídeo. */
   videoParabens?: string;
-  /** Código do Google Analytics (G-XXXXXXX). Vazio = desligado. */
+  /** Código do Google: Analytics (G-XXXXXXX) ou Tag Manager (GTM-XXXXXXX). Vazio = desligado. */
   googleAnalyticsId?: string;
 }
 const CONFIG_LOJA_PADRAO: ConfigLoja = {
@@ -322,7 +322,7 @@ const CONFIG_LOJA_PADRAO: ConfigLoja = {
   mesesDeAcesso: null, pesquisaNasAulas: true, mostrarDepoimentos: true, whatsapp: "", emailContato: "", instagram: "",
   precoCertIndividual: 3790, precoCertEssencial: 8990, precoCertProfissional: 12990,
   videoParabens: "/video/parabens.mp4",
-  googleAnalyticsId: "",
+  googleAnalyticsId: "GTM-M8V8THNK", // contêiner do Google Tag Manager da Tecpro (enviado pelo dono em 2026-11-26)
 };
 
 const gLoja = globalThis as unknown as { __configLojaDemo?: ConfigLoja };

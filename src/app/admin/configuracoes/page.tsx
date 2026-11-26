@@ -119,11 +119,11 @@ export default async function Configuracoes({ searchParams }: Props) {
             <Chave nome="mostrarDepoimentos" ligado={loja.mostrarDepoimentos} titulo="Depoimentos na página inicial" texto="Mostra os depoimentos ativos cadastrados em Loja virtual > Depoimentos." />
           </div>
           <label className="mt-5 block">
-            <span className="text-sm font-semibold text-marca-900">Código do Google Analytics</span>
-            <span className="block text-sm text-slate-500">Começa com G- (no Google Analytics: Administrador &gt; Fluxos de dados &gt; seu site &gt; ID da métrica). Deixe em branco para desligar.</span>
+            <span className="text-sm font-semibold text-marca-900">Código do Google (Analytics ou Tag Manager)</span>
+            <span className="block text-sm text-slate-500">Começa com G- (Google Analytics) ou GTM- (Google Tag Manager). Use só um dos dois. Deixe em branco para desligar.</span>
             <input name="googleAnalyticsId" defaultValue={loja.googleAnalyticsId ?? ""} placeholder="G-XXXXXXXXXX" className={`${campo} mt-2 max-w-xs uppercase`} />
           </label>
-          {erro === "ga" && <p className="mt-3 text-sm text-red-700">Esse código não parece do Google Analytics. Ele começa com G- e tem letras e números, por exemplo G-AB12CD34EF.</p>}
+          {erro === "ga" && <p className="mt-3 text-sm text-red-700">Esse código não parece do Google. Ele começa com G- ou GTM- e tem letras e números, por exemplo GTM-AB12CD3.</p>}
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
