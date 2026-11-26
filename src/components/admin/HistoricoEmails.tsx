@@ -7,7 +7,7 @@ import { Dica } from "@/components/admin/Dica";
 const SITUACAO: Record<string, [string, string, string]> = {
   agendado: ["Agendado", "bg-slate-100 text-slate-600", "Ainda não saiu: o Resend guarda e entrega no horário marcado."],
   cancelado: ["Cancelado", "bg-slate-100 text-slate-500", "Estava agendado e foi cancelado antes de sair (ex.: o aluno pagou o certificado antes)."],
-  enviado: ["Enviado", "bg-slate-100 text-slate-700", "Saiu do site. Ainda não chegou o aviso de entrega do Resend."],
+  enviado: ["Enviado", "bg-slate-100 text-slate-700", "Saiu do site. O aviso de entrega do Resend ainda não chegou (e-mails mandados antes do webhook ser cadastrado ficam assim)."],
   atrasado: ["Atrasando", "bg-amber-100 text-amber-800", "O provedor da pessoa ainda não aceitou. O Resend continua tentando."],
   entregue: ["Entregue", "bg-green-100 text-green-800", "Chegou na caixa de e-mail da pessoa (pode ter ido para Promoções ou Spam)."],
   voltou: ["Voltou", "bg-red-100 text-red-700", "O e-mail não chegou: o endereço não existe, está cheio ou recusou. Confira se o e-mail está escrito certo."],
@@ -18,9 +18,19 @@ const SITUACAO: Record<string, [string, string, string]> = {
 
 const pilula = "rounded-full px-2.5 py-1 text-xs font-semibold";
 
+/**
+ * Agendado com horário que já passou = o Resend já mandou no horário marcado.
+ * (O aviso de entrega só chega se o webhook estava cadastrado naquela hora.)
+ */
+function situacao(m: EmailEnviado): string {
+  if (m.status === "agendado" && m.agendadoPara && new Date(m.agendadoPara).getTime() < Date.now()) return "enviado";
+  return m.status;
+}
+
 function Pilulas({ m }: { m: EmailEnviado }) {
-  const [rotulo, cls, explica] = SITUACAO[m.status] ?? [m.status, "bg-slate-100 text-slate-600", ""];
-  const textoSituacao = m.status === "agendado" && m.agendadoPara ? `Agendado para ${dataHoraBR(m.agendadoPara)}` : rotulo;
+  const st = situacao(m);
+  const [rotulo, cls, explica] = SITUACAO[st] ?? [st, "bg-slate-100 text-slate-600", ""];
+  const textoSituacao = st === "agendado" && m.agendadoPara ? `Agendado para ${dataHoraBR(m.agendadoPara)}` : rotulo;
   return (
     <span className="flex flex-wrap items-center gap-1.5">
       <Dica texto={explica}><span className={`${pilula} ${cls}`}>{textoSituacao}</span></Dica>
@@ -63,7 +73,7 @@ export function HistoricoEmails({ emails, endereco }: { emails: EmailEnviado[] |
       </p>
     );
   }
-  const saiu = emails.filter((m) => !["agendado", "cancelado", "erro", "falhou"].includes(m.status));
+  const saiu = emails.filter((m) => !["agendado", "cancelado", "erro", "falhou"].includes(situacao(m)));
   const abertos = saiu.filter((m) => m.aberturas > 0).length;
   const clicados = saiu.filter((m) => m.cliques > 0).length;
   const problemas = emails.filter((m) => ["voltou", "spam", "falhou", "erro"].includes(m.status)).length;
@@ -94,7 +104,7 @@ export function HistoricoEmails({ emails, endereco }: { emails: EmailEnviado[] |
               </summary>
               <dl className="mt-3 grid gap-x-6 gap-y-2 rounded-xl bg-slate-50 p-4 text-xs sm:grid-cols-2">
                 <div><dt className="text-slate-500">Assunto</dt><dd className="font-medium text-marca-900">{m.assunto ?? "—"}</dd></div>
-                <div><dt className="text-slate-500">{m.status === "agendado" ? "Vai sair em" : "Saiu em"}</dt><dd className="font-medium text-marca-900">{dataHoraBR(m.agendadoPara ?? m.criadoEm)}</dd></div>
+                <div><dt className="text-slate-500">{situacao(m) === "agendado" ? "Vai sair em" : "Saiu em"}</dt><dd className="font-medium text-marca-900">{dataHoraBR(m.agendadoPara ?? m.criadoEm)}</dd></div>
                 <div><dt className="text-slate-500">Entregue</dt><dd className="font-medium text-marca-900">{m.entregueEm ? dataHoraBR(m.entregueEm) : "—"}</dd></div>
                 <div>
                   <dt className="text-slate-500">Aberto</dt>
