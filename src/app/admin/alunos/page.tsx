@@ -8,6 +8,7 @@ import { DIAS_PARA_INATIVO, pessoasDoPainel } from "@/lib/painel-resumo";
 import { EtiquetaAluno, Numero, Titulo } from "@/components/admin/Blocos";
 import { BotaoExportar } from "@/components/admin/BotaoExportar";
 import { Dica } from "@/components/admin/Dica";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Alunos" };
 export const dynamic = "force-dynamic";
@@ -85,7 +86,7 @@ export default async function Alunos({ searchParams }: Props) {
           {todos.length ? "Ninguém neste filtro." : "Nenhum aluno ainda."}
         </p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+        <Recolhivel total={alunos.length} className="mt-6"><div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
               <tr>
@@ -96,7 +97,7 @@ export default async function Alunos({ searchParams }: Props) {
                 <th className="px-5 py-3 font-semibold">Última atividade</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100"><Itens>
               {alunos.map((a) => (
                 <tr key={a.email} className="hover:bg-marca-50/50">
                   <td className="px-5 py-3 font-medium">
@@ -111,9 +112,9 @@ export default async function Alunos({ searchParams }: Props) {
                   <td className="whitespace-nowrap px-5 py-3">{a.matriculado ? <Atividade iso={a.ultimaAtividade} /> : <span className="text-xs text-slate-400">—</span>}</td>
                 </tr>
               ))}
-            </tbody>
+            </Itens></tbody>
           </table>
-        </div>
+        </div></Recolhivel>
       )}
 
       <h2 id="eventos" className="mt-12 text-xl font-bold text-marca-900">Últimas tentativas de matrícula</h2>
@@ -126,7 +127,7 @@ export default async function Alunos({ searchParams }: Props) {
           (abra a tela do pedido: ela também libera o acesso quando vê o pagamento aprovado).
         </p>
       ) : (
-        <ul className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
+        <Recolhivel total={eventos.length} className="mt-4"><ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm"><Itens>
           {eventos.map((e, i) => (
             <li key={i} className="flex gap-3 px-5 py-3">
               <Dica texto={e.ok ? "Esta etapa deu certo." : "Esta etapa deu erro. Veja o detalhe ao lado."} className="self-start rounded-full">
@@ -142,7 +143,7 @@ export default async function Alunos({ searchParams }: Props) {
               </div>
             </li>
           ))}
-        </ul>
+        </Itens></ul></Recolhivel>
       )}
     </>
   );

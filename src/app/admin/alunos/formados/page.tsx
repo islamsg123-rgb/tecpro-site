@@ -10,6 +10,7 @@ import { listarFormados } from "@/lib/painel-resumo";
 import { dataCurta, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { BotaoExportar } from "@/components/admin/BotaoExportar";
 import { Dica } from "@/components/admin/Dica";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Formados" };
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export default async function Formados() {
       {!formados.length ? (
         <Vazio>Ninguém concluiu um curso ainda.</Vazio>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+        <Recolhivel total={formados.length}><div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[880px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
               <tr>
@@ -58,7 +59,7 @@ export default async function Formados() {
                 <th className="px-5 py-3 font-semibold">Chamar</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100"><Itens>
               {formados.map((f) => (
                 <tr key={`${f.email}|${f.cursoId}`} className="hover:bg-marca-50/50">
                   <td className="px-5 py-3">
@@ -89,9 +90,9 @@ export default async function Formados() {
                   </td>
                 </tr>
               ))}
-            </tbody>
+            </Itens></tbody>
           </table>
-        </div>
+        </div></Recolhivel>
       )}
     </>
   );

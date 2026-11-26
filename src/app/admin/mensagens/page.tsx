@@ -7,6 +7,7 @@ import { listarMensagens, TIPOS_AJUDA, type MensagemAjuda } from "@/lib/dados/me
 import { AvisoSql, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { anotarMensagem, excluirMensagem, marcarResolvida } from "./acoes";
 import { Dica } from "@/components/admin/Dica";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Mensagens" };
 export const dynamic = "force-dynamic";
@@ -174,7 +175,7 @@ export default async function Mensagens({ searchParams }: Props) {
         {!lista.length ? (
           <Vazio>{status === "novas" ? "Nenhuma mensagem nova. Tudo em dia!" : "Nenhuma mensagem aqui."}</Vazio>
         ) : (
-          <ul className="space-y-3">{lista.map((m) => <Cartao key={m.id} m={m} conta={conta} />)}</ul>
+          <Recolhivel total={lista.length}><ul className="space-y-3"><Itens>{lista.map((m) => <Cartao key={m.id} m={m} conta={conta} />)}</Itens></ul></Recolhivel>
         )}
       </div>
     </>

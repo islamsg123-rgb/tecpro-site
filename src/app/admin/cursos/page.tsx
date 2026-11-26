@@ -5,6 +5,7 @@ import { configuracoesDosCursos } from "@/lib/dados";
 import { formatarPreco } from "@/lib/formatar";
 import { gratuitoEmMassa, salvarCurso } from "../acoes";
 import { CapaCurso } from "@/components/CapaCurso";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Cursos" };
 
@@ -50,7 +51,7 @@ export default async function CursosAdmin({ searchParams }: Props) {
         {sp.massa && <p className="w-full text-sm font-medium text-green-700">Pronto, todos os cursos foram atualizados.</p>}
       </form>
 
-      <div className="mt-8 space-y-4">
+      <Recolhivel total={cursos.length} mostrar={15} abertoInicial={Boolean(sp.curso)} className="mt-8"><div className="space-y-4"><Itens>
         {cursos.map((c) => {
           const ajuste = cfg.get(c.id);
           const desteCurso = sp.curso === c.id;
@@ -115,7 +116,7 @@ export default async function CursosAdmin({ searchParams }: Props) {
             </form>
           );
         })}
-      </div>
+      </Itens></div></Recolhivel>
     </>
   );
 }

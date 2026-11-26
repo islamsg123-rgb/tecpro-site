@@ -26,6 +26,7 @@ import { situacaoSenha } from "@/lib/dados/senha-aluno";
 import { SITE_OFICIAL } from "@/lib/site";
 import { HistoricoEmails } from "@/components/admin/HistoricoEmails";
 import { emailsDoAluno, semearEmailsDemo } from "@/lib/dados/emails";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Ficha do aluno" };
 export const dynamic = "force-dynamic";
@@ -348,8 +349,8 @@ export default async function Ficha({ searchParams }: Props) {
       {!atividades.length ? (
         <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">Ainda não abriu nenhuma aula.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
-          {atividades.slice(0, 40).map((a, i) => {
+        <Recolhivel total={Math.min(atividades.length, 100)} className="mt-4"><ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm"><Itens>
+          {atividades.slice(0, 100).map((a, i) => {
             const t = tituloAula(a.cursoId, a.aulaId);
             return (
               <li key={i} className="flex flex-wrap gap-x-3 px-5 py-3">
@@ -360,7 +361,7 @@ export default async function Ficha({ searchParams }: Props) {
               </li>
             );
           })}
-        </ul>
+        </Itens></ul></Recolhivel>
       )}
 
       {acesso.dono && (registro || carrinhos.length > 0) && (

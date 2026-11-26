@@ -9,6 +9,7 @@ import {
 } from "@/lib/lembretes";
 import { AvisoSql, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { Dica } from "@/components/admin/Dica";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 import { rodarAgora, salvarLembretes, testeCertificado, testeNunca, testeParado } from "./acoes";
 import {
   listarEmailsCertificado, NOME_EMAIL_CERTIFICADO, situacaoReal, type RegistroEmailCertificado, type TipoEmailCertificado,
@@ -18,11 +19,14 @@ export const metadata: Metadata = { title: "Lembretes de estudo" };
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-type Props = { searchParams: Promise<{ salvo?: string; erro?: string; teste?: string; erroTeste?: string; rodou?: string; ver?: string }> };
+type Props = { searchParams: Promise<{ salvo?: string; erro?: string; teste?: string; erroTeste?: string; rodou?: string; }> };
 
 const dataHora = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
 const dataCurta = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+/** Dia (AAAA-MM-DD) no horário de Belém. */
+const diaBelem = (d: string | number) => new Date(d).toLocaleDateString("sv-SE", { timeZone: "America/Belem" });
+const hora = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { timeZone: "America/Belem", hour: "2-digit", minute: "2-digit" });
 
 const campoNum = "w-20 rounded-xl border border-slate-300 px-3 py-2 text-center text-marca-900";
 const ficha = (email: string) => `/admin/alunos/ficha?email=${encodeURIComponent(email)}`;
@@ -52,13 +56,24 @@ export default async function Lembretes({ searchParams }: Props) {
   const ultimos30 = enviados.filter((h) => Date.now() - new Date(h.enviadoEm).getTime() < 30 * 86_400_000);
   const alunos30 = new Set(ultimos30.map((h) => h.email));
   const voltaram30 = new Set(ultimos30.filter(voltou).map((h) => h.email));
+  const ultimos7 = ultimos30.filter((h) => Date.now() - new Date(h.enviadoEm).getTime() < 7 * 86_400_000);
+  const alunos7 = new Set(ultimos7.map((h) => h.email));
+  const voltaram7 = new Set(ultimos7.filter(voltou).map((h) => h.email));
+  // Voltaram HOJE: foram lembrados (30 dias) e a última aula estudada é de hoje (horário de Belém), depois do e-mail.
+  const hoje = diaBelem(Date.now());
+  const voltaramHoje: { email: string; nome: string | null; quando: string; lembrete: RegistroLembrete }[] = [];
+  for (const h of ultimos30) {
+    const a = atividade.get(h.email);
+    if (!a || diaBelem(a) !== hoje || !voltou(h) || voltaramHoje.some((v) => v.email === h.email)) continue;
+    voltaramHoje.push({ email: h.email, nome: h.nome, quando: a, lembrete: h });
+  }
+  voltaramHoje.sort((x, y) => y.quando.localeCompare(x.quando));
   const ultimoDoPar = new Map<string, RegistroLembrete>();
   for (const h of enviados) if (!ultimoDoPar.has(`${h.tipo}|${h.email}|${h.cursoId}`)) ultimoDoPar.set(`${h.tipo}|${h.email}|${h.cursoId}`, h);
   const enviadoDesta = (tipo: TipoLembrete, email: string, cursoId: string, ref: string) => {
     const u = ultimoDoPar.get(`${tipo}|${email}|${cursoId}`);
     return u && new Date(u.ultimaAtividade).getTime() === new Date(ref).getTime() ? u : null;
   };
-  const todos = q.ver === "todos";
 
   return (
     <>
@@ -104,18 +119,19 @@ export default async function Lembretes({ searchParams }: Props) {
         )}
       </section>
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <VoltaramHoje lista={voltaramHoje} semana={voltaram7.size} lembrados7={alunos7.size} mes={voltaram30.size} lembrados30={alunos30.size} />
+
+      <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Numero rotulo="Pararam de estudar" valor={String(new Set(parados.map((p) => p.email)).size)} cor="laranja" href="#parados" dica={`Alunos com curso começado e não concluído, há ${cfg.dias[0]} dias ou mais sem estudar.`} />
         <Numero rotulo="Nunca começaram" valor={String(new Set(nunca.map((p) => p.email)).size)} cor="laranja" href="#nunca" dica="Se matricularam pelo site, mas ainda não abriram nenhuma aula do curso." />
         <Numero rotulo="Lembrados (30 dias)" valor={String(alunos30.size)} detalhe={`${ultimos30.length} e-mails`} href="#enviados" dica="Pessoas que receberam pelo menos um lembrete nos últimos 30 dias." />
-        <Numero rotulo="Voltaram a estudar" valor={String(voltaram30.size)} cor="verde" detalhe={alunos30.size ? `${Math.round((voltaram30.size / alunos30.size) * 100)}% dos lembrados` : undefined} dica="Das pessoas lembradas nos últimos 30 dias, quantas estudaram alguma aula depois do e-mail." />
         <Numero rotulo="Não querem lembretes" valor={String(sairam.size)} cor="cinza" dica="Clicaram no link do fim do e-mail para não receber mais lembretes. O site respeita (LGPD)." />
       </div>
 
       <Config cfg={cfg} erro={q.erro} />
 
-      <Secao id="parados" titulo="Pararam de estudar" texto={<>Quem está há {cfg.dias[0]} dias ou mais sem estudar um curso que começou.</>} total={parados.length} todos={todos}>
-        {parados.slice(0, todos ? undefined : 100).map((p) => (
+      <Secao id="parados" titulo="Pararam de estudar" texto={<>Quem está há {cfg.dias[0]} dias ou mais sem estudar um curso que começou.</>} total={parados.length}>
+        {parados.map((p) => (
           <Linha
             key={`${p.email}|${p.cursoId}`} email={p.email} nome={p.nome} curso={p.cursoNome}
             detalhe={<Progresso pct={p.pct} feitas={p.feitas} total={p.total} />}
@@ -126,8 +142,8 @@ export default async function Lembretes({ searchParams }: Props) {
         ))}
       </Secao>
 
-      <Secao id="nunca" titulo="Matriculados que nunca começaram" texto="Se matricularam pelo site (pago ou gratuito) e não abriram nenhuma aula daquele curso. Os dias contam desde a matrícula." total={nunca.length} todos={todos}>
-        {nunca.slice(0, todos ? undefined : 100).map((p) => (
+      <Secao id="nunca" titulo="Matriculados que nunca começaram" texto="Se matricularam pelo site (pago ou gratuito) e não abriram nenhuma aula daquele curso. Os dias contam desde a matrícula." total={nunca.length}>
+        {nunca.map((p) => (
           <Linha
             key={`${p.email}|${p.cursoId}`} email={p.email} nome={p.nome} curso={p.cursoNome}
             detalhe={<span className="text-xs text-slate-500">matriculado em {dataCurta(p.desde)}</span>}
@@ -145,7 +161,8 @@ export default async function Lembretes({ searchParams }: Props) {
       {!historico.lista.length ? (
         <div className="mt-4"><Vazio>Nenhum lembrete enviado ainda.</Vazio></div>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+        <Recolhivel total={Math.min(historico.lista.length, 200)} className="mt-4">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
               <tr>
@@ -156,7 +173,7 @@ export default async function Lembretes({ searchParams }: Props) {
                 <th className="px-5 py-3 font-semibold">Resultado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100"><Itens>
               {historico.lista.slice(0, 200).map((h) => (
                 <tr key={h.id}>
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">{dataHora(h.enviadoEm)}</td>
@@ -179,9 +196,10 @@ export default async function Lembretes({ searchParams }: Props) {
                   </td>
                 </tr>
               ))}
-            </tbody>
+            </Itens></tbody>
           </table>
         </div>
+        </Recolhivel>
       )}
     </>
   );
@@ -213,7 +231,7 @@ function Progresso({ pct, feitas, total }: { pct: number; feitas: number; total:
   );
 }
 
-function Secao({ id, titulo, texto, total, todos, children }: { id: string; titulo: string; texto: React.ReactNode; total: number; todos: boolean; children: React.ReactNode }) {
+function Secao({ id, titulo, texto, total, children }: { id: string; titulo: string; texto: React.ReactNode; total: number; children: React.ReactNode }) {
   return (
     <>
       <h2 id={id} className="mt-12 scroll-mt-24 text-xl font-bold text-marca-900">{titulo} <span className="text-base font-normal text-slate-400">({total})</span></h2>
@@ -221,7 +239,8 @@ function Secao({ id, titulo, texto, total, todos, children }: { id: string; titu
       {!total ? (
         <div className="mt-4"><Vazio>Ninguém aqui agora. 🎉</Vazio></div>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+        <Recolhivel total={total} className="mt-4">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[820px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
               <tr>
@@ -232,12 +251,10 @@ function Secao({ id, titulo, texto, total, todos, children }: { id: string; titu
                 <th className="px-5 py-3 font-semibold">WhatsApp</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">{children}</tbody>
+            <tbody className="divide-y divide-slate-100"><Itens>{children}</Itens></tbody>
           </table>
-          {!todos && total > 100 && (
-            <p className="border-t border-slate-100 p-4 text-center text-sm"><Link href={`/admin/lembretes?ver=todos#${id}`} className="font-semibold text-marca-700">Ver todos os {total}</Link></p>
-          )}
         </div>
+        </Recolhivel>
       )}
     </>
   );
@@ -433,7 +450,8 @@ function EmailsCertificado({ lista }: { lista: RegistroEmailCertificado[] }) {
       {!lista.length ? (
         <div className="mt-4"><Vazio>Nenhum e-mail do certificado ainda.</Vazio></div>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+        <Recolhivel total={lista.length} className="mt-4">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[820px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
               <tr>
@@ -444,7 +462,7 @@ function EmailsCertificado({ lista }: { lista: RegistroEmailCertificado[] }) {
                 <th className="px-5 py-3 font-semibold">Resultado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100"><Itens>
               {lista.map((r) => {
                 const st = ROTULO_STATUS[situacaoReal(r)];
                 return (
@@ -461,10 +479,55 @@ function EmailsCertificado({ lista }: { lista: RegistroEmailCertificado[] }) {
                   </tr>
                 );
               })}
-            </tbody>
+            </Itens></tbody>
           </table>
         </div>
+        </Recolhivel>
       )}
     </>
+  );
+}
+
+/** Destaque do topo: quem voltou a estudar HOJE depois de um lembrete. */
+function VoltaramHoje({ lista, semana, lembrados7, mes, lembrados30 }: {
+  lista: { email: string; nome: string | null; quando: string; lembrete: RegistroLembrete }[];
+  semana: number; lembrados7: number; mes: number; lembrados30: number;
+}) {
+  const n = lista.length;
+  return (
+    <section id="voltaram-hoje" className="mb-6 scroll-mt-24 rounded-3xl border border-green-200 bg-green-50 p-6">
+      <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+        <div>
+          <p className="text-sm font-semibold text-green-800">Voltaram a estudar hoje</p>
+          <p className="mt-1 font-display text-5xl font-extrabold text-green-900">{n}</p>
+          <p className="mt-1 text-sm text-green-800">{n === 0 ? "Ninguém ainda hoje." : n === 1 ? "pessoa estudou hoje depois de receber um lembrete" : "pessoas estudaram hoje depois de receber um lembrete"}</p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Dica texto="Das pessoas lembradas nos últimos 7 dias, quantas estudaram alguma aula depois do e-mail.">
+            <span className="rounded-full bg-white px-3 py-1.5 text-green-900"><strong>{semana}</strong> nos últimos 7 dias{lembrados7 ? ` (de ${lembrados7} lembrados)` : ""}</span>
+          </Dica>
+          <Dica texto="Das pessoas lembradas nos últimos 30 dias, quantas estudaram alguma aula depois do e-mail.">
+            <span className="rounded-full bg-white px-3 py-1.5 text-green-900"><strong>{mes}</strong> nos últimos 30 dias{lembrados30 ? ` (de ${lembrados30} lembrados)` : ""}</span>
+          </Dica>
+        </div>
+      </div>
+      {n > 0 && (
+        <Recolhivel total={n} mostrar={5} className="mt-5">
+          <ul className="divide-y divide-green-100 overflow-hidden rounded-2xl bg-white text-sm">
+            <Itens>
+              {lista.map((v) => (
+                <li key={v.email} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3">
+                  <span>
+                    <Link href={ficha(v.email)} className="font-medium text-marca-900 underline decoration-laranja-500 underline-offset-4">{v.nome ?? v.email}</Link>
+                    <span className="block text-xs text-slate-500">{v.lembrete.cursoNome} · recebeu o {v.lembrete.etapa}º lembrete em {dataCurta(v.lembrete.enviadoEm)}</span>
+                  </span>
+                  <span className="whitespace-nowrap rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">estudou às {hora(v.quando)}</span>
+                </li>
+              ))}
+            </Itens>
+          </ul>
+        </Recolhivel>
+      )}
+    </section>
   );
 }

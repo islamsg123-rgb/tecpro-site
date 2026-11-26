@@ -5,6 +5,7 @@ import Link from "next/link";
 import { matricularDeNovo } from "@/app/admin/acoes";
 import { financasDaVenda, type TaxasPagamento } from "@/lib/taxas";
 import { Dica } from "./Dica";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 function data(iso?: string) {
   if (!iso) return "—";
@@ -18,7 +19,7 @@ export function TabelaVendas({ vendas, taxas }: { vendas: Cobranca[]; taxas?: Ta
     return <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">Nenhuma venda ainda.</p>;
   }
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+    <Recolhivel total={vendas.length}><div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
       <table className={`w-full text-left text-sm ${taxas ? "min-w-[1180px]" : "min-w-[860px]"}`}>
         <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
           <tr>
@@ -39,7 +40,7 @@ export function TabelaVendas({ vendas, taxas }: { vendas: Cobranca[]; taxas?: Ta
             <th className="px-5 py-3 font-semibold"><span className="sr-only">Ações</span></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-slate-100"><Itens>
           {vendas.map((v) => (
             <tr key={v.id} className="hover:bg-marca-50/50">
               {!taxas && <td className="whitespace-nowrap px-5 py-3 text-slate-500">{data(v.criadoEm)}</td>}
@@ -77,8 +78,8 @@ export function TabelaVendas({ vendas, taxas }: { vendas: Cobranca[]; taxas?: Ta
               </td>
             </tr>
           ))}
-        </tbody>
+        </Itens></tbody>
       </table>
-    </div>
+    </div></Recolhivel>
   );
 }

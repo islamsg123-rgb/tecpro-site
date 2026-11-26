@@ -8,6 +8,7 @@ import { Duvidas } from "@/components/Duvidas";
 import {
   IconeCadeado, IconeCelular, IconeCertificado, IconeCheck, IconeChevron, IconePlay, IconeRelogio,
 } from "@/components/Icones";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -96,14 +97,16 @@ export default async function PaginaCurso({ params }: Props) {
                     <span className="hidden text-sm text-slate-500 sm:inline">{m.aulas.length} aulas</span>
                     <IconeChevron className="seta h-5 w-5 text-slate-400 transition" />
                   </summary>
-                  <ol className="border-t border-slate-100 px-6 py-2">
+                  <Recolhivel total={m.aulas.length} mostrar={8} className="border-t border-slate-100 pb-4">
+                  <ol className="px-6 py-2"><Itens>
                     {m.aulas.map((a) => (
                       <li key={a.id} className="flex items-center gap-3 py-3 text-sm text-slate-600">
                         <IconePlay className="h-5 w-5 shrink-0 text-slate-300" /> {a.titulo}
                         <IconeCadeado className="ml-auto h-4 w-4 shrink-0 text-slate-300" />
                       </li>
                     ))}
-                  </ol>
+                  </Itens></ol>
+                  </Recolhivel>
                 </details>
               ))}
             </div>

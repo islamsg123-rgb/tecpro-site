@@ -5,6 +5,7 @@ import { obterConfigLoja } from "@/lib/dados";
 import { listarPesquisas } from "@/lib/dados/painel";
 import { AvisoSql, Caixa, dataCurta, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { excluirPesquisa } from "../acoes";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Pesquisa de satisfação" };
 export const dynamic = "force-dynamic";
@@ -69,7 +70,7 @@ export default async function Pesquisa({ searchParams }: Props) {
           {!lista.length ? (
             <Vazio>Nenhuma resposta ainda.</Vazio>
           ) : (
-            <ul className="space-y-3">
+            <Recolhivel total={lista.length}><ul className="space-y-3"><Itens>
               {lista.map((p) => (
                 <li key={p.id} className="rounded-2xl border border-slate-200 bg-white p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -89,7 +90,7 @@ export default async function Pesquisa({ searchParams }: Props) {
                   {p.comentario && <p className="mt-3 whitespace-pre-line text-sm text-slate-700">“{p.comentario}”</p>}
                 </li>
               ))}
-            </ul>
+            </Itens></ul></Recolhivel>
           )}
         </div>
       </div>

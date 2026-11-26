@@ -7,6 +7,7 @@ import { formatarPreco } from "@/lib/formatar";
 import { BotaoWhatsApp } from "@/components/admin/BotaoWhatsApp";
 import { alternarContatado, salvarMensagens } from "../acoes";
 import { Dica } from "@/components/admin/Dica";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Carrinhos abandonados" };
 export const dynamic = "force-dynamic";
@@ -88,7 +89,7 @@ export default async function Carrinhos({ searchParams }: Props) {
       {!filtrada.length ? (
         <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">Nada por aqui.</p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+        <Recolhivel total={filtrada.length} className="mt-4"><div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
               <tr>
@@ -99,7 +100,7 @@ export default async function Carrinhos({ searchParams }: Props) {
                 <th className="px-5 py-3 font-semibold">Contato</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100"><Itens>
               {filtrada.map((c) => {
                 const curso = cursos.find((x) => x.id === c.cursoId);
                 const nomeCurso = curso?.nome ?? `curso ${c.cursoId}`;
@@ -144,9 +145,9 @@ export default async function Carrinhos({ searchParams }: Props) {
                   </tr>
                 );
               })}
-            </tbody>
+            </Itens></tbody>
           </table>
-        </div>
+        </div></Recolhivel>
       )}
 
       <section id="mensagens" className="mt-12 scroll-mt-24">
