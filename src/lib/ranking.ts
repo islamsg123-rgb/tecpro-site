@@ -1,7 +1,7 @@
 import "server-only";
 import { getCursos, getModulos } from "./cursos";
 import { listarAlunos, listarCertificados, todasAsLinhasDeProgresso, type LinhaProgresso } from "./dados";
-import { diasDesde } from "./admin-relatorios";
+import { diasDesde } from "./dias";
 
 /**
  * Progresso dos alunos (antes era "ranking por pontos").

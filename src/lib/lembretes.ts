@@ -20,6 +20,7 @@ import { listarCarrinhos } from "./dados/carrinhos";
 import { telefonesDemonstracao } from "./dados/painel";
 import { emailConfigurado, emailLembrete, emailNuncaComecou, enviarEmail } from "./email";
 import { SITE_OFICIAL } from "./site";
+import { diasDesde } from "./dias";
 
 /**
  * Lembretes de estudo: quando o aluno começou um curso, não terminou e ficou alguns dias
@@ -294,11 +295,10 @@ export async function cursosParados(minimoDias = 1, progresso?: Progresso): Prom
     todosAlunos(), getCursos(), todosCursosRemovidos(), telefonesDosAlunos(),
   ]);
   const aluno = new Map(alunos.map((a) => [norm(a.email), a]));
-  const agora = Date.now();
 
   const candidatos = Array.from(porPar.entries()).flatMap(([k, p]) => {
     const [email, cursoId] = k.split("|");
-    const dias = Math.floor((agora - new Date(p.ultima).getTime()) / DIA);
+    const dias = diasDesde(p.ultima) ?? 0;
     if (dias < minimoDias || !aluno.has(email) || removidos.has(k)) return [];
     const curso = cursos.find((c) => c.id === cursoId);
     return curso ? [{ email, cursoId, curso, p, dias }] : [];
@@ -399,14 +399,13 @@ export async function semAula(minimoDias = 1, progresso?: Progresso): Promise<{ 
     progresso ?? lerProgresso(), carrinhosDeCurso(), todosAlunos(), getCursos(), todosCursosRemovidos(), telefonesDosAlunos(),
   ]);
   const aluno = new Map(alunos.map((a) => [norm(a.email), a]));
-  const agora = Date.now();
   const nunca: PessoaSemAula[] = [];
   for (const c of carrinhos) {
     const curso = cursos.find((x) => x.id === c.cursoId);
     if (!curso) continue;
     if (c.etapa !== "pago" && c.etapa !== "matriculado") continue;
     const desde = c.atualizadoEm;
-    const dias = Math.floor((agora - new Date(desde).getTime()) / DIA);
+    const dias = diasDesde(desde) ?? 0;
     if (dias < minimoDias) continue;
     const base = {
       email: c.email, telefone: telefones.get(c.email) ?? c.telefone, cursoId: c.cursoId, cursoNome: curso.nome, cursoSlug: curso.slug,
