@@ -1,6 +1,7 @@
 import "server-only";
 import { getCursos, getModulos } from "./cursos";
 import { listarAlunos, listarCertificados, todasAsLinhasDeProgresso, type LinhaProgresso } from "./dados";
+import { diasDesde } from "./admin-relatorios";
 
 /**
  * Progresso dos alunos (antes era "ranking por pontos").
@@ -112,12 +113,11 @@ export async function calcularProgresso(): Promise<ProgressoAluno[]> {
     porAluno.set(email, lista);
   }
 
-  const agora = Date.now();
   const out: ProgressoAluno[] = Array.from(porAluno, ([email, cursos]) => {
     // Dentro do aluno: mais perto de terminar primeiro (os já certificados vão para o fim).
     cursos.sort((a, b) => PESO[a.situacao] - PESO[b.situacao] || b.pct - a.pct);
     const ultima = cursos.reduce((m, c) => (c.ultimaAtividade > m ? c.ultimaAtividade : m), "");
-    const diasSemEstudar = ultima ? Math.floor((agora - new Date(ultima).getTime()) / 86_400_000) : 9999;
+    const diasSemEstudar = diasDesde(ultima || null) ?? 9999;
     const temAberto = cursos.some((c) => c.pct < 100);
     return {
       email,

@@ -6,10 +6,16 @@ import { listarCobrancas } from "./pagamentos";
 import { financasDaVenda, obterTaxas } from "./taxas";
 import { nomeForma } from "@/components/admin/EtiquetaSituacao";
 
-/** Dias desde uma data (null = nunca). */
+/** Dia do calendário no horário de Brasília (Belém usa o mesmo horário), contado em dias. */
+function diaLocal(d: Date): number {
+  const [a, m, dia] = d.toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }).split("-").map(Number);
+  return Date.UTC(a, m - 1, dia) / 86_400_000;
+}
+
+/** Dias de calendário desde uma data (null = nunca): 0 = hoje, 1 = ontem. Não é "24 horas atrás". */
 export function diasDesde(iso: string | null | undefined): number | null {
   if (!iso) return null;
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  return Math.max(0, diaLocal(new Date()) - diaLocal(new Date(iso)));
 }
 
 export function dataBR(iso: string | null | undefined): string {
