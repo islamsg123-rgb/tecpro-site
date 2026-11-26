@@ -9,7 +9,7 @@ import { bancoEmDemonstracao, db } from "./index";
 
 export type TipoEmail =
   | "boas_vindas" | "acesso" | "senha" | "lembrete" | "nunca_comecou"
-  | "cert_parabens" | "cert_pdf" | "teste" | "equipe" | "outro";
+  | "cert_parabens" | "cert_convite" | "cert_ultimo" | "cert_pdf" | "teste" | "equipe" | "outro";
 
 export const NOME_TIPO_EMAIL: Record<string, string> = {
   boas_vindas: "Boas-vindas",
@@ -18,6 +18,8 @@ export const NOME_TIPO_EMAIL: Record<string, string> = {
   lembrete: "Lembrete de estudo",
   nunca_comecou: "Lembrete: ainda não começou",
   cert_parabens: "Parabéns (certificado)",
+  cert_convite: "2º e-mail do certificado",
+  cert_ultimo: "Último aviso do certificado",
   cert_pdf: "Certificado em PDF",
   teste: "E-mail de teste",
   equipe: "Aviso para a equipe",

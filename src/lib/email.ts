@@ -349,6 +349,88 @@ ${beneficios.map(([t, s]) => `<tr><td width="28" valign="top" style="padding:5px
   return { assunto, html, texto };
 }
 
+/**
+ * 2º e-mail do certificado (padrão: 1 dia depois de concluir, se ainda não emitiu).
+ * Mais persuasivo: mostra para que o certificado serve no dia a dia e como é rápido. Sem preço.
+ */
+export function emailConviteCertificado(d: { nome: string; curso: string; horas: number; link: string; linkSair: string }) {
+  const nomeCompleto = d.nome.trim().replace(/\s+/g, " ");
+  const primeiro = nomeCompleto.split(" ")[0] || "";
+  const assunto = `${primeiro ? `${primeiro}, s` : "S"}eu certificado de ${d.curso} está esperando por você`;
+  const usos = [
+    ["No currículo:", "um curso com certificado vale muito mais do que escrever \u201cconhecimento em\u201d sem comprovar."],
+    ["No LinkedIn:", "adicione em \u201cLicenças e certificados\u201d e apareça mais para os recrutadores."],
+    ["Na entrevista:", "você mostra o documento e não precisa só dizer que sabe."],
+    ["Na faculdade ou no trabalho:", "pode contar como horas complementares ou de capacitação, conforme as regras de cada lugar."],
+  ];
+  const horas = d.horas ? `${d.horas} horas` : "muitas horas";
+  const html = `${topo}
+<tr><td style="padding:28px">
+<p style="font-size:20px;font-weight:bold;margin:0 0 12px">${primeiro ? `${escapar(primeiro)}, você` : "Você"} já fez a parte mais difícil 💪</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 12px">Você concluiu o curso <strong>${escapar(d.curso)}</strong>: foram <strong>${horas}</strong> de estudo até a última aula. Mas, para quem vai te contratar, o que conta é o que você consegue <strong>comprovar</strong>.</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 4px">O seu certificado já está pronto, com o seu nome. Só falta emitir:</p>
+${miniCertificado(nomeCompleto || "Seu nome aqui", d.curso, d.horas, "Pronto para emitir")}
+<p style="font-size:15px;font-weight:bold;margin:0 0 10px">Onde o certificado faz diferença:</p>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px">
+${usos.map(([t, s]) => `<tr><td width="28" valign="top" style="padding:5px 0;font-size:16px;color:#16a34a">✔</td><td style="padding:5px 0;font-size:14px;line-height:1.5"><strong>${t}</strong> ${s}</td></tr>`).join("\n")}
+</table>
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px;background:#f4f7fe;border-radius:12px"><tr><td style="padding:14px 18px;font-size:14px;line-height:1.6">
+<strong>Qualquer empresa confere em segundos</strong> se o seu certificado é verdadeiro, pelo código e pelo QR Code impressos nele.
+</td></tr></table>
+<p style="margin:24px 0 10px;text-align:center">${botaoLaranja(d.link, "Emitir meu certificado")}</p>
+<p style="font-size:13px;line-height:1.5;margin:0 0 22px;color:#64748b;text-align:center">Você confere o seu nome e baixa o PDF na hora. Vai fazer outros cursos? Nos pacotes, cada certificado sai mais barato.</p>
+<p style="font-size:13px;color:#64748b;margin:0">Um abraço,<br>Equipe Tecpro Multi Ensino</p>
+</td></tr>${fim(rodapeSair(d.linkSair))}`;
+  const texto = [
+    `${primeiro ? `${primeiro}, você` : "Você"} já fez a parte mais difícil!`, ``,
+    `Você concluiu o curso ${d.curso}: foram ${horas} de estudo. Mas, para quem vai te contratar, o que conta é o que você consegue comprovar.`, ``,
+    `O seu certificado já está pronto, com o seu nome. Onde ele faz diferença:`,
+    ...usos.map(([t, s]) => `- ${t} ${s}`), ``,
+    `Qualquer empresa confere se ele é verdadeiro pelo código e pelo QR Code.`, ``,
+    `Emitir meu certificado: ${d.link}`, ``,
+    `Equipe Tecpro Multi Ensino`, ``,
+    `Não quer mais receber lembretes? ${d.linkSair}`,
+  ].join("\n");
+  return { assunto, html, texto };
+}
+
+/**
+ * 3º e-mail do certificado (padrão: 7 dias depois de concluir, se ainda não emitiu). Tom firme,
+ * mas só com coisas verdadeiras: é mesmo o último e-mail sobre este certificado e nada é apagado
+ * (o acesso é vitalício). Não ameaçar com perda que não acontece (CDC art. 37).
+ */
+export function emailUltimoAvisoCertificado(d: { nome: string; curso: string; horas: number; link: string; linkSair: string }) {
+  const nomeCompleto = d.nome.trim().replace(/\s+/g, " ");
+  const primeiro = nomeCompleto.split(" ")[0] || "";
+  const assunto = `Último aviso: seu certificado de ${d.curso} ainda não foi emitido`;
+  const horas = d.horas ? `${d.horas} horas` : "horas";
+  const html = `${topo}
+<tr><td style="padding:28px">
+<p style="margin:0 0 14px"><span style="display:inline-block;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:bold;padding:5px 12px;border-radius:999px">ÚLTIMO AVISO</span></p>
+<p style="font-size:20px;font-weight:bold;margin:0 0 12px">${primeiro ? `${escapar(primeiro)}, n` : "N"}ão deixe o seu esforço sem comprovação</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 12px">Você estudou <strong>${horas}</strong> e concluiu o curso <strong>${escapar(d.curso)}</strong>, mas o seu certificado <strong>ainda não foi emitido</strong>.</p>
+<p style="font-size:15px;line-height:1.6;margin:0 0 12px">Pense em todo o tempo que você dedicou. Sem o certificado, nada disso aparece no seu currículo. E uma boa vaga pode aparecer amanhã: quem já tem o certificado em mãos se candidata na hora; quem deixou para depois fica para trás.</p>
+${miniCertificado(nomeCompleto || "Seu nome aqui", d.curso, d.horas, "Ainda não emitido")}
+<table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 6px;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px"><tr><td style="padding:14px 18px;font-size:14px;line-height:1.6">
+<strong>Este é o último e-mail que vamos mandar sobre este certificado.</strong> Depois dele, não vamos mais lembrar você. Resolva agora: leva menos de 2 minutos.
+</td></tr></table>
+<p style="margin:24px 0 10px;text-align:center">${botaoLaranja(d.link, "Emitir meu certificado agora")}</p>
+<p style="font-size:13px;line-height:1.5;margin:0 0 22px;color:#64748b;text-align:center">O PDF sai na hora e você recebe uma cópia por e-mail.</p>
+<p style="font-size:13px;color:#64748b;margin:0">Equipe Tecpro Multi Ensino</p>
+</td></tr>${fim(rodapeSair(d.linkSair))}`;
+  const texto = [
+    `ÚLTIMO AVISO`, ``,
+    `${primeiro ? `${primeiro}, n` : "N"}ão deixe o seu esforço sem comprovação.`, ``,
+    `Você estudou ${horas} e concluiu o curso ${d.curso}, mas o seu certificado ainda não foi emitido.`,
+    `Sem ele, nada disso aparece no seu currículo. Uma boa vaga pode aparecer amanhã: quem já tem o certificado se candidata na hora.`, ``,
+    `Este é o último e-mail que vamos mandar sobre este certificado. Leva menos de 2 minutos:`,
+    `Emitir meu certificado agora: ${d.link}`, ``,
+    `Equipe Tecpro Multi Ensino`, ``,
+    `Não quer mais receber lembretes? ${d.linkSair}`,
+  ].join("\n");
+  return { assunto, html, texto };
+}
+
 /** Certificado emitido: vai em PDF anexo, com link permanente para baixar de novo e para validar. */
 export function emailCertificadoEmitido(d: {
   nome: string; curso: string; horas: number; codigo: string; emitidoEm: string; linkPdf: string; linkValidar: string;

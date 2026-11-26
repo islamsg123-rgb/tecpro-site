@@ -63,6 +63,15 @@ export interface ConfigCertificado {
   horas: number;
   /** Manda o certificado em PDF por e-mail assim que é emitido */
   entrega: boolean;
+  /** 2º e-mail (convite para emitir), X dias depois de concluir, se ainda não emitiu */
+  segundo: EtapaCertificado;
+  /** 3º e-mail (último aviso), X dias depois de concluir, se ainda não emitiu */
+  terceiro: EtapaCertificado;
+}
+
+export interface EtapaCertificado {
+  ligado: boolean;
+  dias: number;
 }
 
 export interface GrupoExtra {
@@ -90,7 +99,7 @@ export const MENSAGEM_WHATSAPP_NUNCA =
 export const CONFIG_LEMBRETES_PADRAO: ConfigLembretes = {
   ligado: false, dias: [3, 7, 14], limiteDias: 45, maximoPorDia: 90, mensagemWhatsapp: MENSAGEM_WHATSAPP_PADRAO,
   nuncaComecou: { ligado: false, dias: [1, 3, 7], mensagemWhatsapp: MENSAGEM_WHATSAPP_NUNCA },
-  certificado: { ligado: true, horas: 1, entrega: true },
+  certificado: { ligado: true, horas: 1, entrega: true, segundo: { ligado: true, dias: 1 }, terceiro: { ligado: true, dias: 7 } },
 };
 
 /** Junta o que está salvo com o padrão (configurações antigas não têm os grupos novos). */
@@ -99,7 +108,11 @@ function completar(c: Partial<ConfigLembretes> | undefined): ConfigLembretes {
   return {
     ...p, ...c,
     nuncaComecou: { ...p.nuncaComecou, ...c?.nuncaComecou },
-    certificado: { ...p.certificado, ...c?.certificado },
+    certificado: {
+      ...p.certificado, ...c?.certificado,
+      segundo: { ...p.certificado.segundo, ...c?.certificado?.segundo },
+      terceiro: { ...p.certificado.terceiro, ...c?.certificado?.terceiro },
+    },
   };
 }
 
