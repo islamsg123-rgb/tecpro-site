@@ -350,7 +350,7 @@ async function todosAlunos(): Promise<{ email: string; nome: string | null }[]> 
   return linhas.map((r) => ({ email: String(r.email), nome: (r.nome as string) ?? null }));
 }
 
-async function todosCursosRemovidos(): Promise<Set<string>> {
+export async function todosCursosRemovidos(): Promise<Set<string>> {
   if (bancoEmDemonstracao) {
     const g = globalThis as unknown as { __painelDemo?: { removidos: Map<string, string> } };
     return new Set(g.__painelDemo?.removidos.keys() ?? []);
