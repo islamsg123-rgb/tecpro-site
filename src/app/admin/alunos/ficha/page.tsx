@@ -21,6 +21,9 @@ import { EtiquetaAluno } from "@/components/admin/Blocos";
 import { adicionarCursoAluno, removerCursoAluno, salvarDadosAlunoAcao, excluirAlunoAcao } from "../../acoes";
 import { IconeChevron } from "@/components/Icones";
 import { Dica } from "@/components/admin/Dica";
+import { SenhaDoAluno } from "@/components/admin/SenhaDoAluno";
+import { situacaoSenha } from "@/lib/dados/senha-aluno";
+import { SITE_OFICIAL } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Ficha do aluno" };
 export const dynamic = "force-dynamic";
@@ -102,7 +105,13 @@ export default async function Ficha({ searchParams }: Props) {
   const pagos = (pagamentos ?? []).filter((p) => p.situacao === "pago");
   const aviso = params.salvo ? avisos[`salvo:${params.salvo}`] : params.erro ? avisos[`erro:${params.erro}`] : null;
   const campo = "mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal";
-  const funcionario = acesso.dono ? await obterFuncionario(email).catch(() => null) : null;
+  const funcionario = await obterFuncionario(email).catch(() => null);
+  const senha = await situacaoSenha(email).catch(() => null);
+  const nomeMudanca = { criada: "Senha criada pelo painel", trocada: "Senha trocada pelo painel", email: "E-mail para criar a senha enviado pelo painel" } as const;
+  const senhaProtegida = eDono(email)
+    ? "Este e-mail é do dono do site. A senha dele só pode ser trocada em Minha senha, pela própria pessoa."
+    : funcionario ? "Esta pessoa é funcionária do painel. Por segurança, ela mesma troca a senha em Minha senha."
+    : null;
   const protegido =
     email === acesso.email.toLowerCase() ? "Esta é a sua própria conta. Ela não pode ser excluída por aqui."
     : eDono(email) ? "Este e-mail é do dono do site e não pode ser excluído por aqui."
@@ -178,6 +187,22 @@ export default async function Ficha({ searchParams }: Props) {
           {asaas && <p className="text-xs text-slate-400">CPF e telefone vêm do cadastro de pagamento quando não foram editados aqui.</p>}
         </div>
       </form>
+
+      {senha === null ? (
+        <p className="mt-10 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">Não conseguimos consultar a conta de login agora (seção Senha de acesso). Tente de novo em instantes.</p>
+      ) : (
+        <SenhaDoAluno
+          email={email}
+          nome={nome}
+          telefone={telefone}
+          linkEntrar={`${SITE_OFICIAL}/entrar`}
+          podeCriar={acesso.dono}
+          protegido={senhaProtegida}
+          temLogin={senha.temLogin}
+          ultimoLogin={senha.ultimoLogin ? dataHoraBR(senha.ultimoLogin) : null}
+          historico={senha.historico.map((h) => ({ quando: dataHoraBR(h.quando), texto: `${nomeMudanca[h.tipo] ?? h.tipo} · por ${h.quem}` }))}
+        />
+      )}
 
       <h2 id="cursos" className="mt-10 scroll-mt-24 text-xl font-bold text-marca-900">Cursos</h2>
       {cursos === null ? (
