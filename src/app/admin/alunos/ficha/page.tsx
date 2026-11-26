@@ -151,7 +151,7 @@ export default async function Ficha({ searchParams }: Props) {
             Total pago: <strong className="text-marca-900">{formatarPreco(pagos.reduce((s, p) => s + p.valorCentavos, 0))}</strong>
           </p>
           <p className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600">
-            Última atividade: <strong className="text-marca-900">{ultima ? `${dataHoraBR(ultima)} (${dias === 0 ? "hoje" : `há ${dias} dias`})` : "nunca estudou"}</strong>
+            Última atividade: <strong className="text-marca-900">{ultima ? `${dataHoraBR(ultima)} (${dias === 0 ? "hoje" : dias === 1 ? "ontem" : `há ${dias} dias`})` : "nunca estudou"}</strong>
           </p>
           {telefone && (
             <a href={`https://wa.me/${telefone.replace(/\D/g, "").length <= 11 ? "55" : ""}${telefone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white hover:bg-emerald-700">

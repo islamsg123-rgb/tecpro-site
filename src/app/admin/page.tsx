@@ -7,6 +7,7 @@ import {
 import { Caixa, dataCurta, LinkVerTudo, Numero, Vazio } from "@/components/admin/Blocos";
 import { contarNovas } from "@/lib/dados/mensagens";
 import { Dica } from "@/components/admin/Dica";
+import { inicioUltimosDias } from "@/lib/dias";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +52,7 @@ export default async function PainelRapido({ searchParams }: Props) {
   const hoje = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
   const diaDe = (iso: string | null) => (iso ? new Date(iso.length === 10 ? `${iso}T12:00:00-03:00` : iso).toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" }) : "");
   const novosHoje = alunos.filter((a) => diaDe(a.desde) === hoje).length;
-  const seteDias = new Date(Date.now() - 7 * 86400_000).toISOString();
+  const seteDias = inicioUltimosDias(7);
   const novos7 = alunos.filter((a) => a.desde && new Date(a.desde.length === 10 ? `${a.desde}T12:00:00-03:00` : a.desde).toISOString() >= seteDias).length;
   const semCertificado = formados.filter((f) => f.faltaPagarCertificado);
 

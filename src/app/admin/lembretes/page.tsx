@@ -3,6 +3,7 @@ import Link from "next/link";
 import { exigirAdmin } from "@/lib/admin";
 import { ultimaAtividadePorAluno } from "@/lib/dados";
 import { emailConfigurado } from "@/lib/email";
+import { inicioUltimosDias } from "@/lib/dias";
 import {
   descadastrados, etapaPara, faltaSqlTipos, linkContinuar, listarLembretes, listasDoPainel, NOME_TIPO, obterConfigLembretes, ultimaRodada,
   type AlunoParado, type ConfigLembretes, type PessoaSemAula, type RegistroLembrete, type TipoLembrete,
@@ -53,10 +54,11 @@ export default async function Lembretes({ searchParams }: Props) {
     const a = atividade.get(h.email);
     return Boolean(a && new Date(a).getTime() > new Date(h.enviadoEm).getTime());
   };
-  const ultimos30 = enviados.filter((h) => Date.now() - new Date(h.enviadoEm).getTime() < 30 * 86_400_000);
+  const inicio30 = inicioUltimosDias(30), inicio7 = inicioUltimosDias(7);
+  const ultimos30 = enviados.filter((h) => new Date(h.enviadoEm).toISOString() >= inicio30);
   const alunos30 = new Set(ultimos30.map((h) => h.email));
   const voltaram30 = new Set(ultimos30.filter(voltou).map((h) => h.email));
-  const ultimos7 = ultimos30.filter((h) => Date.now() - new Date(h.enviadoEm).getTime() < 7 * 86_400_000);
+  const ultimos7 = ultimos30.filter((h) => new Date(h.enviadoEm).toISOString() >= inicio7);
   const alunos7 = new Set(ultimos7.map((h) => h.email));
   const voltaram7 = new Set(ultimos7.filter(voltou).map((h) => h.email));
   // Voltaram HOJE: foram lembrados (30 dias) e a última aula estudada é de hoje (horário de Belém), depois do e-mail.

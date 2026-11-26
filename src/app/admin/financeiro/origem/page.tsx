@@ -7,6 +7,7 @@ import { CANAIS, nomeOrigem } from "@/lib/origem";
 import { SITE_OFICIAL } from "@/lib/site";
 import { Caixa, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { GeradorLinks } from "@/components/admin/GeradorLinks";
+import { inicioUltimosDias } from "@/lib/dias";
 
 export const metadata: Metadata = { title: "De onde vêm as vendas" };
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ function inicioDoPeriodo(p: Periodo): string {
   const hojeBR = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
   if (p === "hoje") return new Date(`${hojeBR}T00:00:00-03:00`).toISOString();
   if (p === "mes") return new Date(`${hojeBR.slice(0, 7)}-01T00:00:00-03:00`).toISOString();
-  return new Date(Date.now() - (p === "sete" ? 7 : 30) * 86400_000).toISOString();
+  return inicioUltimosDias(p === "sete" ? 7 : 30);
 }
 
 export default async function OrigemDasVendas({ searchParams }: Props) {

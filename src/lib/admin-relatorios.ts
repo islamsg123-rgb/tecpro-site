@@ -6,11 +6,8 @@ import { listarCobrancas } from "./pagamentos";
 import { financasDaVenda, obterTaxas } from "./taxas";
 import { nomeForma } from "@/components/admin/EtiquetaSituacao";
 
-/** Dias desde uma data (null = nunca). */
-export function diasDesde(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-}
+import { diasDesde } from "./dias";
+export { diasDesde };
 
 export function dataBR(iso: string | null | undefined): string {
   if (!iso) return "";
