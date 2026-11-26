@@ -5,6 +5,7 @@ import { listarCupons, type Cupom } from "@/lib/dados/carrinhos";
 import { formatarPreco } from "@/lib/formatar";
 import { alternarCupom, criarCupom, excluirCupom } from "../acoes";
 import { Dica } from "@/components/admin/Dica";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Cupons" };
 export const dynamic = "force-dynamic";
@@ -82,7 +83,7 @@ export default async function Cupons({ searchParams }: Props) {
       {!lista.length ? (
         <p className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">Nenhum cupom criado ainda.</p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+        <Recolhivel total={lista.length} className="mt-6"><div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
               <tr>
@@ -95,7 +96,7 @@ export default async function Cupons({ searchParams }: Props) {
                 <th className="px-5 py-3 font-semibold"><span className="sr-only">Ações</span></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100"><Itens>
               {lista.map((c) => {
                 const vencido = Boolean(c.validade && c.validade < hoje);
                 const esgotado = c.limiteUsos !== null && c.usos >= c.limiteUsos;
@@ -128,9 +129,9 @@ export default async function Cupons({ searchParams }: Props) {
                   </tr>
                 );
               })}
-            </tbody>
+            </Itens></tbody>
           </table>
-        </div>
+        </div></Recolhivel>
       )}
     </>
   );

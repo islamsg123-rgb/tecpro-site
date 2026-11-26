@@ -10,6 +10,7 @@ import { linkEmitirCertificado, mensagemCertificado } from "@/lib/whatsapp-certi
 import { BotaoWhatsCertificado } from "@/components/admin/BotaoWhatsCertificado";
 import { nomeForma } from "@/components/admin/EtiquetaSituacao";
 import { Caixa, dataCurta, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Recuperar vendas" };
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export default async function Devedores() {
         {!devedores.length ? (
           <Vazio>Nenhum Pix ou boleto esquecido.</Vazio>
         ) : (
-          <div className="overflow-x-auto">
+          <Recolhivel total={devedores.length}><div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
                 <tr>
@@ -58,7 +59,7 @@ export default async function Devedores() {
                   <th className="py-2 font-semibold"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100"><Itens>
                 {devedores.map((d) => {
                   const fone = d.telefone || (d.email ? telefone(d.email) : null);
                   const fatura = d.cobrancas.find((c) => c.linkFatura)?.linkFatura;
@@ -92,9 +93,9 @@ export default async function Devedores() {
                     </tr>
                   );
                 })}
-              </tbody>
+              </Itens></tbody>
             </table>
-          </div>
+          </div></Recolhivel>
         )}
       </Caixa>
 
@@ -102,7 +103,7 @@ export default async function Devedores() {
         {!pendentesCert.length ? (
           <Vazio>Ninguém nessa situação agora.</Vazio>
         ) : (
-          <ul className="divide-y divide-slate-100 text-sm">
+          <Recolhivel total={pendentesCert.length}><ul className="divide-y divide-slate-100 text-sm"><Itens>
             {pendentesCert.map((f) => {
               const fone = telefones.get(f.email.trim().toLowerCase()) ?? telefone(f.email);
               return (
@@ -115,7 +116,7 @@ export default async function Devedores() {
                 </li>
               );
             })}
-          </ul>
+          </Itens></ul></Recolhivel>
         )}
       </Caixa>
     </>

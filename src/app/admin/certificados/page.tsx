@@ -7,6 +7,7 @@ import { dataBR } from "@/lib/admin-relatorios";
 import { BotaoExportar } from "@/components/admin/BotaoExportar";
 import { Dica } from "@/components/admin/Dica";
 import { reenviarCertificado } from "./acoes";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Certificados" };
 export const dynamic = "force-dynamic";
@@ -39,13 +40,13 @@ export default async function Certificados({ searchParams }: Props) {
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
           <p className="font-semibold">Pagos e ainda não emitidos ({naoEmitidos.length})</p>
           <p className="mt-1 text-amber-800">O aluno já pagou; falta ele confirmar o nome e emitir na área do aluno.</p>
-          <ul className="mt-3 space-y-1">
+          <Recolhivel total={naoEmitidos.length} className="mt-3"><ul className="space-y-1"><Itens>
             {naoEmitidos.map((p) => (
               <li key={`${p.email}|${p.cursoId}`}>
                 <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(p.email)}`} className="underline">{p.email}</Link> · {nomeCurso(p.cursoId)} · pago em {dataBR(p.pagoEm)}
               </li>
             ))}
-          </ul>
+          </Itens></ul></Recolhivel>
         </div>
       )}
 
@@ -58,7 +59,7 @@ export default async function Certificados({ searchParams }: Props) {
           {emitidos.length ? "Nenhum certificado nesta busca." : "Nenhum certificado emitido ainda."}
         </p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200 bg-white">
+        <Recolhivel total={lista.length} className="mt-4"><div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
               <tr>
@@ -70,7 +71,7 @@ export default async function Certificados({ searchParams }: Props) {
                 <th className="px-5 py-3 font-semibold"><span className="sr-only">Ações</span></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100"><Itens>
               {lista.map((c) => (
                 <tr key={c.codigo} className="hover:bg-marca-50/50">
                   <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-marca-900">{c.codigo}</td>
@@ -97,9 +98,9 @@ export default async function Certificados({ searchParams }: Props) {
                   </td>
                 </tr>
               ))}
-            </tbody>
+            </Itens></tbody>
           </table>
-        </div>
+        </div></Recolhivel>
       )}
     </>
   );

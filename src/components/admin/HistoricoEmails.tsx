@@ -1,6 +1,7 @@
 import { dataHoraBR } from "@/lib/admin-relatorios";
 import { NOME_TIPO_EMAIL, type EmailEnviado } from "@/lib/dados/emails";
 import { Dica } from "@/components/admin/Dica";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 /** Seção "E-mails enviados" da ficha do aluno: cada e-mail que a escola mandou e o que a pessoa fez com ele. */
 
@@ -88,7 +89,7 @@ export function HistoricoEmails({ emails, endereco }: { emails: EmailEnviado[] |
           <p className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-red-700">Com problema <strong>{problemas}</strong></p>
         )}
       </div>
-      <ul className="mt-3 divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm">
+      <Recolhivel total={emails.length} mostrar={5} className="mt-3"><ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm"><Itens>
         {emails.map((m) => (
           <li key={m.id}>
             <details className="group px-5 py-3">
@@ -134,7 +135,7 @@ export function HistoricoEmails({ emails, endereco }: { emails: EmailEnviado[] |
             </details>
           </li>
         ))}
-      </ul>
+      </Itens></ul></Recolhivel>
       <p className="mt-2 text-xs text-slate-400">
         Abertura é aproximada: o Mail do iPhone às vezes conta como aberto sozinho, e alguns aplicativos bloqueiam a contagem. Clique é mais confiável.
       </p>

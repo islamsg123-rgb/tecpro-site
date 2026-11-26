@@ -9,6 +9,7 @@ import { financasDaVenda, obterTaxas } from "@/lib/taxas";
 import { nomeForma } from "@/components/admin/EtiquetaSituacao";
 import { Caixa, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import type { Cobranca } from "@/lib/pagamentos/tipos";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Hoje" };
 export const dynamic = "force-dynamic";
@@ -96,7 +97,7 @@ export default async function Hoje() {
           {!vendasHoje.length ? (
             <Vazio>Nenhuma venda hoje ainda. Assim que entrar uma, ela aparece aqui (e o painel toca o aviso).</Vazio>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <Recolhivel total={vendasHoje.length}><ul className="divide-y divide-slate-100"><Itens>
               {vendasHoje.map((c, i) => {
                 const r = registro.get(c.id);
                 const f = fin[i];
@@ -119,7 +120,7 @@ export default async function Hoje() {
                   </li>
                 );
               })}
-            </ul>
+            </Itens></ul></Recolhivel>
           )}
         </Caixa>
 

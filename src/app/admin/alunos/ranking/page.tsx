@@ -5,6 +5,7 @@ import { dataHoraBR } from "@/lib/admin-relatorios";
 import { calcularProgresso, filtrar, FILTROS, QUASE, type CursoDoAluno, type Filtro, type ProgressoAluno, type SituacaoCurso } from "@/lib/ranking";
 import { Titulo, Vazio } from "@/components/admin/Blocos";
 import { Dica } from "@/components/admin/Dica";
+import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 
 export const metadata: Metadata = { title: "Progresso dos alunos" };
 export const dynamic = "force-dynamic";
@@ -124,9 +125,9 @@ export default async function Progresso({ searchParams }: Props) {
           <p className="mb-3 text-sm text-slate-500">
             {plural(lista.length, "aluno", "alunos")}{filtro === "todos" ? "" : ` em "${atual.rotulo}"`}, do mais adiantado para o menos adiantado.
           </p>
-          <ol className="space-y-3">
+          <Recolhivel total={lista.length}><ol className="space-y-3"><Itens>
             {lista.map((a, i) => <CartaoAluno key={a.email} a={a} posicao={i + 1} />)}
-          </ol>
+          </Itens></ol></Recolhivel>
         </>
       )}
     </>
