@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { acessoPainel, emailsDono } from "@/lib/admin";
 import { getCursos } from "@/lib/cursos";
 import { listarFuncionarios } from "@/lib/dados/painel";
-import { cadastrosHoje, contatosPorEmail, inicioDeHoje, resumoPresenca } from "@/lib/dados/online";
+import { cadastrosHoje, certificadosEmitidos, contatosPorEmail, inicioDeHoje, resumoPresenca } from "@/lib/dados/online";
 import { listarVendasRegistradas } from "@/lib/dados/avisos-venda";
 import { linkWhatsapp } from "@/lib/whatsapp-certificado";
 import type { PaginaOnline, PessoaNoCheckout, RespostaOnline } from "@/lib/online";
@@ -57,31 +57,51 @@ export async function GET(req: Request) {
   ]);
   const nomeCurso = new Map(cursos.map((c) => [c.slug, c.nome]));
   const nomePorId = new Map(cursos.map((c) => [c.id, c.nome]));
-  const online = resumo.online.filter((p) => !p.email || !equipe.has(p.email));
+  const idPorSlug = new Map(cursos.map((c) => [c.slug, c.id]));
+  const gratis = new Set(cursos.filter((c) => c.gratuito).map((c) => c.slug));
+  const online = resumo.online
+    .filter((p) => !p.email || !equipe.has(p.email))
+    // A tela de "finalizar matrícula" de um curso GRATUITO é só cadastro: não tem pagamento.
+    .map((p) => (p.pagina === "checkout" && p.cursoSlug && gratis.has(p.cursoSlug) ? { ...p, pagina: "cadastro" as const } : p));
   const loja = online.filter((p) => p.area === "loja");
   const aluno = online.filter((p) => p.area === "aluno");
 
   const paginas: Partial<Record<PaginaOnline, number>> = {};
   for (const p of loja) paginas[p.pagina] = (paginas[p.pagina] ?? 0) + 1;
 
-  const pagando = loja.filter((p) => p.pagina === "checkout" || p.pagina === "pagando");
-  const contatos = verPessoas ? await contatosPorEmail([...new Set(pagando.map((p) => p.email).filter((e): e is string => Boolean(e)))]).catch(() => new Map()) : new Map();
-  const noCheckout: PessoaNoCheckout[] = pagando.map((p) => {
+  // Pagamento de verdade: curso pago, tela do Pix/boleto, ou aluno na página do certificado que ainda não tem o certificado.
+  const naPaginaCertificado = aluno.filter((p) => p.pagina === "certificado" && p.email && p.cursoSlug);
+  const emitidos = await certificadosEmitidos([...new Set(naPaginaCertificado.map((p) => p.email!))]).catch(() => new Set<string>());
+  const pagandoCertificado = naPaginaCertificado.filter((p) => !emitidos.has(`${p.email}|${idPorSlug.get(p.cursoSlug!)}`));
+  const pagando = [...loja.filter((p) => p.pagina === "checkout" || p.pagina === "pagando"), ...pagandoCertificado];
+  const cadastrando = loja.filter((p) => p.pagina === "cadastro");
+
+  const emails = [...new Set([...pagando, ...cadastrando].map((p) => p.email).filter((e): e is string => Boolean(e)))];
+  const contatos = verPessoas ? await contatosPorEmail(emails).catch(() => new Map()) : new Map();
+  const pessoa = (p: (typeof online)[number]): PessoaNoCheckout => {
     const c = p.email ? contatos.get(p.email) : undefined;
     // Na tela do Pix/boleto o endereço não diz o curso: usa o último carrinho da pessoa.
     const curso = (p.cursoSlug ? nomeCurso.get(p.cursoSlug) : c?.cursoId ? nomePorId.get(c.cursoId) : null) ?? null;
     const nome = verPessoas ? c?.nome ?? null : null;
     const primeiro = (nome ?? "").split(/\s+/)[0];
-    const texto = `Oi${primeiro ? `, ${primeiro}` : ""}! Aqui é da Tecpro Multi Ensino. Vi que você está finalizando sua inscrição${curso ? ` no curso ${curso}` : ""}. Posso te ajudar com alguma dúvida no pagamento?`;
+    const pagina = (p.area === "aluno" ? "certificado" : p.pagina) as PessoaNoCheckout["pagina"];
+    const oi = `Oi${primeiro ? `, ${primeiro}` : ""}! Aqui é da Tecpro Multi Ensino.`;
+    const texto = pagina === "cadastro"
+      ? `${oi} Vi que você está se cadastrando${curso ? ` no curso grátis ${curso}` : " num curso grátis"}. Posso te ajudar em alguma coisa?`
+      : pagina === "certificado"
+        ? `${oi} Parabéns por concluir${curso ? ` o curso ${curso}` : " o curso"}! Posso te ajudar com alguma dúvida para emitir o seu certificado?`
+        : `${oi} Vi que você está finalizando sua inscrição${curso ? ` no curso ${curso}` : ""}. Posso te ajudar com alguma dúvida no pagamento?`;
     return {
       nome,
       email: verPessoas ? p.email : null,
       curso,
-      pagina: p.pagina as "checkout" | "pagando",
+      pagina,
       ficha: verPessoas && p.email && acesso.permissoes.includes("alunos") ? `/admin/alunos/ficha?email=${encodeURIComponent(p.email)}` : null,
       whatsapp: verPessoas && c?.telefone ? linkWhatsapp(c.telefone, texto) : null,
     };
-  });
+  };
+  const noCheckout = pagando.map(pessoa);
+  const cadastroGratis = cadastrando.map(pessoa);
 
   const resposta: RespostaOnline = {
     tabelaFaltando: resumo.tabelaFaltando,
@@ -89,8 +109,9 @@ export async function GET(req: Request) {
     loja: {
       total: loja.length,
       paginas,
-      cursosVistos: contarPor(loja.filter((p) => p.pagina === "curso" || p.pagina === "checkout"), (p) => (p.cursoSlug ? nomeCurso.get(p.cursoSlug) ?? null : null)).slice(0, 5),
+      cursosVistos: contarPor(loja.filter((p) => p.pagina === "curso" || p.pagina === "checkout" || p.pagina === "cadastro"), (p) => (p.cursoSlug ? nomeCurso.get(p.cursoSlug) ?? null : null)).slice(0, 5),
       noCheckout,
+      cadastroGratis,
     },
     aluno: {
       total: aluno.length,
