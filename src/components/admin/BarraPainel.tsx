@@ -8,6 +8,7 @@ import { ChavePaineis } from "./ChavePaineis";
 import { AvisoVendas } from "./AvisoVendas";
 import { NOME_AREA, areaDoCaminho, temDuasAreas, type Contadores, type Secao } from "./MenuLateral";
 import { definirModoAluno } from "../VoltarAoPainel";
+import { CHAVE_EQUIPE } from "../SinalOnline";
 
 /**
  * Barra preta no topo do painel: deixa claro que você está no painel, não no site.
@@ -20,7 +21,15 @@ export function BarraPainel({ secoes, contadores, veFinanceiro }: { secoes: Seca
   const area = areaDoCaminho(pathname);
   const duas = temDuasAreas(secoes);
   // Voltou ao painel: sai do modo "ver como aluno".
-  useEffect(() => definirModoAluno(false), []);
+  useEffect(() => {
+    definirModoAluno(false);
+    // Este navegador é da equipe: não entra na contagem do "Online agora".
+    try {
+      localStorage.setItem(CHAVE_EQUIPE, "1");
+    } catch {
+      /* sem armazenamento */
+    }
+  }, []);
 
   function verComoAluno() {
     definirModoAluno(true);

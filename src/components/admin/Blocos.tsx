@@ -39,7 +39,7 @@ export function Numero({ rotulo, valor, detalhe, href, cor = "marca", dica }: { 
 
 export function Caixa({ titulo, acao, children, className = "" }: { titulo: string; acao?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-5 ${className}`}>
+    <section className={`min-w-0 rounded-2xl border border-slate-200 bg-white p-5 ${className}`}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-base font-bold text-marca-900">{titulo}</h2>
         {acao}

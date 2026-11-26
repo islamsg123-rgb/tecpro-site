@@ -122,7 +122,7 @@ export default async function PainelRapido({ searchParams }: Props) {
           )}
         </Caixa>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {verAlunos && (
             <Caixa titulo="Novos alunos" acao={<LinkVerTudo href="/admin/alunos" />}>
               {!alunos.length ? (

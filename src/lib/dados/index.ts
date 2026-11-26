@@ -314,12 +314,15 @@ export interface ConfigLoja {
   gateway: "mercadopago" | "asaas";
   /** Vídeo de parabéns na última aula de todos os cursos: arquivo do site (/video/parabens.mp4), .mp4, Panda ou YouTube. Vazio = sem vídeo. */
   videoParabens?: string;
+  /** Código do Google Analytics (G-XXXXXXX). Vazio = desligado. */
+  googleAnalyticsId?: string;
 }
 const CONFIG_LOJA_PADRAO: ConfigLoja = {
   gateway: "mercadopago",
   mesesDeAcesso: null, pesquisaNasAulas: true, mostrarDepoimentos: true, whatsapp: "", emailContato: "", instagram: "",
   precoCertIndividual: 3790, precoCertEssencial: 8990, precoCertProfissional: 12990,
   videoParabens: "/video/parabens.mp4",
+  googleAnalyticsId: "",
 };
 
 const gLoja = globalThis as unknown as { __configLojaDemo?: ConfigLoja };
