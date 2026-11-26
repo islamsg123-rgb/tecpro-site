@@ -7,6 +7,7 @@ import {
 import { Caixa, dataCurta, LinkVerTudo, Numero, Vazio } from "@/components/admin/Blocos";
 import { contarNovas } from "@/lib/dados/mensagens";
 import { Dica } from "@/components/admin/Dica";
+import { OnlineAgora } from "@/components/admin/OnlineAgora";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,8 @@ export default async function PainelRapido({ searchParams }: Props) {
         </Link>
       )}
 
+      <OnlineAgora />
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Numero rotulo="Alunos novos hoje" valor={String(novosHoje)} detalhe={`${novos7} nos últimos 7 dias`} href={verAlunos ? "/admin/alunos" : undefined} cor="laranja" dica="Pessoas que se matricularam hoje (curso grátis ou pago). Embaixo, quantas nos últimos 7 dias." />
         <Numero rotulo="Alunos ativos" valor={String(conta("ativo"))} detalhe={`estudaram nos últimos ${DIAS_PARA_INATIVO} dias`} href={verAlunos ? "/admin/alunos?filtro=ativo" : undefined} cor="verde" dica={`Alunos que estudaram alguma aula nos últimos ${DIAS_PARA_INATIVO} dias.`} />
@@ -122,7 +125,7 @@ export default async function PainelRapido({ searchParams }: Props) {
           )}
         </Caixa>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {verAlunos && (
             <Caixa titulo="Novos alunos" acao={<LinkVerTudo href="/admin/alunos" />}>
               {!alunos.length ? (

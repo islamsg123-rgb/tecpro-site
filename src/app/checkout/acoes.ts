@@ -19,6 +19,7 @@ import { estadoValido } from "@/lib/estados";
 import { salvarContatoAluno, salvarLocalidadeAluno } from "@/lib/dados/painel";
 import { opcoesParcelas as parcelasPara } from "@/lib/config-loja";
 import { contarUsoCupom, registrarCarrinho } from "@/lib/dados/carrinhos";
+import { COOKIE_CONTATO_CHECKOUT } from "@/lib/online-cookie";
 import type { Curso } from "@/lib/types";
 import {
   cartaoValido, cepValido, cpfValido, emailValido, soDigitos, telefoneValido, validadeValida,
@@ -87,6 +88,8 @@ export async function salvarContato(f: FormData): Promise<EstadoCheckout & { ok?
     email: comprador.email, cursoId: curso.id, tipo: tipoDoForm(f), etapa: "contato",
     nome: comprador.nome, telefone: comprador.telefone,
   });
+  // Para o painel "Online agora" mostrar quem está na tela de pagamento (com nome e WhatsApp).
+  (await cookies()).set(COOKIE_CONTATO_CHECKOUT, encodeURIComponent(comprador.email), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 });
   return { ok: true };
 }
 

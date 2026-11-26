@@ -9,6 +9,7 @@ import { BotaoAjuda } from "@/components/ajuda/BotaoAjuda";
 import { ForaDoPainel } from "@/components/ForaDoPainel";
 import { VoltarAoPainel } from "@/components/VoltarAoPainel";
 import { RegistraOrigem } from "@/components/RegistraOrigem";
+import { SinalOnline } from "@/components/SinalOnline";
 
 const titulo = Poppins({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--fonte-titulo" });
 const texto = Inter({ subsets: ["latin"], variable: "--fonte-texto" });
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BotaoAjuda />
         <VoltarAoPainel />
         <RegistraOrigem />
+        <SinalOnline />
       </body>
     </html>
   );
