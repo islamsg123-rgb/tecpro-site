@@ -5,6 +5,7 @@ import { situacaoCertificado, type EstadoCertificado } from "@/lib/certificados"
 import { atividadesDoAluno, obterAluno, obterConfigLoja, saldoCreditos } from "@/lib/dados";
 import { linkEmitirCertificado, linkWhatsapp, mensagemCertificado } from "@/lib/whatsapp-certificado";
 import { BotaoWhatsCertificado } from "@/components/admin/BotaoWhatsCertificado";
+import { chaveChamada, listarChamadasCertificado } from "@/lib/whatsapp-chamadas";
 import { provaDaAula } from "@/lib/provas";
 import { dataBR, dataHoraBR, diasDesde } from "@/lib/admin-relatorios";
 import { BarraProgresso } from "@/components/aluno/Progresso";
@@ -76,7 +77,7 @@ export default async function Ficha({ searchParams }: Props) {
     );
   }
 
-  const [cursos, atividades, extras, asaas, pagamentos, removidos, todosCursos, { lista: pesquisasTodas }, loja] = await Promise.all([
+  const [cursos, atividades, extras, asaas, pagamentos, removidos, todosCursos, { lista: pesquisasTodas }, loja, chamadasWhats] = await Promise.all([
     registro ? cursosDoAluno(email).catch(() => null) : Promise.resolve([]),
     atividadesDoAluno(email),
     dadosExtrasAluno(email),
@@ -86,6 +87,7 @@ export default async function Ficha({ searchParams }: Props) {
     getCursos(),
     listarPesquisas(500),
     obterConfigLoja(),
+    listarChamadasCertificado(),
   ]);
   const pesquisas = pesquisasTodas.filter((p) => p.email === email);
   // Mais avançados primeiro; empate: o que teve atividade mais recente.
@@ -254,6 +256,7 @@ export default async function Ficha({ searchParams }: Props) {
                   <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 p-3">
                     <p className="flex-1 text-xs text-amber-900">Concluiu e ainda não pagou o certificado. Chame no WhatsApp para dar os parabéns e lembrar de emitir.</p>
                     <BotaoWhatsCertificado
+                      email={email} cursoId={c.curso.id} chamadas={chamadasWhats.get(chaveChamada(email, c.curso.id))}
                       url={whatsCertificado(c.curso)}
                       dicaSemCelular="Este aluno não tem celular cadastrado. Preencha o campo Telefone / WhatsApp nos dados do aluno, aqui nesta página, e salve."
                     />

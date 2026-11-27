@@ -5,6 +5,7 @@ import { listarAlunos, obterConfigLoja } from "@/lib/dados";
 import { telefonesDosAlunos } from "@/lib/lembretes";
 import { linkEmitirCertificado, linkWhatsapp, mensagemCertificado } from "@/lib/whatsapp-certificado";
 import { BotaoWhatsCertificado } from "@/components/admin/BotaoWhatsCertificado";
+import { chaveChamada, listarChamadasCertificado } from "@/lib/whatsapp-chamadas";
 import { formatarPreco } from "@/lib/formatar";
 import { listarFormados } from "@/lib/painel-resumo";
 import { dataCurta, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
@@ -17,8 +18,9 @@ export const dynamic = "force-dynamic";
 
 export default async function Formados() {
   const acesso = await exigirAdmin("alunos");
-  const [formados, alunos, telefones, loja] = await Promise.all([
+  const [formados, alunos, telefones, loja, chamadas] = await Promise.all([
     listarFormados(), listarAlunos(5000), telefonesDosAlunos().catch(() => new Map<string, string>()), obterConfigLoja(),
+    listarChamadasCertificado(),
   ]);
   const nome = (email: string) => alunos.find((a) => a.email === email)?.nome ?? email;
   const precos = { individual: loja.precoCertIndividual, essencial: loja.precoCertEssencial, profissional: loja.precoCertProfissional };
@@ -85,7 +87,7 @@ export default async function Formados() {
                   <td className="whitespace-nowrap px-5 py-3 text-slate-500">{dataCurta(f.certificado?.emitidoEm)}</td>
                   <td className="px-5 py-3">
                     {f.faltaPagarCertificado ? (
-                      <BotaoWhatsCertificado url={telefones.get(f.email.trim().toLowerCase()) ? linkWhatsapp(telefones.get(f.email.trim().toLowerCase())!, mensagemPara(f)) : null} />
+                      <BotaoWhatsCertificado email={f.email} cursoId={f.cursoId} chamadas={chamadas.get(chaveChamada(f.email, f.cursoId))} url={telefones.get(f.email.trim().toLowerCase()) ? linkWhatsapp(telefones.get(f.email.trim().toLowerCase())!, mensagemPara(f)) : null} />
                     ) : null}
                   </td>
                 </tr>

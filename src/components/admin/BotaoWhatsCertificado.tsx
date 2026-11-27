@@ -1,13 +1,39 @@
+"use client";
+
+import { useState } from "react";
+import { anotarChamadaWhatsCertificado } from "@/app/admin/_acoes/whatsapp-chamada";
 import { Dica } from "./Dica";
 
-/** Botão verde "Chamar no WhatsApp" (ou cinza, sem celular) para cobrar o certificado de quem concluiu. */
+function quando(iso: string): string {
+  const d = new Date(iso);
+  const tz = { timeZone: "America/Sao_Paulo" } as const;
+  const data = d.toLocaleDateString("pt-BR", { ...tz, day: "2-digit", month: "2-digit" });
+  const hora = d.toLocaleTimeString("pt-BR", { ...tz, hour: "2-digit", minute: "2-digit" });
+  return `${data} às ${hora}`;
+}
+
+/**
+ * Botão verde "Chamar no WhatsApp" (ou cinza, sem celular) para cobrar o certificado de quem concluiu.
+ * Com `email` e `cursoId`, cada clique fica anotado no banco e aparece "Chamado em dd/mm às hh:mm";
+ * depois disso o botão vira "Chamar de novo". Formados, ficha do aluno e Recuperar vendas usam o mesmo registro.
+ */
 export function BotaoWhatsCertificado({
   url,
+  email,
+  cursoId,
+  chamadas = [],
   dicaSemCelular = "Este aluno não tem celular cadastrado. Dá para incluir na ficha do aluno (clique no nome dele).",
 }: {
   url: string | null;
+  email?: string;
+  cursoId?: string;
+  /** Quando já foi chamado (ISO), a mais recente no fim */
+  chamadas?: string[];
   dicaSemCelular?: string;
 }) {
+  const [vezes, setVezes] = useState(chamadas);
+  const ultima = vezes[vezes.length - 1];
+
   if (!url) {
     return (
       <Dica texto={dicaSemCelular}>
@@ -17,12 +43,36 @@ export function BotaoWhatsCertificado({
       </Dica>
     );
   }
+  const anotar = () => {
+    // Mostra na hora e grava no banco em seguida (o WhatsApp abre numa aba nova, a página continua aqui).
+    setVezes((v) => [...v, new Date().toISOString()]);
+    if (email && cursoId) {
+      anotarChamadaWhatsCertificado(email, cursoId).then((r) => r && setVezes(r)).catch(() => {});
+    }
+  };
+  const explica = "Abre o seu WhatsApp com a mensagem pronta: parabéns pela conclusão, por que o certificado é importante e o link para emitir o certificado deste curso. Dá para mudar o texto antes de enviar.";
+  const historico = vezes.length > 1 ? ` Vezes que foi chamado: ${vezes.map(quando).join("; ")}.` : "";
+
   return (
-    <Dica temLink texto="Abre o seu WhatsApp com a mensagem pronta: parabéns pela conclusão, por que o certificado é importante e o link para emitir o certificado deste curso. Dá para mudar o texto antes de enviar.">
-      <a href={url} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#25D366] px-3 py-2 text-xs font-bold text-white hover:bg-[#1ebe5a]">
-        <Icone /> Chamar no WhatsApp
-      </a>
-    </Dica>
+    <span className="inline-flex flex-wrap items-center justify-end gap-2">
+      {ultima && (
+        <Dica texto={`Você clicou em Chamar no WhatsApp para esta pessoa em ${quando(ultima)}.${historico} Fica anotado no painel e aparece em qualquer aparelho. (O painel não sabe se a mensagem foi enviada de fato, só que o WhatsApp foi aberto.)`}>
+          <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200">
+            ✓ Chamado em {quando(ultima)}{vezes.length > 1 ? ` · ${vezes.length}x` : ""}
+          </span>
+        </Dica>
+      )}
+      <Dica temLink texto={ultima ? `Já foi chamado. ${explica}` : explica}>
+        <a
+          href={url} target="_blank" rel="noopener" onClick={anotar} onAuxClick={(e) => e.button === 1 && anotar()}
+          className={ultima
+            ? "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#25D366] bg-white px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
+            : "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#25D366] px-3 py-2 text-xs font-bold text-white hover:bg-[#1ebe5a]"}
+        >
+          <Icone /> {ultima ? "Chamar de novo" : "Chamar no WhatsApp"}
+        </a>
+      </Dica>
+    </span>
   );
 }
 

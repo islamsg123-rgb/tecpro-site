@@ -77,12 +77,15 @@ export interface Formado {
   /** O certificado é pago, ainda não foi pago e não foi emitido */
   faltaPagarCertificado: boolean;
   precoCertificadoCentavos: number | null;
+  /** Quando concluiu: data da última aula feita (ou da emissão do certificado) */
+  concluidoEm: string | null;
 }
 
 /** Quem concluiu todas as aulas de um curso (ou já tem o certificado). */
 export async function listarFormados(): Promise<Formado[]> {
+  const ultimaAula = new Map<string, string>();
   const [contagem, certificados, pagos, cursos] = await Promise.all([
-    aulasConcluidasPorAlunoCurso(), listarCertificados(5000), listarCertificadosPagos(), getCursos(),
+    aulasConcluidasPorAlunoCurso(ultimaAula), listarCertificados(5000), listarCertificadosPagos(), getCursos(),
   ]);
   const pago = new Set(pagos.map((p) => `${p.email}|${p.cursoId}`));
   const cert = new Map(certificados.map((c) => [`${c.email}|${c.cursoId}`, c]));
@@ -117,6 +120,7 @@ export async function listarFormados(): Promise<Formado[]> {
       email, cursoId, cursoNome: c?.cursoNome ?? nomeCurso(cursoId), cursoSlug: slugCurso(cursoId), certificado: c,
       faltaPagarCertificado: !c && regra.modo === "pago" && !pago.has(k),
       precoCertificadoCentavos: regra.modo === "pago" ? regra.precoCentavos : null,
+      concluidoEm: ultimaAula.get(k) ?? c?.emitidoEm ?? null,
     });
   }
   return out.sort((a, b) => String(b.certificado?.emitidoEm ?? "").localeCompare(String(a.certificado?.emitidoEm ?? "")));
