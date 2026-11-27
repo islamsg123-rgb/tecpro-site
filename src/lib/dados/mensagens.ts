@@ -17,7 +17,6 @@ export const TIPOS_AJUDA = {
   pagamento: "Pagamento",
   certificado: "Certificado",
   duvida: "Dúvida sobre um curso",
-  prova: "Questão da prova com erro",
   outro: "Outro assunto",
 } as const;
 export type TipoAjuda = keyof typeof TIPOS_AJUDA;

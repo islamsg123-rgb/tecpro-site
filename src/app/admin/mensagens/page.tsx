@@ -21,7 +21,6 @@ const corTipo: Record<string, string> = {
   pagamento: "bg-emerald-100 text-emerald-800",
   certificado: "bg-amber-100 text-amber-900",
   duvida: "bg-sky-100 text-sky-800",
-  prova: "bg-violet-100 text-violet-800",
   outro: "bg-slate-100 text-slate-700",
 };
 
@@ -98,14 +97,6 @@ function Cartao({ m, conta }: { m: MensagemAjuda; conta: string }) {
       </div>
 
       <p className="mt-3 whitespace-pre-line rounded-xl bg-slate-50 p-3 text-[15px] text-slate-800">{m.mensagem}</p>
-      {m.tipo === "prova" && m.email && (
-        <p className="mt-2 text-sm">
-          <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(m.email)}#cursos`} className="font-semibold text-violet-800 underline">
-            Abrir a ficha do aluno para liberar a aula
-          </Link>
-          <span className="text-slate-500"> (se ele estiver travado nessa prova)</span>
-        </p>
-      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         {m.pagina && <a href={m.pagina} target="_blank" rel="noopener noreferrer" className="text-marca-700 underline">Abrir a página onde estava</a>}
