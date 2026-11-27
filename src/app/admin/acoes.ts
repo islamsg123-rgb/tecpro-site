@@ -11,7 +11,11 @@ import {
   salvarDepoimento, salvarFuncionario, type Secao, dadosExtrasAluno, definirCursoRemovido, salvarDadosAluno, obterFuncionario,
 } from "@/lib/dados/painel";
 import { excluirAluno } from "@/lib/dados/excluir-aluno";
-import { obterAluno } from "@/lib/dados";
+import { certificadoDoAluno, definirAulaConcluida, obterAluno } from "@/lib/dados";
+import { cursosDoAluno } from "@/lib/area-aluno";
+import { situacaoCertificado } from "@/lib/certificados";
+import { lembrarDeComprar } from "@/lib/lembrete-certificado";
+import { registrarAulaLiberada, registrarLiberacaoDesfeita } from "@/lib/dados/aulas-liberadas";
 import { clientePorEmail, cobrancaParaLiberacao, pagamentoEmSimulacao } from "@/lib/pagamentos";
 import { liberarAcesso } from "@/lib/pagamentos/liberacao";
 import { cpfValido, emailValido, soDigitos, telefoneValido } from "@/lib/validacao";
@@ -399,4 +403,55 @@ export async function excluirAlunoAcao(f: FormData) {
   revalidatePath("/", "layout");
   const q = new URLSearchParams({ excluido: aluno?.nome || "1", ea: aluno?.eaUsuarioId ?? "", certs: String(r.certificados), pedidos: String(r.pedidos) });
   redirect(`/admin/alunos?${q}`);
+}
+
+/* ---------- Liberar aula travada (ficha do aluno) ---------- */
+
+/**
+ * Conclui pelo painel a aula em que o aluno está parado (ex.: questão da prova com gabarito errado).
+ * Só a aula atual (a primeira que falta), para não pular o curso inteiro sem querer.
+ * Se for a última, o curso fica concluído e segue o caminho normal do certificado.
+ */
+export async function liberarAulaAluno(f: FormData) {
+  const quem = await exigirAdmin("alunos");
+  const email = String(f.get("email") ?? "").trim().toLowerCase();
+  const cursoId = String(f.get("cursoId") ?? "");
+  const aulaId = String(f.get("aulaId") ?? "");
+  const motivo = String(f.get("motivo") ?? "").trim().slice(0, 300) || null;
+  const c = (await cursosDoAluno(email).catch(() => [])).find((x) => x.curso.id === cursoId);
+  const i = c ? c.aulas.findIndex((a) => a.id === aulaId) : -1;
+  if (!c || i < 0 || c.concluidas.has(aulaId) || i !== c.liberadaAte) redirect(ficha(email, `erro=liberar&curso=${cursoId}#curso-${cursoId}`));
+  try {
+    await definirAulaConcluida(email, cursoId, aulaId, true);
+    await registrarAulaLiberada(email, {
+      cursoId, aulaId, cursoNome: c.curso.nome, aulaTitulo: c.aulas[i].titulo, numero: i + 1, quem: quem.email, motivo,
+    });
+  } catch {
+    redirect(ficha(email, `erro=banco&curso=${cursoId}#curso-${cursoId}`));
+  }
+  const ultima = c.concluidas.size + 1 >= c.total;
+  if (ultima) {
+    // Curso concluído: dispara os e-mails do certificado como se o aluno tivesse terminado sozinho.
+    const atualizado = (await cursosDoAluno(email).catch(() => [])).find((x) => x.curso.id === cursoId);
+    if (atualizado && (await situacaoCertificado(email, atualizado)).estado === "aguardando_pagamento") await lembrarDeComprar(email, cursoId);
+  }
+  revalidatePath("/", "layout");
+  redirect(ficha(email, `salvo=${ultima ? "concluido" : "liberada"}&curso=${cursoId}#curso-${cursoId}`));
+}
+
+/** Desfaz uma aula liberada pelo painel (a aula volta a ficar pendente). */
+export async function desfazerAulaLiberada(f: FormData) {
+  const quem = await exigirAdmin("alunos");
+  const email = String(f.get("email") ?? "").trim().toLowerCase();
+  const cursoId = String(f.get("cursoId") ?? "");
+  const aulaId = String(f.get("aulaId") ?? "");
+  if (await certificadoDoAluno(email, cursoId)) redirect(ficha(email, `erro=desfazer-certificado&curso=${cursoId}#curso-${cursoId}`));
+  try {
+    await definirAulaConcluida(email, cursoId, aulaId, false);
+    await registrarLiberacaoDesfeita(email, cursoId, aulaId, quem.email);
+  } catch {
+    redirect(ficha(email, `erro=banco&curso=${cursoId}#curso-${cursoId}`));
+  }
+  revalidatePath("/", "layout");
+  redirect(ficha(email, `salvo=desfeita&curso=${cursoId}#curso-${cursoId}`));
 }

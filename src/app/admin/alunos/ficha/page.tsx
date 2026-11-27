@@ -19,7 +19,11 @@ import { ESTADOS } from "@/lib/estados";
 import { DIAS_PARA_INATIVO } from "@/lib/painel-resumo";
 import { TabelaVendas } from "@/components/admin/TabelaVendas";
 import { EtiquetaAluno } from "@/components/admin/Blocos";
-import { adicionarCursoAluno, removerCursoAluno, salvarDadosAlunoAcao, excluirAlunoAcao } from "../../acoes";
+import { adicionarCursoAluno, removerCursoAluno, salvarDadosAlunoAcao, excluirAlunoAcao, liberarAulaAluno, desfazerAulaLiberada } from "../../acoes";
+import { aulasLiberadasDoAluno, type AulaLiberada } from "@/lib/dados/aulas-liberadas";
+import { situacaoDaAula, type SituacaoAula } from "@/lib/regras-aula";
+import { AvisoVisivel } from "@/components/AvisoVisivel";
+import type { CursoDoAluno } from "@/lib/area-aluno";
 import { IconeChevron } from "@/components/Icones";
 import { Dica } from "@/components/admin/Dica";
 import { SenhaDoAluno } from "@/components/admin/SenhaDoAluno";
@@ -32,7 +36,7 @@ import { Itens, Recolhivel } from "@/components/ListaRecolhida";
 export const metadata: Metadata = { title: "Ficha do aluno" };
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Promise<{ email?: string; salvo?: string; erro?: string }> };
+type Props = { searchParams: Promise<{ email?: string; salvo?: string; erro?: string; curso?: string }> };
 
 const avisos: Record<string, [string, boolean]> = {
   "salvo:dados": ["Dados salvos.", true],
@@ -40,6 +44,11 @@ const avisos: Record<string, [string, boolean]> = {
   "salvo:removido": ["Curso removido. O aluno não vê mais esse curso (dá para devolver abaixo).", true],
   "salvo:devolvido": ["Curso devolvido ao aluno.", true],
   "salvo:novo": ["Aluno cadastrado e curso liberado.", true],
+  "salvo:liberada": ["Aula liberada. A próxima aula já está aberta para o aluno.", true],
+  "salvo:concluido": ["Aula liberada e curso concluído. O aluno já pode seguir para o certificado (os e-mails do certificado saem normalmente).", true],
+  "salvo:desfeita": ["Liberação desfeita. A aula voltou a ficar pendente para o aluno.", true],
+  "erro:liberar": ["Esta aula não é mais a aula atual do aluno (ele pode ter avançado). Atualize a página e confira.", false],
+  "erro:desfazer-certificado": ["O certificado deste curso já foi emitido, então a liberação não pode mais ser desfeita.", false],
   "erro:cpf": ["CPF inválido.", false],
   "erro:telefone": ["Telefone inválido.", false],
   "erro:colunas": ["Falta rodar o SQL novo no Supabase (painel-completo.sql) para salvar isso.", false],
@@ -94,6 +103,11 @@ export default async function Ficha({ searchParams }: Props) {
   const ultimaNo = (id: string) => atividades.find((x) => x.cursoId === id)?.quando ?? "";
   cursos?.sort((a, b) => b.pct - a.pct || ultimaNo(b.curso.id).localeCompare(ultimaNo(a.curso.id)));
   const certs = cursos ? await Promise.all(cursos.map((c) => situacaoCertificado(email, c))) : [];
+  const liberadas = await aulasLiberadasDoAluno(email).catch(() => [] as AulaLiberada[]);
+  // Aula em que o aluno está parado em cada curso (a primeira que falta).
+  const atuais = cursos
+    ? await Promise.all(cursos.map((c) => (c.feitas < c.total ? situacaoDaAula(email, c, c.liberadaAte).catch(() => null) : null)))
+    : [];
   const creditos = await saldoCreditos(email).catch(() => 0);
   const ultima = atividades[0]?.quando ?? null;
   const dias = diasDesde(ultima);
@@ -108,7 +122,10 @@ export default async function Ficha({ searchParams }: Props) {
   const idsAtuais = new Set((cursos ?? []).map((c) => c.curso.id));
   const paraAdicionar = [...todosCursos].filter((c) => !idsAtuais.has(c.id)).sort((a, b) => a.nome.localeCompare(b.nome));
   const pagos = (pagamentos ?? []).filter((p) => p.situacao === "pago");
-  const aviso = params.salvo ? avisos[`salvo:${params.salvo}`] : params.erro ? avisos[`erro:${params.erro}`] : null;
+  const avisoGeral = params.salvo ? avisos[`salvo:${params.salvo}`] : params.erro ? avisos[`erro:${params.erro}`] : null;
+  // Aviso de liberar/desfazer aula aparece dentro do cartão do curso, não no topo.
+  const aviso = params.curso ? null : avisoGeral;
+  const avisoCurso = params.curso ? avisoGeral : null;
   const campo = "mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 font-normal";
   const funcionario = await obterFuncionario(email).catch(() => null);
   const senha = await situacaoSenha(email).catch(() => null);
@@ -131,6 +148,21 @@ export default async function Ficha({ searchParams }: Props) {
     const aula = c?.aulas.find((a) => a.id === id);
     return { curso: c?.curso.nome ?? nomeCurso(cursoId), aula: aula?.titulo ?? `aula ${id}`, etapa: etapa ? nomeEtapa[etapa] ?? etapa : "concluiu a aula" };
   };
+
+  // Histórico: o que o aluno fez + as aulas liberadas (e desfeitas) pelo painel, com quem e por quê.
+  type LinhaHistorico = { quando: string; etapa: string; aula: string; curso: string; extra?: string; painel?: boolean };
+  const historico: LinhaHistorico[] = [
+    // A aula liberada pelo painel não aparece também como "concluiu a aula" (não foi o aluno que concluiu).
+    ...atividades.slice(0, 100)
+      .filter((a) => !liberadas.some((l) => !l.desfeitaEm && l.cursoId === a.cursoId && l.aulaId === a.aulaId))
+      .map((a) => ({ quando: a.quando, ...tituloAula(a.cursoId, a.aulaId) })),
+    ...liberadas.flatMap((l) => {
+      const base = { aula: `Aula ${l.numero}. ${l.aulaTitulo}`, curso: l.cursoNome, painel: true };
+      const linhas: LinhaHistorico[] = [{ ...base, quando: l.quando, etapa: `aula liberada pelo painel · por ${l.quem}`, extra: l.motivo ? `Motivo: ${l.motivo}` : undefined }];
+      if (l.desfeitaEm) linhas.push({ ...base, quando: l.desfeitaEm, etapa: `liberação desfeita · por ${l.desfeitaPor ?? "?"}` });
+      return linhas;
+    }),
+  ].sort((a, b) => b.quando.localeCompare(a.quando));
 
   return (
     <>
@@ -229,7 +261,7 @@ export default async function Ficha({ searchParams }: Props) {
             const [rotulo, cls, explica] = nomeCert[s.estado];
             const ultimaNoCurso = atividades.find((x) => x.cursoId === c.curso.id)?.quando;
             return (
-              <div key={c.curso.id} className="rounded-2xl border border-slate-200 bg-white p-5">
+              <div key={c.curso.id} id={`curso-${c.curso.id}`} className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-5">
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-bold text-marca-900">{c.curso.nome}</p>
                   {c.curso.gratuito && <Dica texto="Curso grátis: o aluno estuda sem pagar e só paga se quiser o certificado no final." className="shrink-0"><span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">gratuito</span></Dica>}
@@ -252,6 +284,11 @@ export default async function Ficha({ searchParams }: Props) {
                     </dd>
                   </div>
                 </dl>
+                {avisoCurso && params.curso === c.curso.id && (
+                  <AvisoVisivel className={`mt-4 rounded-xl border p-3 text-sm ${avisoCurso[1] ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-700"}`}>{avisoCurso[0]}</AvisoVisivel>
+                )}
+                <AulaTravada email={email} c={c} s={atuais[i] ?? null} />
+                <LiberadasNoCurso email={email} lista={liberadas.filter((l) => l.cursoId === c.curso.id && !l.desfeitaEm)} podeDesfazer={s.estado !== "emitido"} />
                 {s.estado === "aguardando_pagamento" && (
                   <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 p-3">
                     <p className="flex-1 text-xs text-amber-900">Concluiu e ainda não pagou o certificado. Chame no WhatsApp para dar os parabéns e lembrar de emitir.</p>
@@ -349,21 +386,19 @@ export default async function Ficha({ searchParams }: Props) {
       <HistoricoEmails emails={emails} endereco={email} />
 
       <h2 className="mt-10 text-xl font-bold text-marca-900">Histórico nas aulas</h2>
-      {!atividades.length ? (
+      {!historico.length ? (
         <p className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">Ainda não abriu nenhuma aula.</p>
       ) : (
-        <Recolhivel total={Math.min(atividades.length, 100)} className="mt-4"><ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm"><Itens>
-          {atividades.slice(0, 100).map((a, i) => {
-            const t = tituloAula(a.cursoId, a.aulaId);
-            return (
-              <li key={i} className="flex flex-wrap gap-x-3 px-5 py-3">
-                <span className="w-36 shrink-0 text-slate-400">{dataHoraBR(a.quando)}</span>
-                <span className="font-semibold text-marca-900">{t.etapa}</span>
-                <span className="text-slate-600">{t.aula}</span>
-                <span className="text-slate-400">· {t.curso}</span>
-              </li>
-            );
-          })}
+        <Recolhivel total={historico.length} className="mt-4"><ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white text-sm"><Itens>
+          {historico.map((h, i) => (
+            <li key={i} className={`flex flex-wrap gap-x-3 px-5 py-3 ${h.painel ? "bg-violet-50/60" : ""}`}>
+              <span className="w-36 shrink-0 text-slate-400">{dataHoraBR(h.quando)}</span>
+              <span className={`font-semibold ${h.painel ? "text-violet-800" : "text-marca-900"}`}>{h.etapa}</span>
+              <span className="text-slate-600">{h.aula}</span>
+              <span className="text-slate-400">· {h.curso}</span>
+              {h.extra && <span className="w-full pl-0 text-xs text-slate-500 sm:pl-[9.75rem]">{h.extra}</span>}
+            </li>
+          ))}
         </Itens></ul></Recolhivel>
       )}
 
@@ -426,5 +461,71 @@ function Voltar() {
     <Link href="/admin/alunos" className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-marca-900">
       <IconeChevron className="h-4 w-4 rotate-90" /> Voltar para alunos
     </Link>
+  );
+}
+
+const faltaNaAula = (s: SituacaoAula) =>
+  [!s.videoOk && "assistir ao vídeo (80%)", !s.provaOk && "acertar 100% da prova"].filter(Boolean).join(" e ");
+
+/** Aula em que o aluno está parado, com o botão para liberar (dono e funcionários com acesso a Alunos). */
+function AulaTravada({ email, c, s }: { email: string; c: CursoDoAluno; s: SituacaoAula | null }) {
+  if (c.feitas >= c.total) return null;
+  const aula = c.aulas[c.liberadaAte];
+  if (!aula) return null;
+  const ultima = c.liberadaAte === c.total - 1;
+  const falta = s ? faltaNaAula(s) : "";
+  return (
+    <details className="mt-4 rounded-xl border border-violet-200 bg-violet-50/60 text-sm">
+      <summary className="cursor-pointer px-3 py-2.5 font-semibold text-violet-900">
+        Aula atual: {c.liberadaAte + 1}. {aula.titulo}
+        <span className="ml-1 font-normal text-violet-700">· {falta ? `falta ${falta}` : "falta clicar em Concluir"}</span>
+      </summary>
+      <form action={liberarAulaAluno} className="space-y-3 border-t border-violet-200 p-3">
+        <input type="hidden" name="email" value={email} />
+        <input type="hidden" name="cursoId" value={c.curso.id} />
+        <input type="hidden" name="aulaId" value={aula.id} />
+        <p className="text-xs text-violet-900">
+          Use quando a aula estiver com problema e o aluno não conseguir avançar (por exemplo, uma questão da prova com gabarito errado).
+          {ultima
+            ? " Esta é a última aula: ao liberar, o curso fica concluído e o aluno segue para o certificado."
+            : " A aula fica concluída e a próxima abre para o aluno."}
+        </p>
+        <label className="block text-xs font-semibold text-violet-900">Motivo (opcional, fica no histórico)
+          <input name="motivo" maxLength={300} placeholder="Ex.: questão 3 da prova com gabarito errado" className="mt-1 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 font-normal" />
+        </label>
+        <button className="rounded-full bg-violet-700 px-4 py-2 text-xs font-bold text-white hover:bg-violet-800">
+          {ultima ? "Liberar e concluir o curso" : "Liberar esta aula"}
+        </button>
+      </form>
+    </details>
+  );
+}
+
+/** Aulas deste curso liberadas pelo painel, com o botão Desfazer. */
+function LiberadasNoCurso({ email, lista, podeDesfazer }: { email: string; lista: AulaLiberada[]; podeDesfazer: boolean }) {
+  if (!lista.length) return null;
+  return (
+    <ul className="mt-3 space-y-2 text-xs">
+      {lista.map((l) => (
+        <li key={`${l.aulaId}-${l.quando}`} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <Dica texto="Esta aula foi concluída pelo painel, não pelo aluno. Quem liberou e o motivo também aparecem no Histórico nas aulas.">
+            <span className="rounded-full bg-violet-100 px-2 py-0.5 font-semibold text-violet-800">liberada pelo painel</span>
+          </Dica>
+          <span className="flex-1 text-slate-600">
+            Aula {l.numero}. {l.aulaTitulo} · por {l.quem} em {dataHoraBR(l.quando)}{l.motivo ? ` · ${l.motivo}` : ""}
+          </span>
+          {podeDesfazer && l === lista[0] && (
+            <form action={desfazerAulaLiberada}>
+              <input type="hidden" name="email" value={email} />
+              <input type="hidden" name="cursoId" value={l.cursoId} />
+              <input type="hidden" name="aulaId" value={l.aulaId} />
+              <Dica texto="A aula volta a ficar pendente para o aluno. Só a liberação mais recente pode ser desfeita.">
+                <button className="rounded-full border border-slate-300 bg-white px-3 py-1 font-semibold text-marca-900 hover:border-marca-900">Desfazer</button>
+              </Dica>
+            </form>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
