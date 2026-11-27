@@ -135,6 +135,7 @@ export default async function Configuracoes({ searchParams }: Props) {
             </label>
             <label className="text-sm font-semibold text-marca-900">E-mail
               <input name="emailContato" type="email" defaultValue={loja.emailContato} placeholder="contato@tecpromultiensino.com.br" className={`mt-1 ${campo}`} />
+              <span className="mt-1 block text-xs font-normal text-slate-500">Os avisos de novas mensagens do botão de ajuda chegam neste e-mail.</span>
             </label>
             <label className="text-sm font-semibold text-marca-900">Instagram
               <input name="instagram" defaultValue={loja.instagram} placeholder="@tecpromultiensino" className={`mt-1 ${campo}`} />
