@@ -7,7 +7,10 @@ import { definirAulaConcluida, marcarEtapa, obterAluno, usarCredito } from "@/li
 import { registrarPesquisa } from "@/lib/dados/painel";
 import { PCT_MINIMO_VIDEO, situacaoDaAula } from "@/lib/regras-aula";
 import { emitirCertificado, limparNome, situacaoCertificado } from "@/lib/certificados";
-import { corrigir, type ResultadoProva } from "@/lib/provas";
+import { corrigir, provaDaAula, type ResultadoProva } from "@/lib/provas";
+import { registrarMensagem } from "@/lib/dados/mensagens";
+import { obterConfigLoja } from "@/lib/dados";
+import { emailConfigurado, enviarEmail } from "@/lib/email";
 import { certificadoLiberado } from "@/lib/lembrete-certificado";
 
 /** Aula pelo id, só se estiver liberada (as anteriores concluídas). */
@@ -142,4 +145,71 @@ export async function usarCreditoCertificado(f: FormData) {
   if (s.estado === "aguardando_pagamento" && (await usarCredito(aluno.email, c.curso.id))) await certificadoLiberado(aluno.email, c.curso.id);
   revalidatePath(`/minha-conta/cursos/${slug}`);
   redirect(`/minha-conta/cursos/${slug}#certificado`);
+}
+
+/* ---------- Aluno avisa que uma questão da prova está errada ---------- */
+
+export interface EstadoReporteQuestao { ok?: boolean; erro?: string }
+const reportesRecentes = new Map<string, number[]>();
+const escHtml = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+/**
+ * Vai para o painel em Mensagens (assunto "Questão da prova com erro") e, se o e-mail estiver ligado,
+ * avisa a escola por e-mail. A equipe confere e, se for o caso, libera a aula na ficha do aluno.
+ */
+export async function reportarQuestao(_: EstadoReporteQuestao, f: FormData): Promise<EstadoReporteQuestao> {
+  const slug = String(f.get("slug") ?? "");
+  const aulaId = String(f.get("aulaId") ?? "");
+  const x = await aulaLiberada(slug, aulaId);
+  if (!x) return { erro: "Não foi possível enviar agora." };
+  const { aluno, c, i } = x;
+  const perguntas = provaDaAula(c.curso.nome, i, c.aulas[i].titulo);
+  const n = Number(f.get("questao"));
+  if (!Number.isInteger(n) || n < 1 || n > perguntas.length) return { erro: "Escolha o número da questão." };
+  const comentario = String(f.get("comentario") ?? "").trim().slice(0, 1000);
+  const marcada = Number(f.get("marcada"));
+
+  // No máximo 5 avisos por hora para cada aluno.
+  const agora = Date.now();
+  const recentes = (reportesRecentes.get(aluno.email) ?? []).filter((t) => agora - t < 3_600_000);
+  if (recentes.length >= 5) return { erro: "Você já enviou vários avisos agora há pouco. Obrigado! A equipe vai conferir." };
+  reportesRecentes.set(aluno.email, [...recentes, agora]);
+
+  const p = perguntas[n - 1];
+  const letra = (k: number) => "ABCDEF"[k] ?? "?";
+  const marcadaTxt = Number.isInteger(marcada) && p.alternativas[marcada] ? `${letra(marcada)}) ${p.alternativas[marcada]}` : null;
+  const linhas = [
+    `Questão ${n} da prova: ${p.pergunta}`,
+    marcadaTxt ? `O aluno marcou: ${marcadaTxt}` : "",
+    comentario ? `Comentário do aluno: ${comentario}` : "",
+  ].filter(Boolean);
+  const mensagem = linhas.join("\n");
+  const registro = await obterAluno(aluno.email).catch(() => null);
+  const aulaTitulo = `${i + 1}. ${c.aulas[i].titulo}`;
+  try {
+    await registrarMensagem({
+      origem: "aluno", tipo: "prova", mensagem, nome: registro?.nome ?? null, email: aluno.email, telefone: null, logado: true,
+      pagina: `/minha-conta/cursos/${slug}/aulas/${aulaId}`, cursoNome: c.curso.nome, aulaTitulo, navegador: null, print: null, ipHash: null,
+    });
+  } catch (e) {
+    console.error("[reportar questão]", e instanceof Error ? e.message : e);
+    return { erro: "Não conseguimos enviar agora. Tente de novo em alguns minutos." };
+  }
+  if (emailConfigurado) {
+    const site = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") || "";
+    const loja = await obterConfigLoja().catch(() => null);
+    const para = loja?.emailContato?.trim() || "contato@tecpromultiensino.com.br";
+    const ficha = `${site}/admin/alunos/ficha?email=${encodeURIComponent(aluno.email)}#cursos`;
+    const html = `<div style="font-family:Arial,sans-serif;color:#011749;font-size:14px;line-height:1.5">
+<p style="font-size:16px;font-weight:bold">Aluno avisou: questão da prova com erro</p>
+<p><strong>Aluno:</strong> ${escHtml(registro?.nome ?? aluno.email)} &lt;${escHtml(aluno.email)}&gt;<br><strong>Curso:</strong> ${escHtml(c.curso.nome)}<br><strong>Aula:</strong> ${escHtml(aulaTitulo)}</p>
+<p style="white-space:pre-line;background:#f4f7fe;border-radius:12px;padding:12px">${escHtml(mensagem)}</p>
+<p><a href="${escHtml(ficha)}" style="color:#011749;font-weight:bold">Abrir a ficha do aluno (para liberar a aula, se for o caso)</a></p></div>`;
+    await enviarEmail({
+      para, assunto: `[Prova] Questão com erro · ${c.curso.nome}`, html,
+      texto: [`Aluno avisou: questão da prova com erro`, `Aluno: ${aluno.email}`, `Curso: ${c.curso.nome}`, `Aula: ${aulaTitulo}`, "", mensagem, "", ficha].join("\n"),
+      tipo: "equipe",
+    }).catch((e) => console.error("[reportar questão] e-mail", e instanceof Error ? e.message : e));
+  }
+  return { ok: true };
 }

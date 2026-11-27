@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { corrigirProva } from "@/app/minha-conta/acoes";
+import { corrigirProva, reportarQuestao } from "@/app/minha-conta/acoes";
 import type { PerguntaPublica, ResultadoProva } from "@/lib/provas";
 
 const LETRAS = ["A", "B", "C", "D", "E", "F"];
@@ -70,6 +70,54 @@ export function ProvaAula({
           </button>
         )}
       </form>
+
+      {r && !aprovado && <AvisarQuestao slug={slug} aulaId={aulaId} r={r} />}
     </section>
+  );
+}
+
+/** Link discreto para o aluno avisar a escola que uma questão parece estar com a resposta errada. */
+function AvisarQuestao({ slug, aulaId, r }: { slug: string; aulaId: string; r: ResultadoProva }) {
+  const erradas = r.corretas.map((c, i) => (r.respostas[i] !== c ? i : -1)).filter((i) => i >= 0);
+  const [aberto, setAberto] = useState(false);
+  const [questao, setQuestao] = useState(erradas[0] ?? 0);
+  const [estado, enviar, enviando] = useActionState(reportarQuestao, {});
+  if (!erradas.length) return null;
+  if (estado.ok) {
+    return (
+      <p className="mt-6 rounded-2xl bg-marca-50 p-4 text-sm text-marca-900">
+        Obrigado pelo aviso! A equipe vai conferir a questão. Se ela estiver mesmo errada, liberamos a aula para você e avisamos.
+      </p>
+    );
+  }
+  if (!aberto) {
+    return (
+      <button type="button" onClick={() => setAberto(true)} className="mt-6 text-sm font-semibold text-slate-500 underline hover:text-marca-900">
+        Acha que alguma questão está com a resposta errada? Avise a gente
+      </button>
+    );
+  }
+  return (
+    <form action={enviar} className="mt-6 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
+      <input type="hidden" name="slug" value={slug} />
+      <input type="hidden" name="aulaId" value={aulaId} />
+      <input type="hidden" name="marcada" value={r.respostas[questao] ?? -1} />
+      <p className="font-semibold text-marca-900">Avisar questão com erro</p>
+      <label className="block font-semibold text-marca-900">Qual questão?
+        <select name="questao" value={questao + 1} onChange={(e) => setQuestao(Number(e.target.value) - 1)} className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-normal sm:w-48">
+          {erradas.map((i) => <option key={i} value={i + 1}>Questão {i + 1}</option>)}
+        </select>
+      </label>
+      <label className="block font-semibold text-marca-900">Por que você acha que está errada? (opcional)
+        <textarea name="comentario" maxLength={1000} rows={3} className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-normal" />
+      </label>
+      {estado.erro && <p className="text-red-700">{estado.erro}</p>}
+      <div className="flex flex-wrap gap-2">
+        <button disabled={enviando} className="rounded-full bg-marca-900 px-5 py-2 font-bold text-white hover:bg-marca-700 disabled:opacity-60">
+          {enviando ? "Enviando..." : "Enviar aviso"}
+        </button>
+        <button type="button" onClick={() => setAberto(false)} className="rounded-full px-4 py-2 font-semibold text-slate-500 hover:text-marca-900">Cancelar</button>
+      </div>
+    </form>
   );
 }
