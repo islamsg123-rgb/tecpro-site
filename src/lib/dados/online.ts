@@ -2,6 +2,8 @@ import "server-only";
 import { bancoEmDemonstracao, db } from "./index";
 import { listarCarrinhos } from "./carrinhos";
 import { JANELA_ONLINE_MS, type LugarOnline } from "../online";
+import type { Canal, OrigemVisita } from "../origem";
+import { diaBR } from "../dias";
 
 /**
  * "Online agora": uma linha por visitante (navegador), atualizada a cada sinal (1 por minuto por aba aberta).
@@ -111,5 +113,119 @@ export async function contatosPorEmail(emails: string[]): Promise<Map<string, { 
     const antes = r.get(a.email);
     r.set(a.email, { nome: a.nome ?? antes?.nome ?? null, telefone: a.telefone ?? antes?.telefone ?? null, cursoId: antes?.cursoId });
   }
+  return r;
+}
+
+/* ---------- De onde vem o público (visitas por origem) ---------- */
+
+/**
+ * Tabela visitas_origem (supabase/migrations/0016_origens_visitas.sql = origens-publico.sql).
+ * Uma linha por navegador, por dia, por origem. Sem a tabela, o site segue normal: só não guarda.
+ */
+
+export interface LinhaVisita {
+  dia: string;
+  visitante: string;
+  canal: Canal;
+  anuncio: boolean;
+  campanha: string;
+  site: string;
+  entrada: string | null;
+  email: string | null;
+  criadoEm: string;
+}
+const gv = globalThis as unknown as { __visitasDemo?: LinhaVisita[] };
+const visitasDemo = () => (gv.__visitasDemo ??= []);
+
+export async function registrarVisita(visitante: string, email: string | null, o: OrigemVisita): Promise<void> {
+  const linha: LinhaVisita = {
+    dia: diaBR(), visitante, canal: o.canal, anuncio: o.anuncio, campanha: o.campanha ?? "", site: o.site ?? "",
+    entrada: o.entrada ?? null, email, criadoEm: new Date().toISOString(),
+  };
+  if (bancoEmDemonstracao) {
+    const lista = visitasDemo();
+    const igual = (x: LinhaVisita) => x.dia === linha.dia && x.visitante === visitante && x.canal === linha.canal && x.anuncio === linha.anuncio && x.campanha === linha.campanha && x.site === linha.site;
+    if (!lista.some(igual)) lista.push(linha);
+    return;
+  }
+  const { error } = await db().from("visitas_origem").upsert(
+    { dia: linha.dia, visitante, canal: linha.canal, anuncio: linha.anuncio, campanha: linha.campanha, site: linha.site, entrada: linha.entrada, email },
+    { onConflict: "dia,visitante,canal,anuncio,campanha,site", ignoreDuplicates: true },
+  );
+  if (error) throw error;
+}
+
+export interface GrupoOrigem { canal: Canal; anuncio: boolean; campanha: string; site: string; visitas: number; pessoas: number }
+export interface ResumoOrigens {
+  tabelaFaltando: boolean;
+  visitas: number;
+  pessoas: number;
+  grupos: GrupoOrigem[];
+  dias: { dia: string; canal: Canal; visitas: number }[];
+  entradas: { entrada: string; visitas: number }[];
+}
+
+/** Soma das visitas desde um dia ("AAAA-MM-DD", horário de Brasília), sem a equipe. */
+export async function resumoOrigens(desde: string, excluir: string[]): Promise<ResumoOrigens> {
+  if (bancoEmDemonstracao) {
+    const v = visitasDemo().filter((x) => x.dia >= desde && !(x.email && excluir.includes(x.email)));
+    const grupos = new Map<string, GrupoOrigem & { quem: Set<string> }>();
+    const dias = new Map<string, { dia: string; canal: Canal; visitas: number }>();
+    const entradas = new Map<string, number>();
+    for (const x of v) {
+      const k = [x.canal, x.anuncio, x.campanha, x.site].join("|");
+      const g = grupos.get(k) ?? { canal: x.canal, anuncio: x.anuncio, campanha: x.campanha, site: x.site, visitas: 0, pessoas: 0, quem: new Set<string>() };
+      g.visitas++;
+      g.quem.add(x.visitante);
+      g.pessoas = g.quem.size;
+      grupos.set(k, g);
+      const d = dias.get(`${x.dia}|${x.canal}`) ?? { dia: x.dia, canal: x.canal, visitas: 0 };
+      d.visitas++;
+      dias.set(`${x.dia}|${x.canal}`, d);
+      if (x.entrada) entradas.set(x.entrada, (entradas.get(x.entrada) ?? 0) + 1);
+    }
+    return {
+      tabelaFaltando: false,
+      visitas: v.length,
+      pessoas: new Set(v.map((x) => x.visitante)).size,
+      grupos: [...grupos.values()].map(({ quem: _q, ...g }) => g).sort((a, b) => b.visitas - a.visitas),
+      dias: [...dias.values()].sort((a, b) => a.dia.localeCompare(b.dia)),
+      entradas: [...entradas].map(([entrada, visitas]) => ({ entrada, visitas })).sort((a, b) => b.visitas - a.visitas),
+    };
+  }
+  const { data, error } = await db().rpc("resumo_origens", { p_desde: desde, p_excluir: excluir });
+  if (error || !data) {
+    if (error) console.error("[origens]", error.message);
+    return { tabelaFaltando: true, visitas: 0, pessoas: 0, grupos: [], dias: [], entradas: [] };
+  }
+  // Faxina de vez em quando: visitas com mais de 400 dias saem da tabela.
+  if (Math.random() < 0.02) {
+    const velho = new Date(Date.now() - 400 * 86400_000).toISOString().slice(0, 10);
+    void db().from("visitas_origem").delete().lt("dia", velho).then(() => undefined, () => undefined);
+  }
+  const d = data as { visitas: number; pessoas: number; grupos: GrupoOrigem[]; dias: { dia: string; canal: Canal; visitas: number }[]; entradas: { entrada: string; visitas: number }[] };
+  const num = (n: unknown) => Number(n) || 0;
+  return {
+    tabelaFaltando: false,
+    visitas: num(d.visitas),
+    pessoas: num(d.pessoas),
+    grupos: (d.grupos ?? []).map((g) => ({ ...g, visitas: num(g.visitas), pessoas: num(g.pessoas) })),
+    dias: (d.dias ?? []).map((x) => ({ ...x, visitas: num(x.visitas) })),
+    entradas: (d.entradas ?? []).map((x) => ({ ...x, visitas: num(x.visitas) })),
+  };
+}
+
+/** De onde veio quem está online agora: a origem mais recente de hoje de cada visitante. */
+export async function origemDosOnline(visitantes: string[]): Promise<Map<string, { canal: Canal; anuncio: boolean }>> {
+  const r = new Map<string, { canal: Canal; anuncio: boolean }>();
+  if (!visitantes.length) return r;
+  const hoje = diaBR();
+  if (bancoEmDemonstracao) {
+    for (const x of visitasDemo()) if (x.dia === hoje && visitantes.includes(x.visitante)) r.set(x.visitante, { canal: x.canal, anuncio: x.anuncio });
+    return r;
+  }
+  const { data, error } = await db().from("visitas_origem").select("visitante, canal, anuncio, criado_em").eq("dia", hoje).in("visitante", visitantes.slice(0, 500)).order("criado_em", { ascending: true });
+  if (error) return r;
+  for (const x of data ?? []) r.set(String(x.visitante), { canal: x.canal as Canal, anuncio: Boolean(x.anuncio) });
   return r;
 }

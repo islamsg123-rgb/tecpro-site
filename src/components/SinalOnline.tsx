@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { INTERVALO_SINAL_MS, lugarDoCaminho } from "@/lib/online";
+import { origemDaVisita, type OrigemVisita } from "@/lib/origem";
 
 /**
  * Avisa o site "estou aqui" para o quadro "Online agora" do painel.
@@ -27,6 +28,44 @@ function visitante(): string | null {
   }
 }
 
+/**
+ * De onde veio ESTA visita (Google, Instagram, direto...). Descoberta uma vez por aba, na página de chegada,
+ * e mandada só no 1º sinal (do dia) para o painel "De onde vem o público".
+ */
+const CHAVE_VISITA = "tecpro:visita";
+type Visita = { dia: string; o: OrigemVisita | null; enviado: boolean };
+const hojeBR = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+
+function lerVisita(): Visita | null {
+  try {
+    return JSON.parse(sessionStorage.getItem(CHAVE_VISITA) ?? "null") as Visita | null;
+  } catch {
+    return null;
+  }
+}
+function guardarVisita(v: Visita) {
+  try {
+    sessionStorage.setItem(CHAVE_VISITA, JSON.stringify(v));
+  } catch {
+    /* sem armazenamento: só não conta a origem */
+  }
+}
+/** Na 1ª página da aba: descobre a origem. Se a aba ficou aberta e virou o dia, conta de novo com a mesma origem. */
+function prepararVisita() {
+  const salvo = lerVisita();
+  const hoje = hojeBR();
+  if (salvo?.dia === hoje) return;
+  let o: OrigemVisita | null = salvo ? salvo.o : null;
+  if (!salvo) {
+    try {
+      o = origemDaVisita(new URL(window.location.href), document.referrer, window.location.hostname);
+    } catch {
+      o = null;
+    }
+  }
+  guardarVisita({ dia: hoje, o, enviado: false });
+}
+
 function eEquipe(): boolean {
   try {
     if (localStorage.getItem(CHAVE_EQUIPE) === "1") return true;
@@ -43,15 +82,20 @@ export function SinalOnline() {
   useEffect(() => {
     if (!lugarDoCaminho(pathname)) return;
     if ((navigator as Navigator & { webdriver?: boolean }).webdriver) return;
+    prepararVisita();
     const enviar = () => {
       if (document.visibilityState !== "visible" || eEquipe()) return;
       const v = visitante();
       if (!v) return;
       ultimo.current = Date.now();
+      prepararVisita(); // aba aberta na virada do dia
+      const visita = lerVisita();
+      const nova = visita && !visita.enviado && visita.o ? visita.o : undefined;
+      if (visita && nova) guardarVisita({ ...visita, enviado: true });
       fetch("/api/online", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ v, c: window.location.pathname }),
+        body: JSON.stringify({ v, c: window.location.pathname, o: nova }),
         keepalive: true,
       }).catch(() => undefined);
     };
