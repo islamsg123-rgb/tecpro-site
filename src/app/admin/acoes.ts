@@ -16,7 +16,7 @@ import { clientePorEmail, cobrancaParaLiberacao, pagamentoEmSimulacao } from "@/
 import { liberarAcesso } from "@/lib/pagamentos/liberacao";
 import { cpfValido, emailValido, soDigitos, telefoneValido } from "@/lib/validacao";
 import { getCursos } from "@/lib/cursos";
-import { configuracoesDosCursos, definirCursoGratuito, definirCursosGratuitos, registrarEventoMatricula, salvarConfigLoja, salvarConfiguracaoCurso, salvarConfiguracoesCursos } from "@/lib/dados";
+import { configuracoesDosCursos, definirCursoGratuito, definirCursosGratuitos, obterConfigLoja, registrarEventoMatricula, salvarConfigLoja, salvarConfiguracaoCurso, salvarConfiguracoesCursos } from "@/lib/dados";
 import { processarPagamento } from "@/lib/pagamentos/liberacao";
 import {
   apagarCupom, marcarContatado, MENSAGENS_PADRAO, normCupom, obterCupom, salvarCupom, salvarMensagensProntas,
@@ -81,26 +81,40 @@ export async function salvarConfiguracoes(f: FormData) {
   if ((whatsapp && (digitos.length < 10 || digitos.length > 13)) || (emailContato && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailContato))) {
     redirect("/admin/configuracoes?erro=contato");
   }
-  const precos = ["precoCertIndividual", "precoCertEssencial", "precoCertProfissional"].map((k) => lerPreco(f.get(k)));
-  if (precos.some((p) => p === null || p === "invalido")) redirect("/admin/configuracoes?erro=precos#certificados");
-  const video = String(f.get("videoParabens") ?? "").trim();
-  if (video && !fonteVideo(video)) redirect("/admin/configuracoes?erro=video#certificados");
   const ga = String(f.get("googleAnalyticsId") ?? "").trim().toUpperCase();
   if (ga && !/^G-[A-Z0-9]{4,20}$/.test(ga)) redirect("/admin/configuracoes?erro=ga#site");
+  const atual = await obterConfigLoja();
   await salvarConfigLoja({
+    ...atual,
     mesesDeAcesso: meses,
     pesquisaNasAulas: f.get("pesquisaNasAulas") === "on",
     mostrarDepoimentos: f.get("mostrarDepoimentos") === "on",
     whatsapp, emailContato, instagram,
-    precoCertIndividual: precos[0] as number,
-    precoCertEssencial: precos[1] as number,
-    precoCertProfissional: precos[2] as number,
     gateway: String(f.get("gateway")) === "asaas" ? "asaas" : "mercadopago",
-    videoParabens: String(f.get("videoParabens") ?? "").trim().slice(0, 500),
     googleAnalyticsId: ga,
   });
   revalidatePath("/", "layout");
   redirect("/admin/configuracoes?salvo=1");
+}
+
+/** Loja virtual > Certificado: preços dos pacotes e vídeo de parabéns. */
+export async function salvarCertificadoLoja(f: FormData) {
+  await exigirAdmin("loja");
+  const voltar = (q: string) => redirect(`/admin/loja/certificado?${q}`);
+  const precos = ["precoCertIndividual", "precoCertEssencial", "precoCertProfissional"].map((k) => lerPreco(f.get(k)));
+  if (precos.some((p) => p === null || p === "invalido")) voltar("erro=precos#precos");
+  const video = String(f.get("videoParabens") ?? "").trim().slice(0, 500);
+  if (video && !fonteVideo(video)) voltar("erro=video#video");
+  const atual = await obterConfigLoja();
+  await salvarConfigLoja({
+    ...atual,
+    precoCertIndividual: precos[0] as number,
+    precoCertEssencial: precos[1] as number,
+    precoCertProfissional: precos[2] as number,
+    videoParabens: video,
+  });
+  revalidatePath("/", "layout");
+  voltar("salvo=1");
 }
 
 /** Refaz a matrícula de uma venda paga (útil depois de corrigir um problema). */

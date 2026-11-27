@@ -51,7 +51,11 @@ function quebrar(texto: string, font: PDFFont, size: number, largura: number): s
   return linhas;
 }
 
-export async function gerarPdfCertificado(c: Certificado & { cpf?: string | null }, urlValidacao: string): Promise<Uint8Array> {
+export async function gerarPdfCertificado(
+  c: Certificado & { cpf?: string | null },
+  urlValidacao: string,
+  opcoes: { previa?: boolean } = {},
+): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
   pdf.setTitle(`Certificado - ${c.cursoNome}`);
@@ -138,6 +142,12 @@ export async function gerarPdfCertificado(c: Certificado & { cpf?: string | null
     50, semi, 7.5, rgb(0.08, 0.08, 0.1),
   );
   centralizado(page, `Tecpro Multi Ensino  ·  CNPJ ${CNPJ_TECPRO}  ·  ${site}`, 36, regular, 8, CINZA);
+
+  // Prévia do painel: aviso pequeno no canto, para a cópia de exemplo nunca passar por certificado de verdade
+  if (opcoes.previa) {
+    const aviso = "PRÉVIA · NOME DE EXEMPLO · SEM VALIDADE";
+    page.drawText(aviso, { x: W - 40 - semi.widthOfTextAtSize(aviso, 7), y: H - 150, size: 7, font: semi, color: CINZA });
+  }
 
   return pdf.save();
 }

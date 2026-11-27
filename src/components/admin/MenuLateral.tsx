@@ -72,9 +72,10 @@ export const MENU: Item[] = [
     ],
   },
   {
-    secao: "loja", rotulo: "Loja virtual", href: "/admin/loja/depoimentos",
+    secao: "loja", rotulo: "Loja virtual", href: "/admin/loja/certificado",
     icone: svg(<><path d="M3 9.5 4.5 4h15L21 9.5" /><path d="M3 9.5c0 1.4 1.1 2.5 2.5 2.5S8 10.9 8 9.5c0 1.4 1.1 2.5 2.5 2.5h3c1.4 0 2.5-1.1 2.5-2.5 0 1.4 1.1 2.5 2.5 2.5S21 10.9 21 9.5" /><path d="M5 12v8h14v-8M10 20v-4h4v4" /></>),
     sub: [
+      { rotulo: "Certificado", href: "/admin/loja/certificado" },
       { rotulo: "Depoimentos", href: "/admin/loja/depoimentos" },
       { rotulo: "Configurações da loja", href: "/admin/configuracoes" },
     ],
