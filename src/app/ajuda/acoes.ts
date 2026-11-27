@@ -3,12 +3,13 @@
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { alunoLogado } from "@/lib/auth";
-import { emailsDono } from "@/lib/admin";
-import { obterAluno } from "@/lib/dados";
+import { obterAluno, obterConfigLoja } from "@/lib/dados";
 import { envioRecentesDoIp, registrarMensagem, TIPOS_AJUDA, type TipoAjuda } from "@/lib/dados/mensagens";
 import { getCursoPorSlug, getModulos } from "@/lib/cursos";
 import { emailConfigurado, enviarEmail } from "@/lib/email";
 import { emailValido } from "@/lib/validacao";
+
+const EMAIL_ESCOLA_PADRAO = "contato@tecpromultiensino.com.br";
 
 /** Dados de quem está logado, para já preencher o nome e o e-mail na janelinha de ajuda. */
 export async function quemEstaLogado(): Promise<{ email: string; nome: string | null } | null> {
@@ -115,12 +116,11 @@ export async function enviarMensagemAjuda(_: EstadoAjuda, f: FormData): Promise<
 <p><strong>Assunto:</strong> ${esc(TIPOS_AJUDA[tipo])}<br><strong>De:</strong> ${esc(nome ?? "(sem nome)")} &lt;${esc(email)}&gt;${telefone ? ` · ${esc(telefone)}` : ""}${curso ? `<br><strong>Curso:</strong> ${esc(curso)}${aula ? ` · ${esc(aula)}` : ""}` : ""}<br><strong>Página:</strong> ${esc(caminho)}</p>
 <p style="white-space:pre-line;background:#f4f7fe;border-radius:12px;padding:12px">${esc(mensagem)}</p>
 <p><a href="${esc(site)}/admin/mensagens" style="color:#011749;font-weight:bold">Abrir no painel</a></p></div>`;
-    await Promise.all(
-      emailsDono().map((para) =>
-        enviarEmail({ para, assunto: `[Ajuda] ${TIPOS_AJUDA[tipo]} · ${onde}`, html, texto: linhas.join("\n"), tipo: "equipe" }).catch((e) =>
-          console.error("[ajuda] aviso por e-mail", e instanceof Error ? e.message : e),
-        ),
-      ),
+    // Vai para o e-mail da escola (Configurações > E-mail de contato), não para o e-mail pessoal do dono.
+    const loja = await obterConfigLoja().catch(() => null);
+    const para = loja?.emailContato?.trim() || EMAIL_ESCOLA_PADRAO;
+    await enviarEmail({ para, assunto: `[Ajuda] ${TIPOS_AJUDA[tipo]} · ${onde}`, html, texto: linhas.join("\n"), tipo: "equipe" }).catch((e) =>
+      console.error("[ajuda] aviso por e-mail", e instanceof Error ? e.message : e),
     );
   }
   return { ok: true };
