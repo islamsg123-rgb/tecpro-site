@@ -3,7 +3,7 @@ import { exigirAdmin } from "@/lib/admin";
 import { formatarPreco } from "@/lib/formatar";
 import { getCursos } from "@/lib/cursos";
 import { listarVendasRegistradas } from "@/lib/dados/avisos-venda";
-import { CANAIS, nomeOrigem } from "@/lib/origem";
+import { CANAIS, nomeCampanha, nomeOrigem } from "@/lib/origem";
 import { SITE_OFICIAL } from "@/lib/site";
 import { Caixa, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
 import { GeradorLinks } from "@/components/admin/GeradorLinks";
@@ -31,13 +31,20 @@ export default async function OrigemDasVendas({ searchParams }: Props) {
   const [vendas, cursos] = await Promise.all([listarVendasRegistradas(inicioDoPeriodo(periodo)).catch(() => []), getCursos()]);
 
   // Agrupa por canal (+ anúncio ou não).
-  const grupos = new Map<string, { nome: string; qtd: number; total: number; campanhas: Map<string, number> }>();
+  const grupos = new Map<string, { nome: string; email: boolean; qtd: number; total: number; campanhas: Map<string, { qtd: number; total: number }> }>();
   for (const v of vendas) {
     const chave = v.origem ? `${v.origem.canal}|${v.origem.anuncio ? 1 : 0}` : "nenhuma";
-    const g = grupos.get(chave) ?? { nome: v.origem ? nomeOrigem(v.origem) : "Direto ou não identificado", qtd: 0, total: 0, campanhas: new Map() };
+    const g = grupos.get(chave) ?? { nome: v.origem ? nomeOrigem(v.origem) : "Direto ou não identificado", email: v.origem?.canal === "email", qtd: 0, total: 0, campanhas: new Map() };
     g.qtd++;
     g.total += v.valorCentavos ?? 0;
-    if (v.origem?.campanha) g.campanhas.set(v.origem.campanha, (g.campanhas.get(v.origem.campanha) ?? 0) + 1);
+    // E-mail sem nome de campanha: link antigo ou e-mail de fora do site.
+    const camp = v.origem?.campanha ?? (g.email ? "(e-mail sem identificação)" : null);
+    if (camp) {
+      const c = g.campanhas.get(camp) ?? { qtd: 0, total: 0 };
+      c.qtd++;
+      c.total += v.valorCentavos ?? 0;
+      g.campanhas.set(camp, c);
+    }
     grupos.set(chave, g);
   }
   const linhas = [...grupos.values()].sort((a, b) => b.total - a.total || b.qtd - a.qtd);
@@ -56,7 +63,7 @@ export default async function OrigemDasVendas({ searchParams }: Props) {
 
   return (
     <>
-      <Titulo descricao="Por onde chegou quem comprou: Instagram, Facebook, Google, WhatsApp... Conta a partir do dia em que esta função foi publicada. Para saber com certeza, divulgue sempre com os links do gerador abaixo.">
+      <Titulo descricao="Por onde chegou quem comprou: Instagram, Facebook, Google, WhatsApp, e-mails do site... Conta a partir do dia em que esta função foi publicada. Para saber com certeza, divulgue sempre com os links do gerador abaixo.">
         De onde vêm as vendas
       </Titulo>
 
@@ -90,11 +97,25 @@ export default async function OrigemDasVendas({ searchParams }: Props) {
                 <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-slate-100">
                   <div className="h-full rounded-full bg-emerald-500" style={{ width: `${total ? Math.max(2, (l.total / total) * 100) : 0}%` }} />
                 </div>
-                {l.campanhas.size > 0 && (
+                {l.email && l.campanhas.size > 0 ? (
+                  <div className="mt-2 rounded-xl bg-slate-50 p-3">
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">Qual e-mail trouxe a venda</p>
+                    <ul className="space-y-1 text-sm">
+                      {[...l.campanhas].sort((a, b) => b[1].total - a[1].total || b[1].qtd - a[1].qtd).map(([c, n]) => (
+                        <li key={c} className="flex flex-wrap items-baseline justify-between gap-2">
+                          <span className="text-marca-900">{nomeCampanha(c)}</span>
+                          <span className="text-slate-600">
+                            {n.qtd} {n.qtd === 1 ? "venda" : "vendas"} · <strong className="text-marca-900">{formatarPreco(n.total)}</strong>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : l.campanhas.size > 0 ? (
                   <p className="mt-1 text-xs text-slate-500">
-                    Campanhas: {[...l.campanhas].map(([c, n]) => `${c} (${n})`).join(", ")}
+                    Campanhas: {[...l.campanhas].map(([c, n]) => `${nomeCampanha(c)} (${n.qtd})`).join(", ")}
                   </p>
-                )}
+                ) : null}
               </li>
             ))}
           </ul>

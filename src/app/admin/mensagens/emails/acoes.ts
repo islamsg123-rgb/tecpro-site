@@ -31,13 +31,19 @@ export async function salvarEmailsCertificado(f: FormData) {
   redirect(`${PAGINA}?salvo=1`);
 }
 
+const CAMPANHA_TESTE: Record<TipoEmailCertificado, string> = {
+  comprar: "certificado-parabens", comprar2: "certificado-convite", comprar3: "certificado-ultimo-aviso", entrega: "certificado-emitido",
+};
+
 /** Manda os 4 e-mails do certificado (com dados de exemplo) para quem está no painel. */
 export async function testeCertificado() {
   const a = await exigirAdmin("mensagens");
   try {
     for (const tipo of ["comprar", "comprar2", "comprar3", "entrega"] as TipoEmailCertificado[]) {
       const e = exemploEmailCertificado(tipo, a.nome ?? "Maria Souza", a.email);
-      await enviarEmail({ para: a.email, ...e, assunto: `[TESTE ${NOME_EMAIL_CERTIFICADO[tipo]}] ${e.assunto}`, tipo: "teste" });
+      await enviarEmail({ para: a.email, ...e, assunto: `[TESTE ${NOME_EMAIL_CERTIFICADO[tipo]}] ${e.assunto}`, tipo: "teste",
+        // Links iguais aos do e-mail de verdade (com a marca de qual e-mail é).
+        campanha: CAMPANHA_TESTE[tipo] });
       await new Promise((ok) => setTimeout(ok, 600));
     }
   } catch (e) {

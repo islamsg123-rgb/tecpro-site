@@ -559,7 +559,8 @@ async function rodada(base: string): Promise<ResultadoRodada> {
     let status: "enviado" | "erro" = "enviado";
     let detalhe: string | null = null;
     try {
-      await enviarEmail({ para: p.email, ...email, cabecalhos: { "List-Unsubscribe": `<${sair(p.email)}>` }, tipo: p.tipo === "nunca" ? "nunca_comecou" : "lembrete", curso: p.cursoNome });
+      await enviarEmail({ para: p.email, ...email, cabecalhos: { "List-Unsubscribe": `<${sair(p.email)}>` }, tipo: p.tipo === "nunca" ? "nunca_comecou" : "lembrete", curso: p.cursoNome,
+        campanha: `${p.tipo === "nunca" ? "nunca-comecou" : "lembrete"}-${etapa}` });
       r.enviados++;
     } catch (e) {
       status = "erro";

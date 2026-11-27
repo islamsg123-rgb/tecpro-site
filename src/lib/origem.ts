@@ -95,3 +95,72 @@ export function nomeOrigem(o: Origem | null | undefined): string {
   if (!o) return "Não identificado";
   return `${CANAIS[o.canal]}${o.anuncio ? " (anúncio)" : ""}`;
 }
+
+/* ---------- Links dos e-mails do site ---------- */
+
+/**
+ * Nome de cada e-mail que o site manda (vai no utm_campaign dos links).
+ * Lembretes por etapa (1º, 2º, 3º) porque os dias de cada etapa mudam no painel.
+ */
+export const NOMES_EMAIL: Record<string, string> = {
+  "boas-vindas": "Boas-vindas (acesso liberado)",
+  "lembrete-1": "Lembrete de estudo · 1º",
+  "lembrete-2": "Lembrete de estudo · 2º",
+  "lembrete-3": "Lembrete de estudo · 3º",
+  "nunca-comecou-1": "Ainda não começou · 1º",
+  "nunca-comecou-2": "Ainda não começou · 2º",
+  "nunca-comecou-3": "Ainda não começou · 3º",
+  "certificado-parabens": "Certificado: parabéns (1º aviso)",
+  "certificado-convite": "Certificado: convite (2º aviso)",
+  "certificado-ultimo-aviso": "Certificado: último aviso (3º)",
+  "certificado-emitido": "Certificado emitido (PDF)",
+};
+
+/** Nome amigável de uma campanha: o nome do e-mail, quando for um e-mail do site. */
+export function nomeCampanha(c: string): string {
+  return NOMES_EMAIL[c] ?? c;
+}
+
+/** Ex.: "E-mail · Lembrete de estudo · 1º". Para as outras origens, igual a nomeOrigem. */
+export function detalheOrigem(o: Origem | null | undefined): string {
+  if (o?.canal === "email" && o.campanha) return `${nomeOrigem(o)} · ${nomeCampanha(o.campanha)}`;
+  return nomeOrigem(o);
+}
+
+/**
+ * Hosts do próprio site: só esses links ganham a marca (links de outros sites ficam como estão).
+ */
+function linkDoSite(u: URL): boolean {
+  const h = u.hostname.replace(/^www\./, "");
+  return h === "tecpromultiensino.com.br" || h.endsWith(".vercel.app") || h === "localhost";
+}
+
+/**
+ * Links que NÃO podem mudar: entrar (código/link mágico), sair da lista e o arquivo PDF.
+ * Os de entrar nem passam por aqui (os e-mails de acesso não levam campanha), mas fica a proteção.
+ */
+const NAO_MARCAR = [/^\/auth\//, /^\/lembretes\/sair/, /^\/certificados\/[^/]+\/pdf/];
+
+/** Acrescenta utm_source=email&utm_medium=email&utm_campaign=<qual e-mail> num link do site. */
+export function marcarLinkEmail(link: string, campanha: string): string {
+  try {
+    const u = new URL(link);
+    if (!/^https?:$/.test(u.protocol) || !linkDoSite(u) || NAO_MARCAR.some((re) => re.test(u.pathname))) return link;
+    if (u.searchParams.has("utm_source") || u.searchParams.has("origem")) return link;
+    u.searchParams.set("utm_source", "email");
+    u.searchParams.set("utm_medium", "email");
+    u.searchParams.set("utm_campaign", campanha);
+    return u.toString();
+  } catch {
+    return link;
+  }
+}
+
+/** Marca todos os href="..." do HTML de um e-mail (o texto simples fica igual). */
+export function marcarLinksDoEmail(html: string, campanha: string): string {
+  return html.replace(/href="([^"]+)"/g, (_, url: string) => {
+    // No HTML o "&" vem escrito "&amp;": volta ao normal, marca e escreve de novo.
+    const marcado = marcarLinkEmail(url.replace(/&amp;/g, "&"), campanha);
+    return `href="${marcado.replace(/&/g, "&amp;")}"`;
+  });
+}
