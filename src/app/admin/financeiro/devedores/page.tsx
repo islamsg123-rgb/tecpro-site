@@ -99,6 +99,7 @@ export default async function Devedores() {
         )}
       </Caixa>
 
+      <div id="certificados" className="scroll-mt-24" />
       <Caixa titulo="Concluíram e falta pagar o certificado" className="mt-6">
         {!pendentesCert.length ? (
           <Vazio>Ninguém nessa situação agora.</Vazio>
