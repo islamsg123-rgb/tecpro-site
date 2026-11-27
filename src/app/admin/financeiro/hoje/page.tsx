@@ -4,7 +4,7 @@ import { exigirAdmin } from "@/lib/admin";
 import { formatarPreco } from "@/lib/formatar";
 import { cobrancasParaRelatorio } from "@/lib/painel-resumo";
 import { listarVendasRegistradas } from "@/lib/dados/avisos-venda";
-import { nomeOrigem } from "@/lib/origem";
+import { detalheOrigem } from "@/lib/origem";
 import { financasDaVenda, obterTaxas } from "@/lib/taxas";
 import { nomeForma } from "@/components/admin/EtiquetaSituacao";
 import { Caixa, Numero, Titulo, Vazio } from "@/components/admin/Blocos";
@@ -110,7 +110,7 @@ export default async function Hoje() {
                         {c.clienteEmail ? <Link href={`/admin/alunos/ficha?email=${encodeURIComponent(c.clienteEmail)}`} className="hover:underline">{(c.cliente ?? "").split(" · ")[0] || c.clienteEmail}</Link> : (c.cliente ?? "Cliente")}
                       </span>
                       <span className="block truncate text-xs text-slate-500">
-                        {c.descricao} · {nomeForma[c.forma] ?? c.forma} · {nomeOrigem(r?.origem ?? null)}
+                        {c.descricao} · {nomeForma[c.forma] ?? c.forma} · {detalheOrigem(r?.origem ?? null)}
                       </span>
                     </span>
                     <span className="shrink-0 text-right">

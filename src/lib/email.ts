@@ -1,5 +1,6 @@
 import "server-only";
 import { anotarEmail, marcarEmailCancelado, type TipoEmail } from "./dados/emails";
+import { marcarLinksDoEmail } from "./origem";
 
 /**
  * E-mails do próprio site, enviados pelo Resend (resend.com).
@@ -27,7 +28,15 @@ export async function enviarEmail(e: {
   para: string; assunto: string; html: string; texto: string; cabecalhos?: Record<string, string>; agendarPara?: string; anexos?: Anexo[];
   /** Para o histórico na ficha do aluno. */
   tipo?: TipoEmail; curso?: string | null;
+  /**
+   * Qual e-mail é (ex.: "lembrete-1"). Os links do site no e-mail ganham utm_campaign com esse nome,
+   * para o painel "De onde vêm as vendas" saber qual e-mail trouxe a venda. Sem ele, usa o padrão do tipo.
+   * E-mails de entrar (link/código), de teste e da equipe não são marcados.
+   */
+  campanha?: string;
 }): Promise<string | null> {
+  const campanha = e.campanha ?? (e.tipo ? CAMPANHA_DO_TIPO[e.tipo] : undefined);
+  const html = campanha ? marcarLinksDoEmail(e.html, campanha) : e.html;
   const anotar = (resendId: string | null, status: "enviado" | "agendado" | "erro", detalhe?: string) =>
     anotarEmail({ resendId, para: e.para, tipo: e.tipo ?? "outro", assunto: e.assunto, curso: e.curso, status, detalhe, agendadoPara: e.agendarPara ?? null });
   if (!CHAVE) throw new Error("RESEND_API_KEY não configurada na Vercel: e-mail não enviado");
@@ -37,7 +46,7 @@ export async function enviarEmail(e: {
       method: "POST",
       headers: { Authorization: `Bearer ${CHAVE}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: REMETENTE, to: [e.para], subject: e.assunto, html: e.html, text: e.texto,
+        from: REMETENTE, to: [e.para], subject: e.assunto, html, text: e.texto,
         ...(e.cabecalhos ? { headers: e.cabecalhos } : {}),
         ...(e.agendarPara ? { scheduled_at: e.agendarPara } : {}),
         ...(e.anexos?.length ? { attachments: e.anexos.map((a) => ({ filename: a.nome, content: Buffer.from(a.conteudo).toString("base64") })) } : {}),
@@ -57,6 +66,17 @@ export async function enviarEmail(e: {
   await anotar(r?.id ?? null, e.agendarPara ? "agendado" : "enviado");
   return r?.id ?? null;
 }
+
+/** Nome do e-mail nos links, quando quem envia não diz (lembretes dizem a etapa: "lembrete-1"...). */
+const CAMPANHA_DO_TIPO: Partial<Record<TipoEmail, string>> = {
+  boas_vindas: "boas-vindas",
+  lembrete: "lembrete-1",
+  nunca_comecou: "nunca-comecou-1",
+  cert_parabens: "certificado-parabens",
+  cert_convite: "certificado-convite",
+  cert_ultimo: "certificado-ultimo-aviso",
+  cert_pdf: "certificado-emitido",
+};
 
 /** Cancela um e-mail agendado no Resend (que ainda não saiu). */
 export async function cancelarEmailAgendado(id: string): Promise<void> {
