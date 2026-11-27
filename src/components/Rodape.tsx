@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Logo } from "./Logo";
+import { LogoComParceiro } from "./LogoComParceiro";
 import { obterConfigLoja } from "@/lib/dados";
 
 export async function Rodape() {
@@ -9,7 +9,7 @@ export async function Rodape() {
     <footer className="bg-marca-950 text-slate-400">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
-          <Logo altura={44} />
+          <LogoComParceiro grande />
           <p className="mt-5 max-w-xs text-sm leading-relaxed">
             Cursos livres, profissionalizantes, certificação por competência e EJA. Aprenda no seu ritmo, de onde estiver.
           </p>

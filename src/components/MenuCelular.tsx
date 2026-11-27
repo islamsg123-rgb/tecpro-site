@@ -35,7 +35,7 @@ export function MenuCelular({ links }: { links: { href: string; rotulo: string }
   const fechar = () => setAberto(false);
 
   return (
-    <div ref={caixa} className="relative md:hidden">
+    <div ref={caixa} className="relative lg:hidden">
       <button
         type="button"
         onClick={() => setAberto((v) => !v)}
