@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { exigirAdmin } from "@/lib/admin";
 import { obterConfigLoja } from "@/lib/dados";
 import { situacaoChaves } from "@/lib/pagamentos";
@@ -86,13 +85,31 @@ export default async function Configuracoes({ searchParams }: Props) {
         </section>
 
         <section id="certificados" className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
-          <h2 className="text-lg font-bold text-marca-900">Certificado</h2>
+          <h2 className="text-lg font-bold text-marca-900">Certificado dos cursos gratuitos</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Os preços dos pacotes de certificado, o vídeo de parabéns e a prévia do certificado agora ficam numa página só.
+            O que o aluno paga para emitir o certificado ao concluir um curso gratuito. Nos pacotes, 1 certificado vai para o curso concluído
+            e os outros ficam como crédito para os próximos cursos gratuitos. O desconto mostrado ao aluno é calculado sozinho.
+            Nos cursos pagos, o certificado é sempre grátis.
           </p>
-          <Link href="/admin/loja/certificado" className="mt-4 inline-block rounded-full border border-marca-900 px-5 py-2 text-sm font-semibold text-marca-900 hover:bg-marca-50">
-            Abrir Loja virtual &gt; Certificado
-          </Link>
+          <div className="mt-5 grid gap-4 sm:grid-cols-3">
+            {[
+              ["precoCertIndividual", "Individual (1)", loja.precoCertIndividual],
+              ["precoCertEssencial", "Essencial (3)", loja.precoCertEssencial],
+              ["precoCertProfissional", "Profissional (5)", loja.precoCertProfissional],
+            ].map(([nome, rotulo, valor]) => (
+              <label key={nome as string} className="text-sm font-semibold text-marca-900">{rotulo as string} — R$
+                <input name={nome as string} inputMode="decimal" required defaultValue={((valor as number) / 100).toFixed(2).replace(".", ",")} className={`mt-1 ${campo}`} />
+              </label>
+            ))}
+          </div>
+          {erro === "precos" && <p className="mt-3 text-sm text-red-700">Confira os três valores (mínimo R$ 5,00 cada).</p>}
+          <label className="mt-6 block text-sm font-semibold text-marca-900">Vídeo de parabéns no fim do curso
+            <input name="videoParabens" defaultValue={loja.videoParabens ?? ""} placeholder="/video/parabens.mp4" className={`mt-1 ${campo}`} />
+            <span className="mt-1 block text-xs font-normal text-slate-500">
+              Aparece na última aula de todos os cursos, quando o aluno conclui, e começa a tocar sozinho, logo acima do quadro &quot;Emitir certificado&quot;. O padrão é o vídeo da Tecpro que já vem no site (/video/parabens.mp4). Também aceita link de .mp4, Panda ou YouTube. Deixe em branco para não mostrar vídeo.
+            </span>
+          </label>
+          {erro === "video" && <p className="mt-3 text-sm text-red-700">Não reconheci esse link. Use /video/parabens.mp4, um link .mp4, do Panda (o de &quot;embed&quot;) ou do YouTube.</p>}
         </section>
 
         <section id="site" className="scroll-mt-24 rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
