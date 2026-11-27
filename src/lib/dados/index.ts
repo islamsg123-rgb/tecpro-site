@@ -595,17 +595,18 @@ export async function usarCredito(emailAluno: string, cursoId: string): Promise<
 }
 
 /** Quantas aulas cada aluno concluiu em cada curso ("email|curso" -> quantidade). Só aulas reais, sem as etapas. */
-export async function aulasConcluidasPorAlunoCurso(): Promise<Map<string, number>> {
+/** Conta as aulas concluídas por "email|cursoId". Se `ultimaEm` vier, guarda nele quando foi a última aula concluída. */
+export async function aulasConcluidasPorAlunoCurso(ultimaEm?: Map<string, string>): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (bancoEmDemonstracao) {
     for (const [k, s] of mem.progresso) out.set(k, s.size);
     return out;
   }
   // O Supabase devolve no máximo 1000 linhas por vez: lemos em páginas.
-  const data: { email: string; curso_id: string }[] = [];
+  const data: { email: string; curso_id: string; concluida_em: string | null }[] = [];
   for (let de = 0; de < 200_000; de += 1000) {
     const { data: pag, error } = await db()
-      .from("progresso").select("email, curso_id, aula_id").not("aula_id", "like", "%#%")
+      .from("progresso").select("email, curso_id, aula_id, concluida_em").not("aula_id", "like", "%#%")
       .order("email").order("curso_id").order("aula_id").range(de, de + 999);
     if (error) throw error;
     data.push(...(pag ?? []));
@@ -614,6 +615,7 @@ export async function aulasConcluidasPorAlunoCurso(): Promise<Map<string, number
   for (const r of data) {
     const k = `${r.email}|${r.curso_id}`;
     out.set(k, (out.get(k) ?? 0) + 1);
+    if (ultimaEm && r.concluida_em && r.concluida_em > (ultimaEm.get(k) ?? "")) ultimaEm.set(k, r.concluida_em);
   }
   return out;
 }
