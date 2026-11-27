@@ -16,7 +16,7 @@ export const metadata: Metadata = { title: "Formados" };
 export const dynamic = "force-dynamic";
 
 export default async function Formados() {
-  await exigirAdmin("alunos");
+  const acesso = await exigirAdmin("alunos");
   const [formados, alunos, telefones, loja] = await Promise.all([
     listarFormados(), listarAlunos(5000), telefonesDosAlunos().catch(() => new Map<string, string>()), obterConfigLoja(),
   ]);
@@ -36,7 +36,7 @@ export default async function Formados() {
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Numero rotulo="Cursos concluídos" valor={String(formados.length)} detalhe={`${new Set(formados.map((f) => f.email)).size} pessoas`} dica="Quantos cursos foram terminados (todas as aulas feitas). Embaixo, quantas pessoas diferentes concluíram." />
         <Numero rotulo="Certificados emitidos" valor={String(emitidos)} cor="verde" dica="Certificados que já foram gerados e têm código de validação." />
-        <Numero rotulo="Falta pagar o certificado" valor={String(faltaPagar)} cor="laranja" dica="Alunos que concluíram um curso grátis e ainda não pagaram o certificado." />
+        <Numero rotulo="Falta pagar o certificado" valor={String(faltaPagar)} cor="laranja" href={acesso.permissoes.includes("financeiro") ? "/admin/financeiro/devedores#certificados" : undefined} dica="Alunos que concluíram um curso grátis e ainda não pagaram o certificado." />
       </div>
       {exemplo && (
         <details className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 text-sm">
