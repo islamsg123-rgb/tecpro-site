@@ -164,6 +164,18 @@ export function OnlineAgora() {
             </div>
           </div>
 
+          {/* De onde vieram os que estão online */}
+          {total > 0 && dados.origemAgora?.length > 0 && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+              <span className="font-bold text-marca-900">Chegaram por:</span>
+              {dados.origemAgora.map((o) => (
+                <span key={o.nome} className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                  {o.nome.replace(" (digitou o endereço)", "")} <strong className="text-marca-900">{o.n}</strong>
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* Hoje */}
           <div className="mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
             <span className="font-bold text-marca-900">Hoje:</span>

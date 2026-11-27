@@ -57,4 +57,6 @@ export interface RespostaOnline {
   loja: { total: number; paginas: Partial<Record<PaginaOnline, number>>; cursosVistos: { nome: string; n: number }[]; noCheckout: PessoaNoCheckout[]; cadastroGratis: PessoaNoCheckout[] };
   aluno: { total: number; assistindo: number; porCurso: { nome: string; n: number }[] };
   hoje: { visitas: number; cadastros: number | null; vendas: number | null };
+  /** De onde veio quem está online agora ("Não identificado" = chegou antes de existir esta função). */
+  origemAgora: { nome: string; n: number }[];
 }

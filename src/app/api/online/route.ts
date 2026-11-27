@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { lugarDoCaminho } from "@/lib/online";
-import { registrarSinal } from "@/lib/dados/online";
+import { registrarSinal, registrarVisita } from "@/lib/dados/online";
+import { limparOrigemVisita } from "@/lib/origem";
 import { emailValido } from "@/lib/validacao";
 import { COOKIE_CONTATO_CHECKOUT } from "@/lib/online-cookie";
 
@@ -36,7 +37,7 @@ function emailDaSessao(lista: { name: string; value: string }[]): string | null 
 export async function POST(req: Request) {
   const vazio = new NextResponse(null, { status: 204 });
   if (ROBO.test(req.headers.get("user-agent") ?? "")) return vazio;
-  let corpo: { v?: unknown; c?: unknown };
+  let corpo: { v?: unknown; c?: unknown; o?: unknown };
   try {
     corpo = await req.json();
   } catch {
@@ -52,10 +53,11 @@ export async function POST(req: Request) {
   if (jar.get("tecpro_modo_aluno")?.value === "1") return vazio;
   const contato = decodeURIComponent(jar.get(COOKIE_CONTATO_CHECKOUT)?.value ?? "").toLowerCase();
   const email = emailDaSessao(todos) ?? jar.get("tecpro_demo_email")?.value ?? (emailValido(contato) ? contato : null);
-  try {
-    await registrarSinal(visitante, email, lugar);
-  } catch {
-    /* tabela ainda não criada (online-agora.sql): ignora em silêncio */
-  }
+  // 1º sinal da visita: diz de onde a pessoa chegou (Google, Instagram, direto...).
+  const origem = limparOrigemVisita(corpo.o);
+  await Promise.all([
+    registrarSinal(visitante, email, lugar).catch(() => undefined), // tabela ainda não criada (online-agora.sql)
+    origem ? registrarVisita(visitante, email, origem).catch(() => undefined) : undefined, // falta origens-publico.sql
+  ]);
   return vazio;
 }

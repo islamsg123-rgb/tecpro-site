@@ -164,3 +164,62 @@ export function marcarLinksDoEmail(html: string, campanha: string): string {
     return `href="${marcado.replace(/&/g, "&amp;")}"`;
   });
 }
+
+/* ---------- Origem de cada VISITA (para "De onde vem o público") ---------- */
+
+/** O que o navegador manda no 1º sinal de cada visita. */
+export interface OrigemVisita extends Origem {
+  /** Site de onde veio quando é "Outro site" (ex.: bing.com, chatgpt.com) ou o nome usado no ?origem= */
+  site?: string;
+  /** Primeira página aberta, ex.: /cursos/excel */
+  entrada?: string;
+}
+
+/**
+ * Origem desta visita (diferente do cookie de 30 dias, que guarda a última origem conhecida para as vendas):
+ * aqui quem entra digitando o endereço conta como "Direto".
+ * null = a pessoa veio de outra página do próprio site (aba nova aberta de um link do site): não é visita nova.
+ */
+export function origemDaVisita(url: URL, referrer: string, hostDoSite: string): OrigemVisita | null {
+  const entrada = url.pathname.slice(0, 120);
+  const o = descobrirOrigem(url, referrer, hostDoSite);
+  if (o) {
+    let site: string | undefined;
+    if (o.canal === "outro") {
+      const fonte = url.searchParams.get("origem") ?? url.searchParams.get("utm_source") ?? url.searchParams.get("ref");
+      if (fonte) site = fonte.slice(0, 60);
+      else {
+        try {
+          site = new URL(referrer).hostname.replace(/^www\./, "").slice(0, 60);
+        } catch {
+          /* sem site */
+        }
+      }
+    }
+    return { ...o, site, entrada };
+  }
+  if (referrer) {
+    try {
+      const h = new URL(referrer).hostname.replace(/^www\./, "");
+      if (h === hostDoSite.replace(/^www\./, "") || h.endsWith("vercel.app")) return null;
+    } catch {
+      /* segue como direto */
+    }
+  }
+  return { canal: "direto", anuncio: false, entrada };
+}
+
+/** Confere o que veio do navegador (nada confiável) antes de gravar. */
+export function limparOrigemVisita(x: unknown): OrigemVisita | null {
+  if (!x || typeof x !== "object") return null;
+  const o = x as Record<string, unknown>;
+  if (typeof o.canal !== "string" || !(o.canal in CANAIS)) return null;
+  const texto = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
+  return {
+    canal: o.canal as Canal,
+    anuncio: o.anuncio === true,
+    campanha: texto(o.campanha, 60),
+    site: texto(o.site, 60)?.toLowerCase(),
+    entrada: texto(o.entrada, 120),
+  };
+}

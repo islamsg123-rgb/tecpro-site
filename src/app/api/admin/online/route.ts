@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { acessoPainel, emailsDono } from "@/lib/admin";
+import { acessoPainel } from "@/lib/admin";
+import { emailsDaEquipe } from "@/lib/equipe";
+import { nomeOrigem } from "@/lib/origem";
 import { getCursos } from "@/lib/cursos";
-import { listarFuncionarios } from "@/lib/dados/painel";
-import { cadastrosHoje, certificadosEmitidos, contatosPorEmail, inicioDeHoje, resumoPresenca } from "@/lib/dados/online";
+import { cadastrosHoje, certificadosEmitidos, contatosPorEmail, inicioDeHoje, origemDosOnline, resumoPresenca } from "@/lib/dados/online";
 import { listarVendasRegistradas } from "@/lib/dados/avisos-venda";
 import { linkWhatsapp } from "@/lib/whatsapp-certificado";
 import type { PaginaOnline, PessoaNoCheckout, RespostaOnline } from "@/lib/online";
@@ -14,15 +15,6 @@ import type { PaginaOnline, PessoaNoCheckout, RespostaOnline } from "@/lib/onlin
  * Vendas de hoje só para quem vê o Financeiro; e nunca em R$ (a Gestão não mostra dinheiro).
  */
 export const dynamic = "force-dynamic";
-
-const cacheEquipe: { em: number; emails: Set<string> } = { em: 0, emails: new Set() };
-async function emailsDaEquipe(): Promise<Set<string>> {
-  if (Date.now() - cacheEquipe.em < 5 * 60_000) return cacheEquipe.emails;
-  const { lista } = await listarFuncionarios().catch(() => ({ lista: [] }));
-  cacheEquipe.emails = new Set([...emailsDono(), ...lista.map((f) => f.email.toLowerCase())]);
-  cacheEquipe.em = Date.now();
-  return cacheEquipe.emails;
-}
 
 function contarPor<T>(lista: T[], chave: (x: T) => string | null): { nome: string; n: number }[] {
   const m = new Map<string, number>();
@@ -103,6 +95,10 @@ export async function GET(req: Request) {
   const noCheckout = pagando.map(pessoa);
   const cadastroGratis = cadastrando.map(pessoa);
 
+  // De onde veio quem está no site agora (Google, Instagram, direto...).
+  const origens = await origemDosOnline(online.map((p) => p.visitante)).catch(() => new Map());
+  const origemAgora = contarPor(online, (p) => nomeOrigem(origens.get(p.visitante) ?? null));
+
   const resposta: RespostaOnline = {
     tabelaFaltando: resumo.tabelaFaltando,
     atualizadoEm: new Date().toISOString(),
@@ -119,6 +115,7 @@ export async function GET(req: Request) {
       porCurso: contarPor(aluno.filter((p) => p.pagina === "aula"), (p) => (p.cursoSlug ? nomeCurso.get(p.cursoSlug) ?? p.cursoSlug : null)).slice(0, 8),
     },
     hoje: { visitas: resumo.visitasHoje, cadastros, vendas },
+    origemAgora,
   };
   return NextResponse.json(resposta, { headers: { "Cache-Control": "no-store" } });
 }
